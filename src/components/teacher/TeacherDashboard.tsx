@@ -160,33 +160,65 @@ export const TeacherDashboard: React.FC = () => {
       let successCount = 0;
 
       for (const st of studentList) {
-        // Kiểm tra xem student email đã có chưa, nếu chưa tạo profile
+        const cleanEmail = st.email.trim().toLowerCase();
+
+        // 1. Kiểm tra xem student email đã có chưa
         const { data: existingProfile } = await supabase
           .from('profiles')
           .select('id')
-          .eq('email', st.email.toLowerCase())
+          .eq('email', cleanEmail)
           .maybeSingle();
 
         let studentId = existingProfile?.id;
 
         if (!studentId) {
-          // Tạo dummy auth user
-          const dummyId = crypto.randomUUID();
-          const { error: insErr } = await supabase.from('profiles').insert([{
-            id: dummyId,
-            email: st.email.toLowerCase(),
-            full_name: st.full_name,
-            role: 'student',
-            status: 'approved',
-            student_code: st.student_code,
-            phone: st.phone
-          }]);
-          if (!insErr) studentId = dummyId;
+          // Thử tạo auth user qua Supabase
+          try {
+            const { data: signUpData } = await supabase.auth.signUp({
+              email: cleanEmail,
+              password: '12345678',
+              options: {
+                data: {
+                  full_name: st.full_name,
+                  role: 'student',
+                  status: 'approved',
+                  student_code: st.student_code,
+                  phone: st.phone
+                }
+              }
+            });
+            studentId = signUpData?.user?.id;
+          } catch (e) {
+            console.warn('SignUp warning on batch import:', e);
+          }
+
+          // Nếu chưa có studentId (do signup chần chừ hoặc rate limit), tạo ID ngẫu nhiên và upsert
+          if (!studentId) {
+            studentId = crypto.randomUUID();
+          }
+
+          try {
+            await supabase.from('profiles').upsert({
+              id: studentId,
+              email: cleanEmail,
+              full_name: st.full_name,
+              role: 'student',
+              status: 'approved',
+              student_code: st.student_code,
+              phone: st.phone
+            });
+          } catch (upsertErr) {
+            console.warn('Upsert profile error on import:', upsertErr);
+          }
         }
 
         if (studentId) {
-          await addStudentToClass(selectedClass.id, studentId);
-          successCount++;
+          try {
+            await addStudentToClass(selectedClass.id, studentId);
+            successCount++;
+          } catch (addErr) {
+            console.warn('Add to class error:', addErr);
+          }
         }
       }
 

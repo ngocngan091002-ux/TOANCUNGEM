@@ -93,7 +93,7 @@ export function parseStudentExcel(file: File): Promise<{ full_name: string; emai
         const nameIdx = headers.findIndex(h => h.includes('tên') || h.includes('họ') || h.includes('name'));
         const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('thư') || h.includes('tài khoản'));
         const phoneIdx = headers.findIndex(h => h.includes('thoại') || h.includes('sđt') || h.includes('phone'));
-        const codeIdx = headers.findIndex(h => h.includes('mã') || h.includes('code') || h.includes('stt'));
+        const codeIdx = headers.findIndex(h => h.includes('mã') || h.includes('code'));
 
         const parsedStudents: { full_name: string; email: string; phone?: string; student_code?: string }[] = [];
 
