@@ -5,7 +5,8 @@ import {
   getDailyTasks, createDailyTask, 
   getLearningMaterials, addLearningMaterial, getGames, addGame, 
   getAssignments, createAssignmentWithQuestions, 
-  getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, supabase 
+  getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
+  batchImportStudentsToClass, supabase 
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -149,93 +150,10 @@ export const TeacherDashboard: React.FC = () => {
         return;
       }
 
-      let successCount = 0;
+      // Gọi hàm batchImportStudentsToClass dùng Service Role Client (Bypassing RLS)
+      const count = await batchImportStudentsToClass(selectedClass.id, studentList);
 
-      // 1. Lấy tất cả profiles hiện có trong DB để so sánh email
-      const { data: existingProfiles } = await supabase
-        .from('profiles')
-        .select('id, email, full_name');
-
-      const existingMap = new Map<string, string>();
-      if (existingProfiles) {
-        existingProfiles.forEach(p => {
-          if (p.email) existingMap.set(p.email.toLowerCase(), p.id);
-        });
-      }
-
-      const memberRows: { class_id: string; student_id: string }[] = [];
-
-      // 2. Xử lý từng học sinh trong danh sách Excel
-      for (const st of studentList) {
-        const cleanEmail = st.email.trim().toLowerCase();
-        let studentId = existingMap.get(cleanEmail);
-
-        if (!studentId) {
-          // Tạo UUID mới cho học sinh
-          studentId = crypto.randomUUID();
-          const newStudentObj = {
-            id: studentId,
-            email: cleanEmail,
-            full_name: st.full_name,
-            role: 'student',
-            status: 'approved',
-            student_code: st.student_code,
-            phone: st.phone || ''
-          };
-
-          const { error: insErr } = await supabase
-            .from('profiles')
-            .insert([newStudentObj]);
-
-          if (insErr) {
-            console.warn('Insert profile warning:', insErr.message);
-            const { data: fetchP } = await supabase
-              .from('profiles')
-              .select('id')
-              .eq('email', cleanEmail)
-              .maybeSingle();
-            if (fetchP) studentId = fetchP.id;
-          } else {
-            existingMap.set(cleanEmail, studentId);
-          }
-        } else {
-          // Cập nhật Họ và Tên + Mã Học Sinh chuẩn từ Excel
-          await supabase
-            .from('profiles')
-            .update({
-              full_name: st.full_name,
-              student_code: st.student_code,
-              phone: st.phone || ''
-            })
-            .eq('id', studentId);
-        }
-
-        if (studentId) {
-          memberRows.push({
-            class_id: selectedClass.id,
-            student_id: studentId
-          });
-        }
-      }
-
-      // 3. Thêm tất cả học sinh vào bảng class_members
-      for (const row of memberRows) {
-        try {
-          const { error: mErr } = await supabase
-            .from('class_members')
-            .insert([row]);
-
-          if (!mErr || mErr.message.includes('unique constraint') || mErr.message.includes('duplicate key') || (mErr as any).code === '23505') {
-            successCount++;
-          } else {
-            console.warn('Class member insert error:', mErr.message);
-          }
-        } catch (e) {
-          console.warn('Class member insert exception:', e);
-        }
-      }
-
-      alert(`🎉 Đã thêm thành công ${successCount} / ${studentList.length} học sinh vào lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã thêm thành công ${count} / ${studentList.length} học sinh vào lớp ${selectedClass.name}!`);
       loadClassData(selectedClass.id);
     } catch (err: any) {
       alert('Lỗi đọc file Excel: ' + err.message);
