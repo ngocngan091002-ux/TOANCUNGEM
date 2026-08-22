@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
 import { School, GraduationCap, ShieldCheck, Mail, Lock, User, Phone, LogIn, UserPlus, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
-  const { loginWithEmail, signUpWithEmail, loginWithGoogle } = useAuth();
+  const { user, loginWithEmail, signUpWithEmail, loginWithGoogle } = useAuth();
+  
+  if (user) {
+    return <Navigate to="/" replace />;
+  }
   
   const [selectedRole, setSelectedRole] = useState<UserRole>('student');
   const [isSignUp, setIsSignUp] = useState<boolean>(false);

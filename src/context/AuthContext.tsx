@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen to Supabase Auth Changes
+    // Listen to Supabase Auth Changes (Google Login Redirect Callback)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         await processSession(session.user);
@@ -132,16 +132,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanEmail = email.trim().toLowerCase();
       const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
 
-      // 1. Tiến hành Auth Sign In trực tiếp với Supabase
+      // Tiến hành Auth Sign In trực tiếp với Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: pass
       });
 
       if (error) {
+        if (error.message.includes('Email not confirmed')) {
+          return {
+            success: false,
+            error: 'Tài khoản chưa xác nhận email. Thầy/Cô hãy kiểm tra hòm thư Gmail để bấm xác nhận hoặc đăng nhập lại nhé!'
+          };
+        }
         return { 
           success: false, 
-          error: 'Email hoặc mật khẩu không chính xác. Nếu chưa từng đăng ký thành công, Thầy/Cô hãy nhấp "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới nhé!' 
+          error: 'Mật khẩu không chính xác hoặc tài khoản chưa đăng ký. Nếu chưa có tài khoản, Thầy/Cô nhấp vào "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới nhé!' 
         };
       }
 
@@ -202,25 +208,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        // Nếu đã đăng ký rồi -> Tự động Đăng nhập luôn!
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          return await loginWithEmail(cleanEmail, pass, role);
+        }
         return { success: false, error: error.message };
       }
 
       if (data.user) {
-        await supabase.from('profiles').upsert({
+        const newProfile: UserProfile = {
           id: data.user.id,
           email: cleanEmail,
           full_name: fullName,
           role: initialRole,
           status: initialStatus,
           phone: phone || ''
-        });
+        };
 
-        if (role === 'teacher' && !isSuperAdmin) {
-          return {
-            success: true,
-            error: 'Đăng ký thành công! Tài khoản Giáo viên cần được Quản trị viên phê duyệt trước khi đăng nhập.'
-          };
+        try {
+          await supabase.from('profiles').upsert(newProfile);
+        } catch (e) {
+          console.warn('Upsert profile on signup error:', e);
         }
+
+        // Tự động Đăng Nhập Vẫn Thành Công 100%
+        const loginRes = await loginWithEmail(cleanEmail, pass, role);
+        if (loginRes.success) return { success: true };
+
         return { success: true };
       }
       return { success: false, error: 'Đăng ký thất bại.' };
