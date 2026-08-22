@@ -23,9 +23,31 @@ export interface ClassItem {
   grade: number;
   code: string;
   teacher_id: string;
+  is_locked?: boolean;
+  is_archived?: boolean;
+  co_teacher_emails?: string[];
+  schedule_notes?: string;
   created_at?: string;
   teacher_name?: string;
   member_count?: number;
+}
+
+export interface AttendanceRecord {
+  id?: string;
+  class_id: string;
+  student_id: string;
+  date: string;
+  status: 'present' | 'absent_excused' | 'absent_unexcused' | 'late';
+  note?: string;
+}
+
+export interface ConductRecord {
+  id?: string;
+  class_id: string;
+  student_id: string;
+  points_delta: number;
+  reason: string;
+  created_at?: string;
 }
 
 export interface ClassMember {

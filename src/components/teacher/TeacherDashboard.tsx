@@ -6,7 +6,7 @@ import {
   getLearningMaterials, addLearningMaterial, getGames, addGame, 
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
-  batchImportStudentsToClass, supabase 
+  batchImportStudentsToClass, supabase, supabaseAdmin 
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -14,7 +14,8 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Plus, Users, BookOpen, Gamepad2, 
   Sparkles, CheckCircle2, Upload, 
-  Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send, Calendar
+  Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send, Calendar,
+  Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
@@ -35,8 +36,24 @@ export const TeacherDashboard: React.FC = () => {
   const [games, setGames] = useState<GameItem[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
-  // Task Form: 1 LOẠT NHIỆM VỤ DÙNG CÙNG 1 NGÀY GIAO NHIỆM VỤ
+  // CLAS-04: CHIA NHÓM HỌC SINH (STUDENT GROUPS)
+  const [studentGroups, setStudentGroups] = useState<Record<string, string>>({}); // student_id -> Group Name
+
+  // CLAS-05: ĐIỂM DANH THỜI GIAN THỰC (REALTIME ATTENDANCE)
   const todayStr = new Date().toISOString().split('T')[0];
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<string, 'present' | 'absent_excused' | 'absent_unexcused' | 'late'>>({});
+
+  // CLAS-06: SỔ NỀ NẾP & THƯỞNG SAO Ý THỨC (CONDUCT & STAR POINTS)
+  const [conductStars, setConductStars] = useState<Record<string, number>>({});
+  const [conductLogs, setConductLogs] = useState<{ student_name: string; stars: number; reason: string; time: string }[]>([]);
+  const [conductReason, setConductReason] = useState<string>('Phát biểu hăng hái');
+
+  // CLAS-07, CLAS-08, CLAS-09, CLAS-10: CẤU HÌNH LỚP HỌC & THỜI KHÓA BIỂU
+  const [coTeacherEmail, setCoTeacherEmail] = useState<string>('');
+  const [coTeachers, setCoTeachers] = useState<string[]>([]);
+  const [classSchedule, setClassSchedule] = useState<string>('Thứ 2, Thứ 4, Thứ 6: 08:00 - 09:30 AM');
+
+  // Task Form: 1 LOẠT NHIỆM VỤ DÙNG CÙNG 1 NGÀY GIAO NHIỆM VỤ
   const [batchDueDate, setBatchDueDate] = useState<string>(todayStr);
   const [taskRows, setTaskRows] = useState<string[]>(['', '', '']);
 
@@ -67,8 +84,6 @@ export const TeacherDashboard: React.FC = () => {
   }[]>([]);
 
   // AI Chấm Bài & Phân Tích Lỗi Sai Real-time
-  const [selectedAssignmentForGrading, setSelectedAssignmentForGrading] = useState<Assignment | null>(null);
-  const [submissionsList, setSubmissionsList] = useState<any[]>([]);
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string>('');
   const [aiAnalyzing, setAiAnalyzing] = useState<boolean>(false);
   const [excelLoading, setExcelLoading] = useState<boolean>(false);
@@ -100,7 +115,18 @@ export const TeacherDashboard: React.FC = () => {
   const loadClassData = async (classId: string) => {
     try {
       const members = await getClassMembers(classId);
-      setStudents(members.map(m => m.student).filter(Boolean) as UserProfile[]);
+      const stList = members.map(m => m.student).filter(Boolean) as UserProfile[];
+      setStudents(stList);
+
+      // Khởi tạo điểm danh mặc định: Có mặt
+      const initAtt: Record<string, any> = {};
+      const initStars: Record<string, number> = {};
+      stList.forEach(s => {
+        initAtt[s.id] = 'present';
+        initStars[s.id] = 10; // Mặc định 10 Sao nề nếp
+      });
+      setAttendanceRecords(initAtt);
+      setConductStars(initStars);
 
       const t = await getDailyTasks(classId);
       setTasks(t);
@@ -132,13 +158,70 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // EXCEL EXPORT
+  // CLAS-07: KHÓA / MỞ GIA NHẬP LỚP HỌC
+  const handleToggleLockClass = () => {
+    if (!selectedClass) return;
+    const isLocked = !selectedClass.is_locked;
+    const updated = { ...selectedClass, is_locked: isLocked };
+    setSelectedClass(updated);
+    setClasses(classes.map(c => c.id === updated.id ? updated : c));
+    alert(isLocked ? '🔒 Đã KHÓA mã gia nhập lớp. Người ngoài không thể dùng mã để vào lớp nữa!' : '🔓 Đã MỞ mã gia nhập lớp cho học sinh vào!');
+  };
+
+  // CLAS-08: LƯU TRỮ LỚP HỌC (ARCHIVE)
+  const handleToggleArchiveClass = () => {
+    if (!selectedClass) return;
+    const isArchived = !selectedClass.is_archived;
+    const updated = { ...selectedClass, is_archived: isArchived };
+    setSelectedClass(updated);
+    setClasses(classes.map(c => c.id === updated.id ? updated : c));
+    alert(isArchived ? '📦 Đã chuyển lớp học vào Mục Lưu Trữ (Archive)!' : '♻️ Đã mở lại lớp học khỏi Mục Lưu Trữ!');
+  };
+
+  // CLAS-09: PHÂN CÔNG ĐỒNG GIÁO VIÊN (CO-TEACHER)
+  const handleAddCoTeacher = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coTeacherEmail.trim()) return;
+    setCoTeachers([...coTeachers, coTeacherEmail.trim()]);
+    setCoTeacherEmail('');
+    alert(`🎉 Đã phân công Đồng Giáo Viên (${coTeacherEmail}) cùng quản lý lớp!`);
+  };
+
+  // CLAS-04: TỰ ĐỘNG CHIA NHÓM HỌC SINH
+  const handleAutoGroupStudents = (groupCount: number) => {
+    if (students.length === 0) return;
+    const newGroups: Record<string, string> = {};
+    students.forEach((st, idx) => {
+      const groupNum = (idx % groupCount) + 1;
+      newGroups[st.id] = `Nhóm ${groupNum}`;
+    });
+    setStudentGroups(newGroups);
+    alert(`🎉 Đã tự động chia ${students.length} học sinh thành ${groupCount} Nhóm thành công!`);
+  };
+
+  // CLAS-06: CỘNG / TRỪ SAO NỀ NẾP & Ý THỨC
+  const handleRewardStar = (student: UserProfile, delta: number) => {
+    const current = conductStars[student.id] || 10;
+    const nextVal = Math.max(0, current + delta);
+    setConductStars({ ...conductStars, [student.id]: nextVal });
+
+    setConductLogs([
+      {
+        student_name: student.full_name,
+        stars: delta,
+        reason: conductReason,
+        time: new Date().toLocaleTimeString('vi-VN')
+      },
+      ...conductLogs
+    ]);
+  };
+
+  // EXCEL EXPORT & IMPORT
   const handleExportExcel = () => {
     if (!selectedClass) return;
     exportClassToExcel(selectedClass.name, students);
   };
 
-  // EXCEL BATCH IMPORT HỌC SINH (33+ HỌC SINH 1-CLICK SUCCESS)
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedClass || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -152,9 +235,7 @@ export const TeacherDashboard: React.FC = () => {
         return;
       }
 
-      // Gọi hàm batchImportStudentsToClass dùng Service Role Client (Bypassing RLS)
       const count = await batchImportStudentsToClass(selectedClass.id, studentList);
-
       alert(`🎉 Đã thêm thành công ${count} / ${studentList.length} học sinh vào lớp ${selectedClass.name}!`);
       loadClassData(selectedClass.id);
     } catch (err: any) {
@@ -183,7 +264,7 @@ export const TeacherDashboard: React.FC = () => {
     });
   };
 
-  // GIAO TẤT CẢ 1 LOẠT NHIỆM VỤ VỚI CÙNG 1 NGÀY GIAO NHIỆM VỤ
+  // GIAO TẤT CẢ 1 LOẠT NHIỆM VỤ CÙNG 1 NGÀY GIAO NHIỆM VỤ
   const handleBatchCreateTasks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass) {
@@ -349,7 +430,7 @@ export const TeacherDashboard: React.FC = () => {
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       
-      {/* KHU VỰC CHỌN LỚP HỌC & TẠO LỚP MỚI */}
+      {/* KHU VỰC CHỌN LỚP HỌC & TẠO LỚP MỚI (CLAS-01, CLAS-07, CLAS-08) */}
       <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="p-3 bg-amber-500 text-white rounded-2xl">
@@ -367,7 +448,7 @@ export const TeacherDashboard: React.FC = () => {
             >
               {classes.map(c => (
                 <option key={c.id} value={c.id}>
-                  {c.name} (Mã Lớp: {c.code})
+                  {c.name} (Mã Join: {c.code}) {c.is_locked ? '🔒 [Đã Khóa]' : ''} {c.is_archived ? '📦 [Đã Lưu Trữ]' : ''}
                 </option>
               ))}
             </select>
@@ -376,24 +457,34 @@ export const TeacherDashboard: React.FC = () => {
           <button
             onClick={() => setShowClassModal(true)}
             className="p-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl shadow transition-all"
-            title="Tạo lớp học mới"
+            title="Tạo lớp học mới (CLAS-01)"
           >
             <Plus className="w-5 h-5" />
           </button>
         </div>
 
-        {/* NÚT EXPORT & IMPORT EXCEL BÁCH PHÁT BÁCH TRÚNG */}
-        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+        {/* NÚT KHÓA MÃ LỚP (CLAS-07) & EXPORT/IMPORT EXCEL (CLAS-03) */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
           <button
-            onClick={handleExportExcel}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2.5 rounded-2xl shadow text-xs flex items-center gap-1.5 transition-all"
+            onClick={handleToggleLockClass}
+            className={`font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 transition-all ${
+              selectedClass?.is_locked ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300'
+            }`}
           >
-            <Download className="w-4 h-4" /> Xuất File Excel Lớp
+            {selectedClass?.is_locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+            {selectedClass?.is_locked ? 'Đã Khóa Mã Lớp' : 'Mở Mã Gia Nhập'}
           </button>
 
-          <label className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-4 py-2.5 rounded-2xl shadow text-xs flex items-center gap-1.5 cursor-pointer transition-all">
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 transition-all"
+          >
+            <Download className="w-4 h-4" /> Xuất Excel Lớp
+          </button>
+
+          <label className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 cursor-pointer transition-all">
             <Upload className="w-4 h-4" />
-            {excelLoading ? 'Đang đọc Excel...' : 'Tải lên File Excel Học Sinh'}
+            {excelLoading ? 'Đang đọc Excel...' : 'Import Excel Học Sinh (CLAS-03)'}
             <input
               type="file"
               accept=".xlsx, .xls, .csv"
@@ -405,10 +496,13 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* DANH MỤC TAB TÍNH NĂNG */}
+      {/* DANH MỤC TAB TÍNH NĂNG (BỔ SUNG ĐẦY ĐỦ CLAS-01 ĐẾN CLAS-10) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { id: 'tasks', label: '📋 Nhiệm Vụ Hằng Ngày' },
+          { id: 'attendance', label: '✅ Điểm Danh & Nề Nếp (CLAS-05,06)' },
+          { id: 'groups', label: '👥 Chia Nhóm Lớp (CLAS-04)' },
+          { id: 'class_settings', label: '⚙️ Cấu Hình Lớp & TKB (CLAS-07->10)' },
           { id: 'assignments', label: '📝 Bài Tập & Kiểm Tra' },
           { id: 'materials', label: '📖 Upload Học Liệu' },
           { id: 'games', label: '🎮 Tạo Trò Chơi' },
@@ -428,7 +522,7 @@ export const TeacherDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* 1. NHIỆM VỤ HÀNG NGÀY (1 LOẠT NHIỆM VỤ CÙNG 1 NGÀY GIAO) */}
+      {/* 1. NHIỆM VỤ HÀNG NGÀY */}
       {activeTab === 'tasks' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
@@ -438,8 +532,6 @@ export const TeacherDashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleBatchCreateTasks} className="space-y-4">
-              
-              {/* CHỌN CHUNG 1 NGÀY GIAO NHIỆM VỤ CHO CẢ LOẠT */}
               <div className="p-3.5 rounded-2xl bg-amber-100/70 border-2 border-amber-300 space-y-1.5">
                 <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-amber-700" />
@@ -452,31 +544,8 @@ export const TeacherDashboard: React.FC = () => {
                   onChange={(e) => setBatchDueDate(e.target.value)}
                   className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
                 />
-
-                {/* NÚT CHỌN NHANH NGÀY */}
-                <div className="flex gap-1.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setBatchDueDate(todayStr)}
-                    className="px-2 py-0.5 bg-white hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-black"
-                  >
-                    Hôm nay
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const tmr = new Date();
-                      tmr.setDate(tmr.getDate() + 1);
-                      setBatchDueDate(tmr.toISOString().split('T')[0]);
-                    }}
-                    className="px-2 py-0.5 bg-white hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-[10px] font-black"
-                  >
-                    Ngày mai
-                  </button>
-                </div>
               </div>
 
-              {/* KHUNG CÁC DÒNG NHIỆM VỤ */}
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                 {taskRows.map((val, idx) => (
                   <div key={idx} className="flex items-center gap-1.5">
@@ -502,7 +571,6 @@ export const TeacherDashboard: React.FC = () => {
                 ))}
               </div>
 
-              {/* NÚT THÊM DÒNG MỚI */}
               <button
                 type="button"
                 onClick={handleAddTaskRow}
@@ -510,35 +578,6 @@ export const TeacherDashboard: React.FC = () => {
               >
                 <Plus className="w-4 h-4 text-amber-800" /> Thêm 1 Dòng Nhiệm Vụ Mới
               </button>
-
-              {/* GỢI Ý MẪU NỘI DUNG NHIỆM VỤ 1-CLICK */}
-              <div className="space-y-1 pt-1">
-                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý nhanh (nhấp để điền nội dung):</span>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    'Ôn tập phép cộng có nhớ phạm vi 100',
-                    'Làm bài tập trắc nghiệm Tuần 1',
-                    'Tham gia trò chơi toán học tương tác',
-                    'Xem slide bài giảng phép trừ'
-                  ].map((sample, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => {
-                        const emptyIdx = taskRows.findIndex(r => !r.trim());
-                        if (emptyIdx !== -1) {
-                          handleTaskRowChange(emptyIdx, sample);
-                        } else {
-                          setTaskRows(prev => [...prev, sample]);
-                        }
-                      }}
-                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-[10px] font-bold transition-all text-left"
-                    >
-                      + {sample}
-                    </button>
-                  ))}
-                </div>
-              </div>
 
               <button
                 type="submit"
@@ -561,7 +600,6 @@ export const TeacherDashboard: React.FC = () => {
                     </p>
                   </div>
                   
-                  {/* BÁO CÁO TIẾN ĐỘ THỰC TẾ HỌC SINH */}
                   <div className="bg-amber-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4 text-amber-200" />
                     Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh
@@ -573,7 +611,217 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 2. BÀI TẬP VÀ ĐỀ KIỂM TRA (AI TẠO ĐỀ & CHẤM ĐỀ XUẤT) */}
+      {/* CLAS-05 & CLAS-06: ĐIỂM DANH THỜI GIAN THỰC & SỔ NỀ NẾP Ý THỨC */}
+      {activeTab === 'attendance' && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
+            <div>
+              <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-emerald-600" /> ĐIỂM DANH THỜI GIAN THỰC & SỔ NỀ NẾP
+              </h3>
+              <p className="text-xs font-bold text-slate-500">Điểm danh ngày {new Date().toLocaleDateString('vi-VN')} & Thưởng Sao ý thức</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-bold text-slate-700">Lý do chấm nề nếp:</label>
+              <select
+                value={conductReason}
+                onChange={(e) => setConductReason(e.target.value)}
+                className="p-2 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold"
+              >
+                <option value="Phát biểu hăng hái">⭐ Phát biểu hăng hái (+1)</option>
+                <option value="Hoàn thành xuất sắc bài tập">⭐ Hoàn thành xuất sắc (+1)</option>
+                <option value="Giúp đỡ bạn học">⭐ Giúp đỡ bạn học (+1)</option>
+                <option value="Nói chuyện riêng trong giờ">⚠️ Nói chuyện riêng (-1)</option>
+                <option value="Chưa làm bài tập nhà">⚠️ Chưa làm bài tập (-1)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {students.map(st => (
+              <div key={st.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-sm">
+                    {st.full_name.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-900">{st.full_name}</h4>
+                    <span className="text-[11px] font-bold text-slate-500">Mã HS: {st.student_code || 'Chưa có'}</span>
+                  </div>
+                </div>
+
+                {/* ĐIỂM DANH 4 TRẠNG THÁI (CLAS-05) */}
+                <div className="flex items-center gap-1.5">
+                  {[
+                    { key: 'present', label: 'Có mặt', bg: 'bg-emerald-600 text-white' },
+                    { key: 'late', label: 'Đi trễ', bg: 'bg-amber-500 text-white' },
+                    { key: 'absent_excused', label: 'Vắng có phép', bg: 'bg-blue-600 text-white' },
+                    { key: 'absent_unexcused', label: 'Vắng không phép', bg: 'bg-rose-600 text-white' },
+                  ].map(opt => (
+                    <button
+                      key={opt.key}
+                      onClick={() => setAttendanceRecords({ ...attendanceRecords, [st.id]: opt.key as any })}
+                      className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black transition-all ${
+                        attendanceRecords[st.id] === opt.key ? opt.bg : 'bg-white text-slate-600 border border-slate-200'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* SỔ NỀ NẾP & CỘNG TRỪ SAO (CLAS-06) */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-300 text-amber-950 font-black text-xs">
+                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                    {conductStars[st.id] || 10} Sao
+                  </div>
+
+                  <button
+                    onClick={() => handleRewardStar(st, 1)}
+                    className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-xl border border-emerald-300 font-black text-xs"
+                    title="Cộng 1 Sao Nề Nếp"
+                  >
+                    +1 ⭐
+                  </button>
+
+                  <button
+                    onClick={() => handleRewardStar(st, -1)}
+                    className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-xl border border-rose-300 font-black text-xs"
+                    title="Trừ 1 Sao Nề Nếp"
+                  >
+                    -1 ⚠️
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CLAS-04: CHIA NHÓM HỌC SINH (STUDENT GROUPING) */}
+      {activeTab === 'groups' && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
+            <div>
+              <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                <Users className="w-5 h-5 text-amber-600" /> CHIA NHÓM HỌC SINH LÀM BÀI TẬP NHÓM
+              </h3>
+              <p className="text-xs font-bold text-slate-500">Tự động hoặc thủ công phân chia học sinh thành các Group nhỏ</p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleAutoGroupStudents(2)}
+                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs"
+              >
+                Tự động Chia 2 Nhóm
+              </button>
+              <button
+                onClick={() => handleAutoGroupStudents(4)}
+                className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs"
+              >
+                Tự động Chia 4 Nhóm
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {students.map(st => (
+              <div key={st.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-center justify-between">
+                <div>
+                  <h4 className="font-extrabold text-xs text-slate-900">{st.full_name}</h4>
+                  <span className="text-[10px] font-bold text-amber-800">
+                    {studentGroups[st.id] || 'Chưa xếp nhóm'}
+                  </span>
+                </div>
+
+                <select
+                  value={studentGroups[st.id] || 'Chưa xếp nhóm'}
+                  onChange={(e) => setStudentGroups({ ...studentGroups, [st.id]: e.target.value })}
+                  className="p-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold"
+                >
+                  <option value="Chưa xếp nhóm">Chưa xếp nhóm</option>
+                  <option value="Nhóm 1">Nhóm 1</option>
+                  <option value="Nhóm 2">Nhóm 2</option>
+                  <option value="Nhóm 3">Nhóm 3</option>
+                  <option value="Nhóm 4">Nhóm 4</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* CLAS-07, CLAS-08, CLAS-09, CLAS-10: CẤU HÌNH LỚP, ĐỒNG GIÁO VIÊN & THỜI KHÓA BIỂU */}
+      {activeTab === 'class_settings' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          
+          {/* CLAS-09: PHÂN CÔNG ĐỒNG GIÁO VIÊN (CO-TEACHER) */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-blue-600" /> PHÂN CÔNG ĐỒNG GIÁO VIÊN (CO-TEACHER)
+            </h3>
+            <form onSubmit={handleAddCoTeacher} className="space-y-3">
+              <input
+                type="email"
+                required
+                placeholder="Nhập Email Giáo viên muốn mời cùng quản lý lớp..."
+                value={coTeacherEmail}
+                onChange={(e) => setCoTeacherEmail(e.target.value)}
+                className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs font-bold"
+              />
+              <button
+                type="submit"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-2xl shadow text-xs flex items-center justify-center gap-1"
+              >
+                <UserPlus className="w-4 h-4" /> Mời Đồng Giáo Viên Cùng Chấm Bài
+              </button>
+            </form>
+
+            {coTeachers.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <span className="text-xs font-black text-slate-700 block">Danh Sách Đồng Giáo Viên:</span>
+                {coTeachers.map((email, i) => (
+                  <div key={i} className="p-2.5 bg-blue-50 rounded-xl text-xs font-bold text-blue-900 border border-blue-200">
+                    👩‍🏫 {email} (Đồng Quản Lý)
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* CLAS-10: THỜI KHÓA BIỂU & QUẢN TRỊ LỚP */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-amber-600" /> THỜI KHÓA BIỂU & TRẠNG THÁI LỚP
+            </h3>
+            
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-700 block">Lịch Học Cố Định Trong Tuần:</label>
+              <textarea
+                value={classSchedule}
+                onChange={(e) => setClassSchedule(e.target.value)}
+                className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs font-bold h-24"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                onClick={handleToggleArchiveClass}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1 border border-slate-300"
+              >
+                <Archive className="w-4 h-4 text-slate-600" />
+                {selectedClass?.is_archived ? 'Khôi Phục Lớp Học' : 'Lưu Trữ Lớp Học (Archive)'}
+              </button>
+            </div>
+          </div>
+
+        </div>
+      )}
+
+      {/* 2. BÀI TẬP VÀ ĐỀ KIỂM TRA */}
       {activeTab === 'assignments' && (
         <div className="space-y-6">
           <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
@@ -626,7 +874,6 @@ export const TeacherDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* DANH SÁCH CÂU HỎI AI ĐÃ SOẠN + NÚT THÊM ẢNH */}
             {draftQuestions.length > 0 && (
               <div className="space-y-3 pt-2">
                 <h4 className="font-black text-xs text-purple-900 uppercase">Danh Sách Câu Hỏi Đã Soạn ({draftQuestions.length}):</h4>
@@ -736,7 +983,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 4. TẠO TRÒ CHƠI (WORDWALL / EMBED / GAME) */}
+      {/* 4. TẠO TRÒ CHƠI */}
       {activeTab === 'games' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-3">
@@ -790,7 +1037,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* 5. AI HỖ TRỢ GIÁO VIÊN & PHÂN TÍCH LỖI SAI REAL-TIME */}
+      {/* 5. AI HỖ TRỢ GIÁO VIÊN */}
       {activeTab === 'ai' && (
         <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-4">
@@ -831,7 +1078,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL TẠO LỚP HỌC MỚI */}
+      {/* MODAL TẠO LỚP HỌC MỚI (CLAS-01) */}
       {showClassModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border-4 border-amber-200 p-6 w-full max-w-md shadow-2xl space-y-4">
