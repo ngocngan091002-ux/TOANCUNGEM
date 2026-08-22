@@ -30,7 +30,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       let profile = await getCurrentProfile(sessionUser.id);
 
-      // Nếu chưa có profile trong bảng profiles (ví dụ chưa chạy SQL Trigger), tự động tạo profile từ OAuth Meta Data
+      // Nếu chưa có profile trong bảng profiles, tự động tạo profile từ User Meta Data
       if (!profile) {
         const savedRole = (localStorage.getItem('auth_selected_role') as UserRole) || 'student';
         const isSuperAdmin = sessionUser.email?.toLowerCase() === 'ngocngan091002@gmail.com';
@@ -38,7 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fallbackProfile: UserProfile = {
           id: sessionUser.id,
           email: sessionUser.email || '',
-          full_name: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.email?.split('@')[0] || 'Người dùng Google',
+          full_name: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.email?.split('@')[0] || 'Người dùng',
           role: isSuperAdmin ? 'admin' : savedRole,
           status: isSuperAdmin ? 'approved' : (savedRole === 'teacher' ? 'pending' : 'approved'),
           avatar_url: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || ''
@@ -72,7 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen to Supabase Auth Changes (Google Login Redirect Callback)
+    // Listen to Supabase Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         await processSession(session.user);
@@ -129,38 +129,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmail = async (email: string, pass: string, selectedRole: UserRole): Promise<{ success: boolean; error?: string }> => {
     try {
-      const isSuperAdmin = email.trim().toLowerCase() === 'ngocngan091002@gmail.com';
+      const cleanEmail = email.trim().toLowerCase();
+      const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
 
-      // 1. Kiểm tra Email xem đã đăng ký trong DB hay chưa
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('email', email.trim().toLowerCase());
-
-      let profile = profiles && profiles.length > 0 ? profiles[0] : null;
-
-      // 2. Tiến hành Auth Sign In
+      // 1. Tiến hành Auth Sign In trực tiếp với Supabase
       const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password: pass
       });
 
       if (error) {
-        if (!profile) {
-          return { 
-            success: false, 
-            error: 'Tài khoản chưa được đăng ký trong hệ thống. Thầy/Cô nhấp vào "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới để đăng ký trước nhé!' 
-          };
-        }
-        return { success: false, error: 'Mật khẩu không chính xác. Vui lòng kiểm tra lại!' };
+        return { 
+          success: false, 
+          error: 'Email hoặc mật khẩu không chính xác. Nếu chưa từng đăng ký thành công, Thầy/Cô hãy nhấp "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới nhé!' 
+        };
       }
 
       if (data.user) {
+        let profile = await getCurrentProfile(data.user.id);
+
         if (!profile) {
           profile = {
             id: data.user.id,
-            email: email.trim().toLowerCase(),
-            full_name: email.split('@')[0],
+            email: cleanEmail,
+            full_name: cleanEmail.split('@')[0],
             role: isSuperAdmin ? 'admin' : selectedRole,
             status: isSuperAdmin ? 'approved' : (selectedRole === 'teacher' ? 'pending' : 'approved')
           };
@@ -191,12 +183,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUpWithEmail = async (email: string, pass: string, fullName: string, role: UserRole, phone?: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      const isSuperAdmin = email.trim().toLowerCase() === 'ngocngan091002@gmail.com';
+      const cleanEmail = email.trim().toLowerCase();
+      const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
       const initialRole = isSuperAdmin ? 'admin' : role;
       const initialStatus = isSuperAdmin ? 'approved' : (role === 'teacher' ? 'pending' : 'approved');
 
       const { data, error } = await supabase.auth.signUp({
-        email: email.trim().toLowerCase(),
+        email: cleanEmail,
         password: pass,
         options: {
           data: {
@@ -215,7 +208,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) {
         await supabase.from('profiles').upsert({
           id: data.user.id,
-          email: email.trim().toLowerCase(),
+          email: cleanEmail,
           full_name: fullName,
           role: initialRole,
           status: initialStatus,
