@@ -20,8 +20,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Bỏ ràng buộc khóa ngoại cứng để hỗ trợ Import học sinh hàng loạt từ Excel
+-- Bỏ ràng buộc khóa ngoại cứng & Đảm bảo email duy nhất để hỗ trợ Import học sinh hàng loạt từ Excel
 ALTER TABLE public.profiles DROP CONSTRAINT IF EXISTS profiles_id_fkey;
+ALTER TABLE public.profiles ADD CONSTRAINT profiles_email_key UNIQUE (email);
 
 -- 2. BẢNG LỚP HỌC (CLASSES)
 CREATE TABLE IF NOT EXISTS public.classes (
