@@ -2,21 +2,53 @@ import * as XLSX from 'xlsx';
 import { UserProfile, LeaderboardEntry } from '../types';
 
 export function exportClassToExcel(className: string, students: UserProfile[], leaderboard: LeaderboardEntry[] = []) {
-  const data = students.map((s, index) => {
-    const lb = leaderboard.find(l => l.student_id === s.id);
-    return {
-      'STT': index + 1,
-      'Mã Học Sinh': s.student_code || `HS2026_${index + 1}`,
-      'Họ và Tên': s.full_name,
-      'Email / Tên đăng nhập': s.email,
-      'Số điện thoại': s.phone || 'Chưa cập nhật',
-      'Nhiệm vụ hoàn thành': lb ? lb.tasks_completed : 0,
-      'Điểm Bài tập': lb ? lb.assignment_score : 0,
-      'Điểm Kiểm tra': lb ? lb.test_score : 0,
-      'Tổng điểm tích lũy': lb ? lb.total_points : 0,
-      'Xếp hạng': lb ? lb.rank : 'N/A'
-    };
-  });
+  let data: any[] = [];
+
+  if (!students || students.length === 0) {
+    // Nếu lớp chưa có học sinh, tự động tạo Tiêu đề cột và Dữ liệu mẫu để Giáo viên xem/nhập liệu
+    data = [
+      {
+        'STT': 1,
+        'Mã Học Sinh': 'HS2026_01',
+        'Họ và Tên': 'Nguyễn Văn An (Mẫu)',
+        'Email / Tên đăng nhập': 'an.nguyen@toancungem.edu.vn',
+        'Số điện thoại': '0901234567',
+        'Nhiệm vụ hoàn thành': 0,
+        'Điểm Bài tập': 0,
+        'Điểm Kiểm tra': 0,
+        'Tổng điểm tích lũy': 0,
+        'Xếp hạng': 'N/A'
+      },
+      {
+        'STT': 2,
+        'Mã Học Sinh': 'HS2026_02',
+        'Họ và Tên': 'Trần Thị Bình (Mẫu)',
+        'Email / Tên đăng nhập': 'binh.tran@toancungem.edu.vn',
+        'Số điện thoại': '0907654321',
+        'Nhiệm vụ hoàn thành': 0,
+        'Điểm Bài tập': 0,
+        'Điểm Kiểm tra': 0,
+        'Tổng điểm tích lũy': 0,
+        'Xếp hạng': 'N/A'
+      }
+    ];
+  } else {
+    data = students.map((s, index) => {
+      const lb = leaderboard.find(l => l.student_id === s.id);
+      return {
+        'STT': index + 1,
+        'Mã Học Sinh': s.student_code || `HS2026_${index + 1}`,
+        'Họ và Tên': s.full_name,
+        'Email / Tên đăng nhập': s.email,
+        'Số điện thoại': s.phone || 'Chưa cập nhật',
+        'Nhiệm vụ hoàn thành': lb ? lb.tasks_completed : 0,
+        'Điểm Bài tập': lb ? lb.assignment_score : 0,
+        'Điểm Kiểm tra': lb ? lb.test_score : 0,
+        'Tổng điểm tích lũy': lb ? lb.total_points : 0,
+        'Xếp hạng': lb ? lb.rank : 'N/A'
+      };
+    });
+  }
 
   const worksheet = XLSX.utils.json_to_sheet(data);
   const workbook = XLSX.utils.book_new();
@@ -36,7 +68,7 @@ export function exportClassToExcel(className: string, students: UserProfile[], l
     { wch: 10 }
   ];
 
-  XLSX.writeFile(workbook, `Danh_Sach_Lop_${className.replace(/\s+/g, '_')}.xlsx`);
+  XLSX.writeFile(workbook, `Danh_Sach_Lop_${(className || 'Moi').replace(/\s+/g, '_')}.xlsx`);
 }
 
 export function parseStudentExcel(file: File): Promise<{ full_name: string; email: string; phone?: string; student_code?: string }[]> {
