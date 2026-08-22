@@ -166,26 +166,45 @@ export async function batchImportStudentsToClass(
 ): Promise<number> {
   if (!classId || !studentList || studentList.length === 0) return 0;
 
-  // 1. Chuẩn bị mảng profiles để Batch Upsert qua Service Role Client (bypassing RLS)
-  const profilesToUpsert = studentList.map(st => ({
-    id: crypto.randomUUID(),
-    email: st.email.trim().toLowerCase(),
-    full_name: st.full_name,
-    role: 'student' as const,
-    status: 'approved' as const,
-    student_code: st.student_code,
-    phone: st.phone || ''
-  }));
+  const emailList = studentList.map(st => st.email.trim().toLowerCase());
 
-  // Batch Upsert
+  // 1. Tra cứu danh sách profile đã có sẵn trong DB để giữ nguyên ID
+  const { data: existingProfiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id, email')
+    .in('email', emailList);
+
+  const existingMap: Record<string, string> = {};
+  if (existingProfiles) {
+    existingProfiles.forEach(p => {
+      existingMap[p.email.toLowerCase()] = p.id;
+    });
+  }
+
+  // 2. Chuẩn bị mảng profiles để Batch Upsert
+  const profilesToUpsert = studentList.map(st => {
+    const cleanEmail = st.email.trim().toLowerCase();
+    const existingId = existingMap[cleanEmail];
+
+    return {
+      id: existingId || crypto.randomUUID(),
+      email: cleanEmail,
+      full_name: st.full_name,
+      role: 'student' as const,
+      status: 'approved' as const,
+      student_code: st.student_code,
+      phone: st.phone || ''
+    };
+  });
+
+  // Batch Upsert qua Service Role Client (bypassing RLS)
   const { error: pErr } = await supabaseAdmin
     .from('profiles')
     .upsert(profilesToUpsert, { onConflict: 'email' });
 
   if (pErr) console.warn('Admin Profiles Upsert Warning:', pErr.message);
 
-  // 2. Lấy lại tất cả profile IDs theo danh sách email
-  const emailList = studentList.map(st => st.email.trim().toLowerCase());
+  // 3. Lấy lại tất cả profile IDs theo danh sách email
   const { data: createdProfiles, error: fetchErr } = await supabaseAdmin
     .from('profiles')
     .select('id, email, full_name')
@@ -195,22 +214,7 @@ export async function batchImportStudentsToClass(
     return 0;
   }
 
-  // Cập nhật lại Họ tên cho khớp chuẩn Tiếng Việt trong file Excel
-  for (const p of createdProfiles) {
-    const matchedSt = studentList.find(st => st.email.trim().toLowerCase() === p.email.toLowerCase());
-    if (matchedSt && matchedSt.full_name && matchedSt.full_name !== p.full_name) {
-      await supabaseAdmin
-        .from('profiles')
-        .update({
-          full_name: matchedSt.full_name,
-          student_code: matchedSt.student_code,
-          phone: matchedSt.phone || ''
-        })
-        .eq('id', p.id);
-    }
-  }
-
-  // 3. Batch Insert vào bảng class_members qua Service Role Client (bypassing RLS)
+  // 4. Batch Insert vào bảng class_members qua Service Role Client
   const memberRows = createdProfiles.map(p => ({
     class_id: classId,
     student_id: p.id
@@ -333,13 +337,35 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
 }
 
 export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>): Promise<DailyTask> {
+  const safeDueDate = (task.due_date && task.due_date.trim() !== '') 
+    ? task.due_date.trim() 
+    : new Date().toISOString().split('T')[0];
+
+  const payload: any = {
+    class_id: task.class_id,
+    teacher_id: task.teacher_id,
+    title: task.title,
+    due_date: safeDueDate
+  };
+
   const { data, error } = await supabaseAdmin
     .from('daily_tasks')
-    .insert([task])
+    .insert([payload])
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.warn('createDailyTask warning, trying fallback without teacher_id:', error.message);
+    delete payload.teacher_id;
+    const { data: fbData, error: fbErr } = await supabaseAdmin
+      .from('daily_tasks')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (fbErr) throw fbErr;
+    return fbData;
+  }
   return data;
 }
 
