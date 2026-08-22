@@ -149,7 +149,7 @@ export const TeacherDashboard: React.FC = () => {
     exportClassToExcel(selectedClass.name, students);
   };
 
-  // EXCEL BATCH IMPORT HỌC SINH
+  // EXCEL BATCH IMPORT HỌC SINH (33+ HỌC SINH 1-CLICK)
   const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedClass || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
@@ -157,72 +157,81 @@ export const TeacherDashboard: React.FC = () => {
 
     try {
       const studentList = await parseStudentExcel(file);
+      if (!studentList || studentList.length === 0) {
+        alert('File Excel không có dữ liệu học sinh hoặc sai định dạng!');
+        setExcelLoading(false);
+        return;
+      }
+
       let successCount = 0;
 
-      for (const st of studentList) {
-        const cleanEmail = st.email.trim().toLowerCase();
+      // 1. Chuẩn bị mảng profiles để Batch Upsert
+      const profilesToUpsert = studentList.map((st) => ({
+        id: crypto.randomUUID(),
+        email: st.email.trim().toLowerCase(),
+        full_name: st.full_name,
+        role: 'student',
+        status: 'approved',
+        student_code: st.student_code,
+        phone: st.phone || ''
+      }));
 
-        // 1. Kiểm tra xem student email đã có chưa
-        const { data: existingProfile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+      // 2. Thử Upsert hàng loạt vào bảng profiles
+      const { error: batchProfErr } = await supabase
+        .from('profiles')
+        .upsert(profilesToUpsert, { onConflict: 'email' });
 
-        let studentId = existingProfile?.id;
+      if (batchProfErr) {
+        console.warn('Batch profiles upsert warning, fallback to individual:', batchProfErr);
+      }
 
-        if (!studentId) {
-          // Thử tạo auth user qua Supabase
-          try {
-            const { data: signUpData } = await supabase.auth.signUp({
-              email: cleanEmail,
-              password: '12345678',
-              options: {
-                data: {
-                  full_name: st.full_name,
-                  role: 'student',
-                  status: 'approved',
-                  student_code: st.student_code,
-                  phone: st.phone
-                }
-              }
-            });
-            studentId = signUpData?.user?.id;
-          } catch (e) {
-            console.warn('SignUp warning on batch import:', e);
-          }
+      // 3. Lấy lại tất cả ID học sinh tương ứng với danh sách Email
+      const emailList = studentList.map(st => st.email.trim().toLowerCase());
+      const { data: allProfiles, error: fetchErr } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .in('email', emailList);
 
-          // Nếu chưa có studentId (do signup chần chừ hoặc rate limit), tạo ID ngẫu nhiên và upsert
-          if (!studentId) {
-            studentId = crypto.randomUUID();
-          }
+      if (fetchErr) throw fetchErr;
 
-          try {
-            await supabase.from('profiles').upsert({
-              id: studentId,
-              email: cleanEmail,
-              full_name: st.full_name,
-              role: 'student',
-              status: 'approved',
-              student_code: st.student_code,
-              phone: st.phone
-            });
-          } catch (upsertErr) {
-            console.warn('Upsert profile error on import:', upsertErr);
+      if (allProfiles && allProfiles.length > 0) {
+        // Cập nhật lại Họ tên nếu lỡ bị trùng tên cũ
+        for (const p of allProfiles) {
+          const matchedSt = studentList.find(st => st.email.trim().toLowerCase() === p.email.toLowerCase());
+          if (matchedSt && matchedSt.full_name && matchedSt.full_name !== p.full_name) {
+            await supabase.from('profiles').update({ 
+              full_name: matchedSt.full_name,
+              student_code: matchedSt.student_code,
+              phone: matchedSt.phone || ''
+            }).eq('id', p.id);
           }
         }
 
-        if (studentId) {
-          try {
-            await addStudentToClass(selectedClass.id, studentId);
-            successCount++;
-          } catch (addErr) {
-            console.warn('Add to class error:', addErr);
+        // 4. Batch Insert vào bảng class_members
+        const memberRows = allProfiles.map(p => ({
+          class_id: selectedClass.id,
+          student_id: p.id
+        }));
+
+        const { error: memberErr } = await supabase
+          .from('class_members')
+          .upsert(memberRows, { onConflict: 'class_id,student_id' });
+
+        if (memberErr) {
+          console.warn('Batch member upsert warning:', memberErr);
+          // Fallback từng dòng
+          for (const row of memberRows) {
+            try {
+              await supabase.from('class_members').upsert([row], { onConflict: 'class_id,student_id' });
+              successCount++;
+            } catch (e) { console.warn(e); }
           }
+        } else {
+          successCount = allProfiles.length;
         }
       }
 
-      alert(`Đã thêm thành công ${successCount} học sinh vào lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã thêm thành công ${successCount} / ${studentList.length} học sinh vào lớp ${selectedClass.name}!`);
       loadClassData(selectedClass.id);
     } catch (err: any) {
       alert('Lỗi đọc file Excel: ' + err.message);

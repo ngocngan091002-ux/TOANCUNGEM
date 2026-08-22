@@ -90,10 +90,23 @@ export function parseStudentExcel(file: File): Promise<{ full_name: string; emai
         // Đọc header hàng 0
         const headers: string[] = json[0].map((h: any) => String(h).toLowerCase().trim());
         
-        const nameIdx = headers.findIndex(h => h.includes('tên') || h.includes('họ') || h.includes('name'));
-        const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('thư') || h.includes('tài khoản'));
-        const phoneIdx = headers.findIndex(h => h.includes('thoại') || h.includes('sđt') || h.includes('phone'));
-        const codeIdx = headers.findIndex(h => h.includes('mã') || h.includes('code'));
+        // Nhận diện cột chuẩn xác
+        let nameIdx = headers.findIndex(h => h === 'họ và tên' || h === 'họ tên' || h === 'tên học sinh' || h === 'ho va ten' || h === 'name' || h === 'full_name');
+        if (nameIdx === -1) {
+          nameIdx = headers.findIndex(h => (h.includes('họ') && h.includes('tên')) || (h.includes('tên') && !h.includes('đăng nhập') && !h.includes('mã')));
+        }
+        if (nameIdx === -1) {
+          nameIdx = 2; // Default to Column C (Họ và Tên)
+        }
+
+        let emailIdx = headers.findIndex(h => h.includes('email') || h.includes('thư') || h.includes('tài khoản'));
+        if (emailIdx === -1) emailIdx = 3; // Default to Column D
+
+        let phoneIdx = headers.findIndex(h => h.includes('điện thoại') || h.includes('sđt') || h.includes('phone'));
+        if (phoneIdx === -1) phoneIdx = 4; // Default to Column E
+
+        let codeIdx = headers.findIndex(h => h === 'mã học sinh' || h === 'mã hs' || h === 'ma hoc sinh' || (h.includes('mã') && !h.includes('tên')));
+        if (codeIdx === -1) codeIdx = 1; // Default to Column B
 
         const parsedStudents: { full_name: string; email: string; phone?: string; student_code?: string }[] = [];
 
@@ -101,22 +114,29 @@ export function parseStudentExcel(file: File): Promise<{ full_name: string; emai
           const row = json[i];
           if (!row || row.length === 0) continue;
 
-          const name = nameIdx !== -1 ? String(row[nameIdx] || '').trim() : String(row[0] || '').trim();
-          let email = emailIdx !== -1 ? String(row[emailIdx] || '').trim() : '';
+          let rawName = String(row[nameIdx] || '').trim();
+          let rawEmail = String(row[emailIdx] || '').trim();
+          let rawPhone = String(row[phoneIdx] || '').trim();
+          let rawCode = String(row[codeIdx] || '').trim();
 
-          if (!name) continue;
+          // Nếu name bị nhầm với mã học sinh (VD: HS2026_01), fallback sang cột C
+          if (!rawName || rawName.startsWith('HS2026_') || rawName.match(/^HS\d+/i)) {
+            rawName = String(row[2] || row[1] || '').trim();
+          }
 
-          if (!email) {
-            // Tự tạo email giả lập chuẩn nếu chỉ có tên
-            const unsignedName = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
-            email = `${unsignedName}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
+          if (!rawName) continue;
+
+          if (!rawEmail) {
+            // Tự tạo email giả lập chuẩn nếu không có email
+            const unsignedName = rawName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
+            rawEmail = `${unsignedName}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
           }
 
           parsedStudents.push({
-            full_name: name,
-            email: email,
-            phone: phoneIdx !== -1 ? String(row[phoneIdx] || '').trim() : '',
-            student_code: codeIdx !== -1 ? String(row[codeIdx] || '').trim() : `HS2026_${i}`
+            full_name: rawName,
+            email: rawEmail,
+            phone: rawPhone,
+            student_code: rawCode || `HS2026_${i}`
           });
         }
 
