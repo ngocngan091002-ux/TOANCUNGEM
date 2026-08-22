@@ -14,8 +14,13 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Plus, Users, BookOpen, Gamepad2, 
   Sparkles, CheckCircle2, Upload, 
-  Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send
+  Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send, Calendar
 } from 'lucide-react';
+
+export interface TaskRowInput {
+  title: string;
+  due_date: string;
+}
 
 export const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -35,8 +40,13 @@ export const TeacherDashboard: React.FC = () => {
   const [games, setGames] = useState<GameItem[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
-  // Task Form: NHIỀU DÒNG NHIỆM VỤ (MULTI-ROW TASKS)
-  const [taskRows, setTaskRows] = useState<string[]>(['', '', '']);
+  // Task Form: NHIỀU DÒNG NHIỆM VỤ CÓ NGÀY RIÊNG BIỆT (MULTI-ROW TASKS WITH SEPARATE DUE DATES)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [taskRows, setTaskRows] = useState<TaskRowInput[]>([
+    { title: '', due_date: todayStr },
+    { title: '', due_date: todayStr },
+    { title: '', due_date: todayStr }
+  ]);
 
   // Material Form
   const [matTitle, setMatTitle] = useState<string>('');
@@ -163,9 +173,9 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // QUẢN LÝ CÁC DÒNG NHIỆM VỤ DYNAMIC
+  // QUẢN LÝ CÁC DÒNG NHIỆM VỤ DYNAMIC CÓ NGÀY RIÊNG BIỆT
   const handleAddTaskRow = () => {
-    setTaskRows(prev => [...prev, '']);
+    setTaskRows(prev => [...prev, { title: '', due_date: todayStr }]);
   };
 
   const handleRemoveTaskRow = (index: number) => {
@@ -173,15 +183,23 @@ export const TeacherDashboard: React.FC = () => {
     setTaskRows(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleTaskRowChange = (index: number, value: string) => {
+  const handleTaskRowTitleChange = (index: number, title: string) => {
     setTaskRows(prev => {
       const updated = [...prev];
-      updated[index] = value;
+      updated[index] = { ...updated[index], title };
       return updated;
     });
   };
 
-  // GIAO NHIỀU NHIỆM VỤ CÙNG LÚC (BATCH TASKS CREATION)
+  const handleTaskRowDateChange = (index: number, due_date: string) => {
+    setTaskRows(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], due_date };
+      return updated;
+    });
+  };
+
+  // GIAO NHIỀU NHIỆM VỤ CÙNG LÚC VỚI NGÀY HẠN CHÓT RIÊNG BIỆT
   const handleBatchCreateTasks = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedClass) {
@@ -189,29 +207,32 @@ export const TeacherDashboard: React.FC = () => {
       return;
     }
 
-    const validTitles = taskRows.map(r => r.trim()).filter(Boolean);
-    if (validTitles.length === 0) {
-      alert('Vui lòng nhập nội dung ít nhất 1 nhiệm vụ (hoặc chọn các gợi ý mẫu bên dưới) nhé!');
+    const validRows = taskRows.filter(r => r.title.trim() !== '');
+    if (validRows.length === 0) {
+      alert('Vui lòng nhập nội dung ít nhất 1 nhiệm vụ trước khi bấm Giao Nhiệm Vụ nhé!');
       return;
     }
 
     try {
       const createdList: DailyTask[] = [];
-      const today = new Date().toISOString().split('T')[0];
 
-      for (const title of validTitles) {
+      for (const row of validRows) {
         const task = await createDailyTask({
           class_id: selectedClass.id,
           teacher_id: user!.id,
-          title: title,
-          due_date: today
+          title: row.title.trim(),
+          due_date: row.due_date || todayStr
         });
         createdList.push(task);
       }
 
       setTasks(prev => [...createdList.reverse(), ...prev]);
-      setTaskRows(['', '', '']);
-      alert(`🎉 Đã giao thành công ${createdList.length} nhiệm vụ cho lớp ${selectedClass.name}!`);
+      setTaskRows([
+        { title: '', due_date: todayStr },
+        { title: '', due_date: todayStr },
+        { title: '', due_date: todayStr }
+      ]);
+      alert(`🎉 Đã giao thành công ${createdList.length} nhiệm vụ với ngày hạn chót riêng biệt cho lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo nhiệm vụ: ' + err.message);
     }
@@ -425,39 +446,55 @@ export const TeacherDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* 1. NHIỆM VỤ HÀNG NGÀY (GIAO NHIỀU DÒNG NHIỆM VỤ 1 LÚC) */}
+      {/* 1. NHIỆM VỤ HÀNG NGÀY (GIAO NHIỀU DÒNG CÓ NGÀY HẠN CHÓT RIÊNG BIỆT) */}
       {activeTab === 'tasks' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
             <div className="flex items-center justify-between border-b border-amber-200 pb-3">
-              <h3 className="text-base font-black text-slate-800">GIAO NHIỀU NHIỆM VỤ</h3>
+              <h3 className="text-base font-black text-slate-800">GIAO NHIỆM VỤ CÓ NGÀY</h3>
               <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-2.5 py-1 rounded-xl border border-amber-300">
                 {taskRows.length} Dòng
               </span>
             </div>
 
             <form onSubmit={handleBatchCreateTasks} className="space-y-3">
-              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {taskRows.map((val, idx) => (
-                  <div key={idx} className="flex items-center gap-1.5">
-                    <span className="text-xs font-black text-amber-800 w-5 text-center flex-shrink-0">{idx + 1}.</span>
+                  <div key={idx} className="p-3 rounded-2xl bg-amber-50/80 border-2 border-amber-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-amber-900">Nhiệm vụ {idx + 1}:</span>
+                      {taskRows.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTaskRow(idx)}
+                          className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-100 rounded-lg transition-all text-xs font-bold flex items-center gap-0.5"
+                          title="Xóa dòng này"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Xóa
+                        </button>
+                      )}
+                    </div>
+
                     <input
                       type="text"
-                      placeholder={`Nhiệm vụ ${idx + 1} (VD: Ôn phép cộng)...`}
-                      value={val}
-                      onChange={(e) => handleTaskRowChange(idx, e.target.value)}
-                      className="flex-1 p-2.5 bg-amber-50/80 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                      placeholder={`VD: Ôn tập phép cộng trong phạm vi 20...`}
+                      value={val.title}
+                      onChange={(e) => handleTaskRowTitleChange(idx, e.target.value)}
+                      className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-500"
                     />
-                    {taskRows.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTaskRow(idx)}
-                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all"
-                        title="Xóa dòng này"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
+
+                    {/* Ô CHỌN NGÀY HẠN CHÓT RIÊNG BIỆT CHO TỪNG DÒNG */}
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <label className="text-[11px] font-black text-amber-900 whitespace-nowrap flex items-center gap-1">
+                        <Calendar className="w-3.5 h-3.5 text-amber-600" /> Hạn chót:
+                      </label>
+                      <input
+                        type="date"
+                        value={val.due_date}
+                        onChange={(e) => handleTaskRowDateChange(idx, e.target.value)}
+                        className="p-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-800 focus:outline-none"
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -473,7 +510,7 @@ export const TeacherDashboard: React.FC = () => {
 
               {/* GỢI Ý MẪU NỘI DUNG NHIỆM VỤ 1-CLICK */}
               <div className="space-y-1 pt-1">
-                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý nhanh (nhấp để thêm vào dòng):</span>
+                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý nhanh (nhấp để điền nội dung):</span>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     'Ôn tập phép cộng có nhớ phạm vi 100',
@@ -485,11 +522,11 @@ export const TeacherDashboard: React.FC = () => {
                       key={i}
                       type="button"
                       onClick={() => {
-                        const emptyIdx = taskRows.findIndex(r => !r.trim());
+                        const emptyIdx = taskRows.findIndex(r => !r.title.trim());
                         if (emptyIdx !== -1) {
-                          handleTaskRowChange(emptyIdx, sample);
+                          handleTaskRowTitleChange(emptyIdx, sample);
                         } else {
-                          setTaskRows(prev => [...prev, sample]);
+                          setTaskRows(prev => [...prev, { title: sample, due_date: todayStr }]);
                         }
                       }}
                       className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-[10px] font-bold transition-all text-left"
@@ -516,7 +553,9 @@ export const TeacherDashboard: React.FC = () => {
                 <div key={t.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-center justify-between gap-3">
                   <div>
                     <h4 className="font-extrabold text-sm text-slate-900">{t.title}</h4>
-                    <p className="text-[11px] font-bold text-amber-800">Ngày tạo: {t.due_date}</p>
+                    <p className="text-[11px] font-bold text-amber-800 flex items-center gap-1 mt-0.5">
+                      <Calendar className="w-3.5 h-3.5 text-amber-600" /> Ngày hạn chót: {t.due_date ? new Date(t.due_date).toLocaleDateString('vi-VN') : 'Trong ngày'}
+                    </p>
                   </div>
                   
                   {/* BÁO CÁO TIẾN ĐỘ THỰC TẾ HỌC SINH */}
