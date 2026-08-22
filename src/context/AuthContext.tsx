@@ -84,7 +84,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginWithGoogle = async (selectedRole: UserRole) => {
-    // Đặt role tạm thời trong localStorage để trigger gán role đúng khi return
     localStorage.setItem('auth_selected_role', selectedRole);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -92,7 +91,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         redirectTo: window.location.origin
       }
     });
-    if (error) throw error;
+    if (error) {
+      if (error.message.includes('provider is not enabled') || (error as any).code === 'validation_failed') {
+        throw new Error('Tính năng Đăng nhập Google chưa được bật trong Supabase Auth Dashboard. Thầy/Cô vui lòng bật tính năng Google Provider trong Supabase hoặc Đăng ký bằng Email bên dưới ạ!');
+      }
+      throw error;
+    }
   };
 
   const loginWithEmail = async (email: string, pass: string, selectedRole: UserRole): Promise<{ success: boolean; error?: string }> => {
