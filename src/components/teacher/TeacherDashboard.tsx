@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { 
   Plus, Users, BookOpen, Gamepad2, 
   Sparkles, CheckCircle2, Upload, 
-  Download, Image as ImageIcon, RefreshCw, Brain
+  Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
@@ -35,8 +35,8 @@ export const TeacherDashboard: React.FC = () => {
   const [games, setGames] = useState<GameItem[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
-  // Task Form
-  const [newTaskTitle, setNewTaskTitle] = useState<string>('');
+  // Task Form: NHIỀU DÒNG NHIỆM VỤ (MULTI-ROW TASKS)
+  const [taskRows, setTaskRows] = useState<string[]>(['', '', '']);
 
   // Material Form
   const [matTitle, setMatTitle] = useState<string>('');
@@ -163,29 +163,55 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // TẠO NHIỆM VỤ HÀNG NGÀY VỚI THÔNG BÁO VÀ GỢI Ý MẪU 1-CLICK
-  const handleCreateTask = async (e: React.FormEvent) => {
+  // QUẢN LÝ CÁC DÒNG NHIỆM VỤ DYNAMIC
+  const handleAddTaskRow = () => {
+    setTaskRows(prev => [...prev, '']);
+  };
+
+  const handleRemoveTaskRow = (index: number) => {
+    if (taskRows.length <= 1) return;
+    setTaskRows(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleTaskRowChange = (index: number, value: string) => {
+    setTaskRows(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  // GIAO NHIỀU NHIỆM VỤ CÙNG LÚC (BATCH TASKS CREATION)
+  const handleBatchCreateTasks = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTaskTitle.trim()) {
-      alert('Vui lòng gõ tên nhiệm vụ (hoặc bấm chọn 1 gợi ý mẫu bên dưới) trước khi bấm Giao Nhiệm Vụ nhé!');
+    if (!selectedClass) {
+      alert('Vui lòng chọn lớp học trước khi giao nhiệm vụ!');
       return;
     }
-    if (!selectedClass) {
-      alert('Vui lòng chọn hoặc tạo lớp học trước khi giao nhiệm vụ!');
+
+    const validTitles = taskRows.map(r => r.trim()).filter(Boolean);
+    if (validTitles.length === 0) {
+      alert('Vui lòng nhập nội dung ít nhất 1 nhiệm vụ (hoặc chọn các gợi ý mẫu bên dưới) nhé!');
       return;
     }
 
     try {
-      const task = await createDailyTask({
-        class_id: selectedClass.id,
-        teacher_id: user!.id,
-        title: newTaskTitle.trim(),
-        due_date: new Date().toISOString().split('T')[0]
-      });
+      const createdList: DailyTask[] = [];
+      const today = new Date().toISOString().split('T')[0];
 
-      setTasks([task, ...tasks]);
-      setNewTaskTitle('');
-      alert(`🎉 Đã giao thành công nhiệm vụ "${task.title}" cho lớp ${selectedClass.name}!`);
+      for (const title of validTitles) {
+        const task = await createDailyTask({
+          class_id: selectedClass.id,
+          teacher_id: user!.id,
+          title: title,
+          due_date: today
+        });
+        createdList.push(task);
+      }
+
+      setTasks(prev => [...createdList.reverse(), ...prev]);
+      setTaskRows(['', '', '']);
+      alert(`🎉 Đã giao thành công ${createdList.length} nhiệm vụ cho lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo nhiệm vụ: ' + err.message);
     }
@@ -399,26 +425,55 @@ export const TeacherDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* 1. NHIỆM VỤ HÀNG NGÀY (THÔNG BÁO TIẾN ĐỘ THỰC TẾ) */}
+      {/* 1. NHIỆM VỤ HÀNG NGÀY (GIAO NHIỀU DÒNG NHIỆM VỤ 1 LÚC) */}
       {activeTab === 'tasks' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-            <h3 className="text-base font-black text-slate-800">GIAO NHIỆM VỤ HÔM NAY CHO LỚP</h3>
-            <form onSubmit={handleCreateTask} className="space-y-3">
-              <div>
-                <label className="text-[11px] font-bold text-slate-700 block mb-1">Tên Nhiệm Vụ Cần Giao:</label>
-                <input
-                  type="text"
-                  placeholder="Gõ tên nhiệm vụ (VD: Ôn phép cộng / Làm Bài tập 1...)"
-                  value={newTaskTitle}
-                  onChange={(e) => setNewTaskTitle(e.target.value)}
-                  className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
-                />
+            <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+              <h3 className="text-base font-black text-slate-800">GIAO NHIỀU NHIỆM VỤ</h3>
+              <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-2.5 py-1 rounded-xl border border-amber-300">
+                {taskRows.length} Dòng
+              </span>
+            </div>
+
+            <form onSubmit={handleBatchCreateTasks} className="space-y-3">
+              <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                {taskRows.map((val, idx) => (
+                  <div key={idx} className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-amber-800 w-5 text-center flex-shrink-0">{idx + 1}.</span>
+                    <input
+                      type="text"
+                      placeholder={`Nhiệm vụ ${idx + 1} (VD: Ôn phép cộng)...`}
+                      value={val}
+                      onChange={(e) => handleTaskRowChange(idx, e.target.value)}
+                      className="flex-1 p-2.5 bg-amber-50/80 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                    />
+                    {taskRows.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTaskRow(idx)}
+                        className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-xl transition-all"
+                        title="Xóa dòng này"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
 
-              {/* NÚT GỢI Ý MẪU NỘI DUNG NHIỆM VỤ 1-CLICK */}
+              {/* NÚT THÊM DÒNG MỚI */}
+              <button
+                type="button"
+                onClick={handleAddTaskRow}
+                className="w-full py-2 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black rounded-2xl text-xs flex items-center justify-center gap-1 border border-amber-300 transition-all"
+              >
+                <Plus className="w-4 h-4 text-amber-800" /> Thêm 1 Dòng Nhiệm Vụ Mới
+              </button>
+
+              {/* GỢI Ý MẪU NỘI DUNG NHIỆM VỤ 1-CLICK */}
               <div className="space-y-1 pt-1">
-                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý tên nhiệm vụ 1-click:</span>
+                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý nhanh (nhấp để thêm vào dòng):</span>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     'Ôn tập phép cộng có nhớ phạm vi 100',
@@ -429,8 +484,15 @@ export const TeacherDashboard: React.FC = () => {
                     <button
                       key={i}
                       type="button"
-                      onClick={() => setNewTaskTitle(sample)}
-                      className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-[10px] font-bold transition-all text-left"
+                      onClick={() => {
+                        const emptyIdx = taskRows.findIndex(r => !r.trim());
+                        if (emptyIdx !== -1) {
+                          handleTaskRowChange(emptyIdx, sample);
+                        } else {
+                          setTaskRows(prev => [...prev, sample]);
+                        }
+                      }}
+                      className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-[10px] font-bold transition-all text-left"
                     >
                       + {sample}
                     </button>
@@ -440,9 +502,9 @@ export const TeacherDashboard: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3 rounded-2xl shadow text-xs flex items-center justify-center gap-1 mt-2"
+                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold py-3 rounded-2xl shadow-lg text-xs flex items-center justify-center gap-1.5 mt-2 transition-all"
               >
-                <Plus className="w-4 h-4" /> Giao Nhiệm Vụ Cho Lớp
+                <Send className="w-4 h-4" /> Giao Tất Cả Nhiệm Vụ Cho Lớp
               </button>
             </form>
           </div>
