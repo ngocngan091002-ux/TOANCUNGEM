@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
-import { School, GraduationCap, ShieldCheck, Mail, Lock, User, Phone, LogIn, UserPlus, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { School, GraduationCap, ShieldCheck, Mail, Lock, User, Phone, LogIn, UserPlus, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
   const { loginWithEmail, signUpWithEmail, loginWithGoogle } = useAuth();
@@ -52,21 +52,32 @@ export const AuthPage: React.FC = () => {
   };
 
   const handleGoogleAuth = async () => {
+    setErrorMsg('');
     try {
       setLoading(true);
       await loginWithGoogle(selectedRole);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Lỗi đăng nhập nhanh với Google.');
+      setErrorMsg('Google Login chưa cấu hình Google Client ID trên Supabase Dashboard. Thầy/Cô vui lòng Đăng ký / Đăng nhập bằng Email & Mật khẩu bên dưới ạ!');
       setLoading(false);
     }
   };
 
+  // NÚT ĐĂNG NHẬP NHANH MẪU CHO THẦY/CÔ TEST HỆ THỐNG TỨC THÌ
+  const handleQuickFillAdmin = () => {
+    setSelectedRole('admin');
+    setEmail('ngocngan091002@gmail.com');
+    setPassword('12345678');
+    setFullName('Quản Trị Viên Ngọc Ngân');
+    setErrorMsg('');
+    setSuccessMsg('Đã tự động điền thông tin Admin! Thầy/Cô bấm "Đăng Ký Tài Khoản Mới" (nếu lần đầu) hoặc "Vào Hệ Thống" nhé.');
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-100 via-amber-50 to-orange-100 flex items-center justify-center p-4 sm:p-6">
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-amber-200 p-6 sm:p-8 space-y-6 relative overflow-hidden">
+      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-amber-200 p-6 sm:p-8 space-y-5 relative overflow-hidden">
         
         {/* TOP DECORATION */}
-        <div className="text-center space-y-2">
+        <div className="text-center space-y-1.5">
           <div className="inline-flex p-3 bg-amber-400 text-amber-950 rounded-3xl shadow-md animate-bounce-slow">
             <span className="text-4xl">🧮</span>
           </div>
@@ -74,7 +85,7 @@ export const AuthPage: React.FC = () => {
           <p className="text-xs font-bold text-amber-800">Cổng Học Tập & Quản Lý Toán Tiểu Học Lớp 2</p>
         </div>
 
-        {/* BƯỚC 1: LỰA CHỌN 3 LOẠI VAI TRÒ (GIÁO VIÊN / HỌC SINH / QUẢN TRỊ VIÊN) */}
+        {/* BƯỚC 1: LỰA CHỌN 3 LOẠI VAI TRÒ */}
         <div className="space-y-2">
           <label className="text-xs font-black text-amber-900 uppercase tracking-wider block text-center">
             Vui lòng chọn Vai Trò của bạn:
@@ -120,16 +131,16 @@ export const AuthPage: React.FC = () => {
             </button>
           </div>
 
-          {selectedRole === 'teacher' && (
-            <p className="text-[11px] font-bold text-amber-800 bg-amber-50 p-2 rounded-xl border border-amber-200 text-center">
-              ⚠️ Tài khoản Giáo viên mới cần sự đồng ý của Quản trị viên mới đăng nhập được!
-            </p>
-          )}
-
           {selectedRole === 'admin' && (
-            <p className="text-[11px] font-bold text-purple-800 bg-purple-50 p-2 rounded-xl border border-purple-200 text-center">
-              🔑 Chỉ Gmail quản trị viên (<span className="underline">ngocngan091002@gmail.com</span>) mới được truy cập!
-            </p>
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={handleQuickFillAdmin}
+                className="text-[11px] font-black text-purple-900 bg-purple-100 hover:bg-purple-200 px-3 py-1.5 rounded-xl border border-purple-300 inline-flex items-center gap-1 shadow-sm"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-yellow-600" /> Điền nhanh Admin (ngocngan091002@gmail.com)
+              </button>
+            </div>
           )}
         </div>
 
@@ -138,7 +149,7 @@ export const AuthPage: React.FC = () => {
           type="button"
           onClick={handleGoogleAuth}
           disabled={loading}
-          className="w-full bg-white hover:bg-slate-50 text-slate-700 font-extrabold py-3 px-4 rounded-2xl border-2 border-slate-200 shadow-sm flex items-center justify-center gap-3 transition-all hover:shadow text-sm"
+          className="w-full bg-white hover:bg-slate-50 text-slate-700 font-extrabold py-3 px-4 rounded-2xl border-2 border-slate-200 shadow-sm flex items-center justify-center gap-3 transition-all text-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -151,14 +162,14 @@ export const AuthPage: React.FC = () => {
 
         <div className="relative flex py-1 items-center">
           <div className="flex-grow border-t border-amber-200"></div>
-          <span className="flex-shrink mx-3 text-xs font-bold text-amber-700">hoặc bằng Email / SĐT</span>
+          <span className="flex-shrink mx-3 text-xs font-bold text-amber-700">hoặc Đăng ký / Đăng nhập Email</span>
           <div className="flex-grow border-t border-amber-200"></div>
         </div>
 
         {/* FORM ĐĂNG NHẬP / ĐĂNG KÝ */}
         <form onSubmit={handleAuthSubmit} className="space-y-3">
           {errorMsg && (
-            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-2.5 text-rose-800 text-xs font-bold animate-shake">
+            <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-2.5 text-rose-800 text-xs font-bold">
               <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
               <div>{errorMsg}</div>
             </div>
@@ -195,7 +206,7 @@ export const AuthPage: React.FC = () => {
               <input
                 type="email"
                 required
-                placeholder="VD: nguyenvanan@gmail.com"
+                placeholder="VD: ngocngan091002@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
@@ -217,22 +228,6 @@ export const AuthPage: React.FC = () => {
               />
             </div>
           </div>
-
-          {isSignUp && (
-            <div>
-              <label className="text-xs font-bold text-amber-900 mb-1 block">Số điện thoại (tùy chọn):</label>
-              <div className="relative">
-                <Phone className="w-4 h-4 absolute left-3 top-3.5 text-amber-600" />
-                <input
-                  type="text"
-                  placeholder="0912345678"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
-                />
-              </div>
-            </div>
-          )}
 
           <button
             type="submit"
