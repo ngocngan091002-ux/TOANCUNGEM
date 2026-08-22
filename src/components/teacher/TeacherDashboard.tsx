@@ -189,7 +189,6 @@ export const TeacherDashboard: React.FC = () => {
 
           if (insErr) {
             console.warn('Insert profile warning:', insErr.message);
-            // Thử fetch lại nếu lỡ đã có
             const { data: fetchP } = await supabase
               .from('profiles')
               .select('id')
@@ -246,10 +245,17 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // TẠO NHIỆM VỤ HÀNG NGÀY
+  // TẠO NHIỆM VỤ HÀNG NGÀY VỚI THÔNG BÁO VÀ GỢI Ý MẪU 1-CLICK
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedClass || !newTaskTitle.trim()) return;
+    if (!newTaskTitle.trim()) {
+      alert('Vui lòng gõ tên nhiệm vụ (hoặc bấm chọn 1 gợi ý mẫu bên dưới) trước khi bấm Giao Nhiệm Vụ nhé!');
+      return;
+    }
+    if (!selectedClass) {
+      alert('Vui lòng chọn hoặc tạo lớp học trước khi giao nhiệm vụ!');
+      return;
+    }
 
     try {
       const task = await createDailyTask({
@@ -261,6 +267,7 @@ export const TeacherDashboard: React.FC = () => {
 
       setTasks([task, ...tasks]);
       setNewTaskTitle('');
+      alert(`🎉 Đã giao thành công nhiệm vụ "${task.title}" cho lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo nhiệm vụ: ' + err.message);
     }
@@ -378,33 +385,6 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // AI ĐỀ XUẤT CHẤM BÀI VÀ NHẬN XÉT GIÁO VIÊN CHỐT
-  const handleLoadSubmissionsForGrading = async (assignment: Assignment) => {
-    setSelectedAssignmentForGrading(assignment);
-    try {
-      const list = await getClassSubmissionsForTeacher(assignment.id);
-      setSubmissionsList(list);
-    } catch (err: any) {
-      console.error('Error fetching submissions:', err);
-    }
-  };
-
-  const handleAiSuggestGrading = async (submission: any) => {
-    try {
-      const totalQ = submission.responses?.length || 1;
-      const wrongQ = submission.responses?.filter((r: any) => !r.is_correct).length || 0;
-      const score = submission.score || 0;
-
-      const aiResult = await suggestGradingAndRemark(score, totalQ, wrongQ);
-      await updateTeacherGrading(submission.id, aiResult.suggestedScore, aiResult.remark);
-
-      alert(`AI Đề xuất: ${aiResult.suggestedScore} điểm. Nhận xét: "${aiResult.remark}". Đã chốt điểm cho học sinh!`);
-      if (selectedAssignmentForGrading) handleLoadSubmissionsForGrading(selectedAssignmentForGrading);
-    } catch (err: any) {
-      alert('Lỗi AI chấm bài: ' + err.message);
-    }
-  };
-
   // AI PHÂN TÍCH LỖI SAI REAL-TIME CỦA HỌC SINH TRONG LỚP
   const handleAnalyzeClassWeaknesses = async () => {
     if (!selectedClass) return;
@@ -501,25 +481,50 @@ export const TeacherDashboard: React.FC = () => {
         ))}
       </div>
 
-      {/* 1. NHIỆM VỤ HÀNG NGÀY (32/33 THỐNG KÊ HOÀN THÀNH POPUP) */}
+      {/* 1. NHIỆM VỤ HÀNG NGÀY (THÔNG BÁO TIẾN ĐỘ THỰC TẾ) */}
       {activeTab === 'tasks' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
             <h3 className="text-base font-black text-slate-800">GIAO NHIỆM VỤ HÔM NAY CHO LỚP</h3>
             <form onSubmit={handleCreateTask} className="space-y-3">
-              <input
-                type="text"
-                required
-                placeholder="VD: Ôn phép cộng / Làm Bài tập 1 / Trò chơi luyện tập"
-                value={newTaskTitle}
-                onChange={(e) => setNewTaskTitle(e.target.value)}
-                className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
-              />
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Tên Nhiệm Vụ Cần Giao:</label>
+                <input
+                  type="text"
+                  placeholder="Gõ tên nhiệm vụ (VD: Ôn phép cộng / Làm Bài tập 1...)"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              {/* NÚT GỢI Ý MẪU NỘI DUNG NHIỆM VỤ 1-CLICK */}
+              <div className="space-y-1 pt-1">
+                <span className="text-[10px] font-black text-amber-900 block">💡 Gợi ý tên nhiệm vụ 1-click:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    'Ôn tập phép cộng có nhớ phạm vi 100',
+                    'Làm bài tập trắc nghiệm Tuần 1',
+                    'Tham gia trò chơi toán học tương tác',
+                    'Xem slide bài giảng phép trừ'
+                  ].map((sample, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setNewTaskTitle(sample)}
+                      className="px-2.5 py-1 bg-amber-100 hover:bg-amber-200 text-amber-900 rounded-xl text-[10px] font-bold transition-all text-left"
+                    >
+                      + {sample}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <button
                 type="submit"
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-2.5 rounded-2xl shadow text-xs flex items-center justify-center gap-1"
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-3 rounded-2xl shadow text-xs flex items-center justify-center gap-1 mt-2"
               >
-                <Plus className="w-4 h-4" /> Giao Nhiệm Vụ
+                <Plus className="w-4 h-4" /> Giao Nhiệm Vụ Cho Lớp
               </button>
             </form>
           </div>
@@ -534,7 +539,7 @@ export const TeacherDashboard: React.FC = () => {
                     <p className="text-[11px] font-bold text-amber-800">Ngày tạo: {t.due_date}</p>
                   </div>
                   
-                  {/* POPUP BÁO CÁO TIẾN ĐỘ THỰC TẾ 32/33 HỌC SINH */}
+                  {/* BÁO CÁO TIẾN ĐỘ THỰC TẾ HỌC SINH */}
                   <div className="bg-amber-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow flex items-center gap-1">
                     <CheckCircle2 className="w-4 h-4 text-amber-200" />
                     Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh
