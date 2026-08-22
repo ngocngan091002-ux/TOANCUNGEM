@@ -85,13 +85,30 @@ export async function getStudentClasses(studentId: string): Promise<ClassItem[]>
 
 export async function createClass(name: string, grade: number = 2, teacherId: string, description?: string): Promise<ClassItem> {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+  const insertPayload: any = { name, grade, code, teacher_id: teacherId };
+  if (description) insertPayload.description = description;
+
   const { data, error } = await supabase
     .from('classes')
-    .insert([{ name, description, grade, code, teacher_id: teacherId }])
+    .insert([insertPayload])
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.message.includes("Could not find the 'description' column") || (error as any).code === 'PGRST204') {
+      delete insertPayload.description;
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('classes')
+        .insert([insertPayload])
+        .select()
+        .single();
+
+      if (fallbackError) throw fallbackError;
+      return fallbackData;
+    }
+    throw error;
+  }
+
   return data;
 }
 
