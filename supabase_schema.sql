@@ -159,12 +159,8 @@ BEGIN
         assigned_role := 'admin';
         assigned_status := 'approved';
     ELSE
-        assigned_role := COALESCE(NEW.raw_user_meta_data->>'role', 'student');
-        IF assigned_role = 'teacher' THEN
-            assigned_status := 'pending';
-        ELSE
-            assigned_status := 'approved';
-        END IF;
+        assigned_role := COALESCE(NEW.raw_user_meta_data->>'role', 'teacher');
+        assigned_status := 'approved';
     END IF;
 
     INSERT INTO public.profiles (id, email, full_name, role, status, phone, avatar_url)
@@ -193,7 +189,7 @@ CREATE TRIGGER on_auth_user_created
     FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ========================================================
--- ROW LEVEL SECURITY (RLS) POLICIES TOÀN BỘ BẢNG
+-- ROW LEVEL SECURITY (RLS) POLICIES RỘNG MỞ CHO TOÀN BỘ BẢNG
 -- ========================================================
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -208,45 +204,30 @@ ALTER TABLE public.question_responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.daily_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.task_completions ENABLE ROW LEVEL SECURITY;
 
--- 1. Profiles RLS
-CREATE POLICY "Public read profiles" ON public.profiles FOR SELECT USING (true);
-CREATE POLICY "Users update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Admin update profiles" ON public.profiles FOR UPDATE USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
+-- Reset all old policies
+DROP POLICY IF EXISTS "Public read profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Users update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Admin update profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow authenticated profiles" ON public.profiles;
 
--- 2. Classes RLS
-CREATE POLICY "View classes" ON public.classes FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Teachers/Admin insert classes" ON public.classes FOR INSERT WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('teacher', 'admin'))
-);
-CREATE POLICY "Teachers update own classes" ON public.classes FOR UPDATE USING (
-    teacher_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
-);
+DROP POLICY IF EXISTS "View classes" ON public.classes;
+DROP POLICY IF EXISTS "Teachers/Admin insert classes" ON public.classes;
+DROP POLICY IF EXISTS "Teachers update own classes" ON public.classes;
+DROP POLICY IF EXISTS "Allow authenticated insert classes" ON public.classes;
+DROP POLICY IF EXISTS "Allow authenticated classes" ON public.classes;
 
--- 3. Class Members RLS
-CREATE POLICY "View class members" ON public.class_members FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Join class or Teacher add member" ON public.class_members FOR INSERT WITH CHECK (auth.role() = 'authenticated');
-
--- 4. Materials RLS
-CREATE POLICY "View public or enrolled materials" ON public.materials FOR SELECT USING (
-    is_public = true OR auth.role() = 'authenticated'
-);
-CREATE POLICY "Teachers/Admin manage materials" ON public.materials FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('teacher', 'admin'))
-);
-
--- 5. Assignments RLS
-CREATE POLICY "View assignments" ON public.assignments FOR SELECT USING (auth.role() = 'authenticated');
-CREATE POLICY "Teachers manage assignments" ON public.assignments FOR ALL USING (
-    EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('teacher', 'admin'))
-);
-
--- 6. Student Progress RLS
-CREATE POLICY "View student progress" ON public.student_progress FOR SELECT USING (
-    student_id = auth.uid() OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('teacher', 'admin'))
-);
-CREATE POLICY "Manage student progress" ON public.student_progress FOR ALL USING (auth.role() = 'authenticated');
+-- New Open Policies
+CREATE POLICY "Allow authenticated profiles" ON public.profiles FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated classes" ON public.classes FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated class_members" ON public.class_members FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated materials" ON public.materials FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated assignments" ON public.assignments FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated student_progress" ON public.student_progress FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated assignment_questions" ON public.assignment_questions FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated assignment_submissions" ON public.assignment_submissions FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated question_responses" ON public.question_responses FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated daily_tasks" ON public.daily_tasks FOR ALL USING (auth.role() = 'authenticated');
+CREATE POLICY "Allow authenticated task_completions" ON public.task_completions FOR ALL USING (auth.role() = 'authenticated');
 
 -- ========================================================
 -- STORAGE BUCKETS SETUP (TẠO TỰ ĐỘNG BẰNG SQL)
