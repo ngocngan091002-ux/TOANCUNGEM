@@ -164,6 +164,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             role: isSuperAdmin ? 'admin' : selectedRole,
             status: isSuperAdmin ? 'approved' : (selectedRole === 'teacher' ? 'pending' : 'approved')
           };
+          try {
+            await supabase.from('profiles').upsert(profile);
+          } catch (e) {
+            console.warn('Upsert profile on login warning:', e);
+          }
         }
 
         // Kiểm tra trạng thái Giáo viên
