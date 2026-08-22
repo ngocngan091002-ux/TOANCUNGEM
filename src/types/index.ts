@@ -11,6 +11,8 @@ export interface UserProfile {
   student_code?: string;
   phone?: string;
   avatar_url?: string;
+  parent_pin?: string;
+  hide_email_on_leaderboard?: boolean;
   created_at?: string;
 }
 

@@ -2,7 +2,11 @@ import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { UserRole } from '../types';
-import { School, GraduationCap, ShieldCheck, Mail, Lock, User, Phone, LogIn, UserPlus, AlertCircle, CheckCircle2, Sparkles } from 'lucide-react';
+import { supabaseAdmin } from '../services/supabase';
+import { 
+  School, GraduationCap, ShieldCheck, Mail, Lock, User, Phone, 
+  LogIn, UserPlus, AlertCircle, CheckCircle2, Sparkles, Key, Eye, Search, X 
+} from 'lucide-react';
 
 export const AuthPage: React.FC = () => {
   const { user, loginWithEmail, signUpWithEmail, loginWithGoogle } = useAuth();
@@ -18,6 +22,15 @@ export const AuthPage: React.FC = () => {
   const [password, setPassword] = useState<string>('');
   const [fullName, setFullName] = useState<string>('');
   const [phone, setPhone] = useState<string>('');
+  const [licenseKey, setLicenseKey] = useState<string>(''); // AUTH-07: VIP License Key
+
+  // AUTH-04: PARENT PIN LOOKUP MODAL
+  const [showParentModal, setShowParentModal] = useState<boolean>(false);
+  const [parentStudentCode, setParentStudentCode] = useState<string>('');
+  const [parentPin, setParentPin] = useState<string>('');
+  const [parentSearchResult, setParentSearchResult] = useState<any>(null);
+  const [parentLoading, setParentLoading] = useState<boolean>(false);
+  const [parentError, setParentError] = useState<string>('');
 
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [successMsg, setSuccessMsg] = useState<string>('');
@@ -36,11 +49,19 @@ export const AuthPage: React.FC = () => {
           setLoading(false);
           return;
         }
-        const res = await signUpWithEmail(email, password, fullName, selectedRole, phone);
+
+        // AUTH-07: KÍCH HOẠT LICENSE MÃ VIP GIÁO VIÊN
+        let roleToRegister = selectedRole;
+        const cleanKey = licenseKey.trim().toUpperCase();
+        if (cleanKey === 'TEACHER2026' || cleanKey === 'VIP2026' || cleanKey === 'GIAOVIEN') {
+          roleToRegister = 'teacher';
+        }
+
+        const res = await signUpWithEmail(email, password, fullName, roleToRegister, phone);
         if (!res.success) {
           setErrorMsg(res.error || 'Đăng ký không thành công.');
         } else {
-          setSuccessMsg(res.error || 'Đăng ký thành công! Bạn có thể đăng nhập ngay bây giờ.');
+          setSuccessMsg('🎉 Đăng ký thành công! Đã kích hoạt tài khoản. Bạn có thể đăng nhập ngay bây giờ.');
           setIsSignUp(false);
         }
       } else {
@@ -77,6 +98,61 @@ export const AuthPage: React.FC = () => {
     setSuccessMsg('🎉 Đã sẵn sàng tài khoản Admin! Thầy/Cô bấm nút cam "Vào Hệ Thống Học Tập" bên dưới để vào ngay nhé.');
   };
 
+  // AUTH-04: PARENT PIN LOOKUP FUNCTION
+  const handleParentLookup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setParentError('');
+    setParentSearchResult(null);
+    setParentLoading(true);
+
+    try {
+      const code = parentStudentCode.trim().toUpperCase();
+      const pin = parentPin.trim();
+
+      // Tra cứu profile bằng Mã Học Sinh
+      const { data: profiles, error: pErr } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('student_code', code);
+
+      if (pErr || !profiles || profiles.length === 0) {
+        setParentError('Không tìm thấy Học sinh có mã này! Vui lòng kiểm tra lại Mã Học Sinh.');
+        setParentLoading(false);
+        return;
+      }
+
+      const st = profiles[0];
+      // Kiểm tra PIN (Mặc định 123456 hoặc st.parent_pin)
+      const validPin = st.parent_pin || '123456';
+      if (pin !== validPin && pin !== '123456') {
+        setParentError('Mã PIN Phụ Huynh không chính xác! (Mã mặc định: 123456)');
+        setParentLoading(false);
+        return;
+      }
+
+      // Lấy tiến độ học tập & điểm số của Học sinh
+      const { data: progress } = await supabaseAdmin
+        .from('student_progress')
+        .select('*, assignment:assignments(*)')
+        .eq('student_id', st.id);
+
+      const { data: tasks } = await supabaseAdmin
+        .from('task_completions')
+        .select('*')
+        .eq('student_id', st.id);
+
+      setParentSearchResult({
+        student: st,
+        completed_tasks: tasks?.length || 0,
+        submissions: progress || []
+      });
+    } catch (err: any) {
+      setParentError('Lỗi tra cứu: ' + err.message);
+    } finally {
+      setParentLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-amber-100 via-amber-50 to-orange-100 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl border-4 border-amber-200 p-6 sm:p-8 space-y-5 relative overflow-hidden">
@@ -90,7 +166,19 @@ export const AuthPage: React.FC = () => {
           <p className="text-xs font-bold text-amber-800">Cổng Học Tập & Quản Lý Toán Tiểu Học Lớp 2</p>
         </div>
 
-        {/* BƯỚC 1: LỰA CHỌN 3 LOẠI VAI TRÒ */}
+        {/* AUTH-04: NÚT DÀNH CHO PHỤ HUYNH TRA CỨU TIẾN ĐỘ BẰNG MÃ PIN */}
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => setShowParentModal(true)}
+            className="w-full py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-black rounded-2xl border-2 border-emerald-300 text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
+          >
+            <Eye className="w-4 h-4 text-emerald-700" />
+            👨‍👩‍👧 Phụ Huynh Tra Cứu Tiến Độ Học (Không Cần Account)
+          </button>
+        </div>
+
+        {/* BƯỚC 1: LỰA CHỌN 3 LOẠI VAI TRÒ (AUTH-03) */}
         <div className="space-y-2">
           <label className="text-xs font-black text-amber-900 uppercase tracking-wider block text-center">
             Vui lòng chọn Vai Trò của bạn:
@@ -149,7 +237,7 @@ export const AuthPage: React.FC = () => {
           )}
         </div>
 
-        {/* NÚT ĐĂNG NHẬP NHANH BẰNG GOOGLE */}
+        {/* AUTH-02: NÚT ĐĂNG NHẬP NHANH BẰNG GOOGLE */}
         <button
           type="button"
           onClick={handleGoogleAuth}
@@ -162,7 +250,7 @@ export const AuthPage: React.FC = () => {
             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
           </svg>
-          Đăng nhập nhanh bằng Google
+          Đăng nhập nhanh bằng Google (1-Click)
         </button>
 
         <div className="relative flex py-1 items-center">
@@ -171,7 +259,7 @@ export const AuthPage: React.FC = () => {
           <div className="flex-grow border-t border-amber-200"></div>
         </div>
 
-        {/* FORM ĐĂNG NHẬP / ĐĂNG KÝ */}
+        {/* AUTH-01: FORM ĐĂNG NHẬP / ĐĂNG KÝ EMAIL */}
         <form onSubmit={handleAuthSubmit} className="space-y-3">
           {errorMsg && (
             <div className="p-3 bg-rose-50 border-2 border-rose-300 rounded-2xl flex items-start gap-2.5 text-rose-800 text-xs font-bold">
@@ -188,24 +276,43 @@ export const AuthPage: React.FC = () => {
           )}
 
           {isSignUp && (
-            <div>
-              <label className="text-xs font-bold text-amber-900 mb-1 block">Họ và Tên:</label>
-              <div className="relative">
-                <User className="w-4 h-4 absolute left-3 top-3.5 text-amber-600" />
-                <input
-                  type="text"
-                  required
-                  placeholder="VD: Nguyễn Văn An"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
-                />
+            <>
+              <div>
+                <label className="text-xs font-bold text-amber-900 mb-1 block">Họ và Tên:</label>
+                <div className="relative">
+                  <User className="w-4 h-4 absolute left-3 top-3.5 text-amber-600" />
+                  <input
+                    type="text"
+                    required
+                    placeholder="VD: Huỳnh Phương Bảo Anh"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
               </div>
-            </div>
+
+              {/* AUTH-07: MÃ KÍCH HOẠT VIP / LICENSE GIÁO VIÊN */}
+              <div>
+                <label className="text-xs font-bold text-amber-900 mb-1 block">
+                  Mã Kích Hoạt VIP / Giáo Viên (Nếu có):
+                </label>
+                <div className="relative">
+                  <Key className="w-4 h-4 absolute left-3 top-3.5 text-amber-600" />
+                  <input
+                    type="text"
+                    placeholder="Nhập TEACHER2026 hoặc VIP2026..."
+                    value={licenseKey}
+                    onChange={(e) => setLicenseKey(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
-            <label className="text-xs font-bold text-amber-900 mb-1 block">Gmail / Số điện thoại:</label>
+            <label className="text-xs font-bold text-amber-900 mb-1 block">Gmail / Tên đăng nhập:</label>
             <div className="relative">
               <Mail className="w-4 h-4 absolute left-3 top-3.5 text-amber-600" />
               <input
@@ -256,6 +363,94 @@ export const AuthPage: React.FC = () => {
         </div>
 
       </div>
+
+      {/* AUTH-04: MODAL PHỤ HUYNH TRA CỨU TIẾN ĐỘ BẰNG MÃ PIN (NO ACCOUNT NEEDED) */}
+      {showParentModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-emerald-200 p-6 w-full max-w-lg shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto relative">
+            <button
+              onClick={() => setShowParentModal(false)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-emerald-200 pb-3">
+              <div className="p-3 bg-emerald-500 text-white rounded-2xl">
+                <Eye className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">CỔNG TRA CỨU PHỤ HUYNH</h3>
+                <p className="text-xs font-bold text-slate-500">Xem báo cáo học tập của con mà không cần tạo tài khoản</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleParentLookup} className="space-y-3">
+              <div>
+                <label className="text-xs font-black text-slate-700 block mb-1">Mã Học Sinh:</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: HS2026_01"
+                  value={parentStudentCode}
+                  onChange={(e) => setParentStudentCode(e.target.value)}
+                  className="w-full p-2.5 bg-emerald-50 border-2 border-emerald-200 rounded-2xl text-xs font-extrabold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-black text-slate-700 block mb-1">Mã PIN Phụ Huynh (Mặc định: 123456):</label>
+                <input
+                  type="password"
+                  required
+                  placeholder="••••••"
+                  value={parentPin}
+                  onChange={(e) => setParentPin(e.target.value)}
+                  className="w-full p-2.5 bg-emerald-50 border-2 border-emerald-200 rounded-2xl text-xs font-extrabold focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {parentError && (
+                <div className="p-3 bg-rose-50 border border-rose-300 rounded-2xl text-xs font-bold text-rose-800">
+                  {parentError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={parentLoading}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-2xl shadow text-xs flex items-center justify-center gap-1.5"
+              >
+                <Search className="w-4 h-4" /> {parentLoading ? 'Đang Tra Cứu...' : 'Tra Cứu Báo Cáo Học Tập'}
+              </button>
+            </form>
+
+            {parentSearchResult && (
+              <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl space-y-3 pt-3">
+                <div className="flex items-center justify-between border-b border-emerald-200 pb-2">
+                  <h4 className="font-black text-sm text-emerald-950">{parentSearchResult.student.full_name}</h4>
+                  <span className="text-[10px] font-black bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-lg">
+                    {parentSearchResult.student.student_code}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs font-extrabold">
+                  <div className="p-2.5 bg-white rounded-xl border border-emerald-200">
+                    <span className="text-slate-500 block text-[10px]">Nhiệm vụ xong:</span>
+                    <span className="text-emerald-700 text-sm">{parentSearchResult.completed_tasks} bài</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white rounded-xl border border-emerald-200">
+                    <span className="text-slate-500 block text-[10px]">Số bài kiểm tra:</span>
+                    <span className="text-emerald-700 text-sm">{parentSearchResult.submissions.length} bài</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
