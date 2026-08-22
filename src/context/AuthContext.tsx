@@ -29,6 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       let profile = await getCurrentProfile(sessionUser.id);
+      const userMetaName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name;
 
       // Nếu chưa có profile trong bảng profiles, tự động tạo profile từ User Meta Data
       if (!profile) {
@@ -38,7 +39,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fallbackProfile: UserProfile = {
           id: sessionUser.id,
           email: sessionUser.email || '',
-          full_name: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.email?.split('@')[0] || 'Người dùng',
+          full_name: userMetaName || sessionUser.email?.split('@')[0] || 'Học sinh',
           role: isSuperAdmin ? 'admin' : savedRole,
           status: isSuperAdmin ? 'approved' : (savedRole === 'teacher' ? 'pending' : 'approved'),
           avatar_url: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || ''
@@ -51,6 +52,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         profile = fallbackProfile;
+      } else if (userMetaName && profile.full_name === profile.email.split('@')[0]) {
+        // Cập nhật lại full_name nếu profile cũ lỡ bị lưu tên email
+        profile.full_name = userMetaName;
+        try {
+          await supabase.from('profiles').update({ full_name: userMetaName }).eq('id', profile.id);
+        } catch (e) {
+          console.warn('Update full_name error:', e);
+        }
       }
 
       handleProfileLoaded(profile);
@@ -72,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen to Supabase Auth Changes (Google Login Redirect Callback)
+    // Listen to Supabase Auth Changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         await processSession(session.user);
@@ -153,12 +162,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (data.user) {
         let profile = await getCurrentProfile(data.user.id);
+        const metaFullName = data.user.user_metadata?.full_name || data.user.user_metadata?.name;
 
         if (!profile) {
           profile = {
             id: data.user.id,
             email: cleanEmail,
-            full_name: cleanEmail.split('@')[0],
+            full_name: metaFullName || cleanEmail.split('@')[0],
             role: isSuperAdmin ? 'admin' : selectedRole,
             status: isSuperAdmin ? 'approved' : (selectedRole === 'teacher' ? 'pending' : 'approved')
           };
@@ -166,6 +176,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             await supabase.from('profiles').upsert(profile);
           } catch (e) {
             console.warn('Upsert profile on login warning:', e);
+          }
+        } else if (metaFullName && profile.full_name === profile.email.split('@')[0]) {
+          profile.full_name = metaFullName;
+          try {
+            await supabase.from('profiles').update({ full_name: metaFullName }).eq('id', profile.id);
+          } catch (e) {
+            console.warn('Update profile full_name on login warning:', e);
           }
         }
 
@@ -190,6 +207,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUpWithEmail = async (email: string, pass: string, fullName: string, role: UserRole, phone?: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const cleanEmail = email.trim().toLowerCase();
+      const cleanFullName = fullName.trim() || cleanEmail.split('@')[0];
       const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
       const initialRole = isSuperAdmin ? 'admin' : role;
       const initialStatus = isSuperAdmin ? 'approved' : (role === 'teacher' ? 'pending' : 'approved');
@@ -199,7 +217,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         password: pass,
         options: {
           data: {
-            full_name: fullName,
+            full_name: cleanFullName,
             role: initialRole,
             status: initialStatus,
             phone: phone || ''
@@ -224,7 +242,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const newProfile: UserProfile = {
           id: data.user.id,
           email: cleanEmail,
-          full_name: fullName,
+          full_name: cleanFullName,
           role: initialRole,
           status: initialStatus,
           phone: phone || ''
@@ -236,10 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           console.warn('Upsert profile on signup error:', e);
         }
 
-        // Tự động Đăng Nhập Vẫn Thành Công 100%
-        const loginRes = await loginWithEmail(cleanEmail, pass, role);
-        if (loginRes.success) return { success: true };
-
+        handleProfileLoaded(newProfile);
         return { success: true };
       }
       return { success: false, error: 'Đăng ký thất bại.' };
