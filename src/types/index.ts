@@ -123,6 +123,8 @@ export interface AssignmentQuestion {
   id: string;
   assignment_id?: string;
   question_text: string;
+  question_type?: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay';
+  difficulty?: 'easy' | 'medium' | 'hard';
   image_url?: string;
   options: QuestionOption[];
   correct_answers: string[];
@@ -138,6 +140,8 @@ export interface Assignment {
   material_id?: string;
   due_date?: string;
   type: 'exercise' | 'weekly_test' | 'game_quiz';
+  time_limit_minutes?: number;
+  shuffle_questions?: boolean;
   is_finalized: boolean;
   created_at?: string;
   material?: Material;
