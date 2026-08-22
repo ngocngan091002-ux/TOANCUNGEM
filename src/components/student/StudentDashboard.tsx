@@ -5,7 +5,7 @@ import {
   LearningMaterial, GameItem, AssignmentSubmission, LeaderboardEntry 
 } from '../../types';
 import { 
-  getStudentClasses, getDailyTasks, markTaskCompleted,
+  getStudentClasses, joinClassByCode, getDailyTasks, markTaskCompleted,
   getAssignments, submitAssignment, getStudentSubmissions,
   getLearningMaterials, getGames, getClassLeaderboard
 } from '../../services/supabase';
@@ -23,6 +23,24 @@ export const StudentDashboard: React.FC = () => {
   
   const [activeMenu, setActiveMenu] = useState<string>('home');
   const [studentClassId, setStudentClassId] = useState<string>('');
+  const [joinCodeInput, setJoinCodeInput] = useState<string>('');
+  const [joinLoading, setJoinLoading] = useState<boolean>(false);
+
+  const handleJoinClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!joinCodeInput.trim()) return;
+    setJoinLoading(true);
+    try {
+      const cls = await joinClassByCode(joinCodeInput, user!.id);
+      alert(`🎉 Gia nhập thành công lớp ${cls.name}!`);
+      setJoinCodeInput('');
+      loadStudentData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi gia nhập lớp.');
+    } finally {
+      setJoinLoading(false);
+    }
+  };
   
   // Data State
   const [tasks, setTasks] = useState<DailyTask[]>([]);
@@ -226,11 +244,29 @@ export const StudentDashboard: React.FC = () => {
                 Cùng khám phá môn Toán Lớp 2 thật thú vị với những nhiệm vụ hôm nay, trò chơi hấp dẫn và Trợ lý AI dễ thương nhé!
               </p>
             </div>
-            <div className="bg-white/90 p-4 rounded-2xl border-2 border-amber-300 shadow text-center min-w-[160px]">
+            <div className="bg-white/90 p-4 rounded-2xl border-2 border-amber-300 shadow text-center min-w-[200px]">
               <div className="text-2xl font-black text-amber-800">
                 {tasks.filter(t => t.is_completed).length}/{tasks.length}
               </div>
-              <div className="text-[11px] font-extrabold text-amber-900">Nhiệm vụ đã làm</div>
+              <div className="text-[11px] font-extrabold text-amber-900 mb-2">Nhiệm vụ đã làm</div>
+
+              {/* FORM GIA NHẬP LỚP BẰNG MÃ (JOIN CODE) */}
+              <form onSubmit={handleJoinClass} className="space-y-1 pt-2 border-t border-amber-200">
+                <input
+                  type="text"
+                  placeholder="Nhập Mã Lớp (VD: 2A1CODE)"
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value)}
+                  className="w-full p-1.5 bg-amber-50 border border-amber-300 rounded-xl text-[11px] font-bold text-center uppercase"
+                />
+                <button
+                  type="submit"
+                  disabled={joinLoading}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-1 rounded-xl text-[10px] shadow"
+                >
+                  {joinLoading ? 'Đang vào...' : 'Gia Nhập Lớp'}
+                </button>
+              </form>
             </div>
           </div>
 

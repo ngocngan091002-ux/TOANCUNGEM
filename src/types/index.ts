@@ -17,6 +17,7 @@ export interface UserProfile {
 export interface ClassItem {
   id: string;
   name: string;
+  description?: string;
   grade: number;
   code: string;
   teacher_id: string;
@@ -31,6 +32,18 @@ export interface ClassMember {
   student_id: string;
   joined_at: string;
   student?: UserProfile;
+}
+
+export interface Material {
+  id: string;
+  title: string;
+  description?: string;
+  file_url: string;
+  type: 'document' | 'video' | 'game_iframe' | 'game_html5';
+  author_id: string;
+  class_id?: string;
+  is_public: boolean;
+  created_at?: string;
 }
 
 export interface LearningMaterial {
@@ -98,11 +111,26 @@ export interface Assignment {
   class_id: string;
   teacher_id: string;
   title: string;
-  type: 'exercise' | 'weekly_test';
+  material_id?: string;
+  due_date?: string;
+  type: 'exercise' | 'weekly_test' | 'game_quiz';
   is_finalized: boolean;
   created_at?: string;
+  material?: Material;
   questions?: AssignmentQuestion[];
   submission?: AssignmentSubmission;
+}
+
+export interface StudentProgress {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  status: 'not_started' | 'in_progress' | 'completed';
+  score: number;
+  completion_time_seconds: number;
+  completed_at?: string;
+  assignment?: Assignment;
+  student?: UserProfile;
 }
 
 export interface AssignmentSubmission {

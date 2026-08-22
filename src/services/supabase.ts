@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import { 
-  UserProfile, ClassItem, ClassMember, LearningMaterial, 
+  UserProfile, ClassItem, ClassMember, Material, LearningMaterial, 
   GameItem, DailyTask, TaskCompletion, Assignment, 
   AssignmentQuestion, AssignmentSubmission, QuestionResponse, 
-  LeaderboardEntry, AIWeaknessSummary 
+  StudentProgress, LeaderboardEntry, AIWeaknessSummary 
 } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pvhpxgczjmzwahidabzy.supabase.co';
@@ -20,13 +20,9 @@ export async function getCurrentProfile(userId: string): Promise<UserProfile | n
       .eq('id', userId)
       .single();
 
-    if (error) {
-      console.warn('Profile fetch error:', error.message);
-      return null;
-    }
+    if (error) return null;
     return data as UserProfile;
-  } catch (err) {
-    console.error('getCurrentProfile Exception:', err);
+  } catch {
     return null;
   }
 }
@@ -87,16 +83,39 @@ export async function getStudentClasses(studentId: string): Promise<ClassItem[]>
   return data?.map((item: any) => item.classes).filter(Boolean) || [];
 }
 
-export async function createClass(name: string, grade: number, teacherId: string): Promise<ClassItem> {
+export async function createClass(name: string, grade: number = 2, teacherId: string, description?: string): Promise<ClassItem> {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
   const { data, error } = await supabase
     .from('classes')
-    .insert([{ name, grade, code, teacher_id: teacherId }])
+    .insert([{ name, description, grade, code, teacher_id: teacherId }])
     .select()
     .single();
 
   if (error) throw error;
   return data;
+}
+
+export async function joinClassByCode(code: string, studentId: string): Promise<ClassItem> {
+  const cleanCode = code.trim().toUpperCase();
+  const { data: cls, error: clsErr } = await supabase
+    .from('classes')
+    .select('*')
+    .eq('code', cleanCode)
+    .single();
+
+  if (clsErr || !cls) {
+    throw new Error('Mã gia nhập Lớp không tồn tại! Vui lòng kiểm tra lại mã từ Giáo viên.');
+  }
+
+  const { error: joinErr } = await supabase
+    .from('class_members')
+    .insert([{ class_id: cls.id, student_id: studentId }]);
+
+  if (joinErr && !joinErr.message.includes('unique constraint')) {
+    throw joinErr;
+  }
+
+  return cls;
 }
 
 export async function getClassMembers(classId: string): Promise<ClassMember[]> {
@@ -119,7 +138,32 @@ export async function addStudentToClass(classId: string, studentId: string): Pro
   }
 }
 
-// --- LEARNING MATERIALS & GAMES ---
+// --- MATERIALS & GAME HUB ---
+export async function getMaterials(classId?: string, isPublic = false): Promise<Material[]> {
+  let query = supabase.from('materials').select('*').order('created_at', { ascending: false });
+
+  if (classId) {
+    query = query.or(`class_id.eq.${classId},is_public.eq.true`);
+  } else if (isPublic) {
+    query = query.eq('is_public', true);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createMaterial(mat: Omit<Material, 'id' | 'created_at'>): Promise<Material> {
+  const { data, error } = await supabase
+    .from('materials')
+    .insert([mat])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function getLearningMaterials(classId: string): Promise<LearningMaterial[]> {
   const { data, error } = await supabase
     .from('learning_materials')
@@ -173,10 +217,8 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-
   if (!tasks || tasks.length === 0) return [];
 
-  // Lấy số lượng hoàn thành cho mỗi nhiệm vụ
   const taskIds = tasks.map(t => t.id);
   const { data: completions } = await supabase
     .from('task_completions')
@@ -234,7 +276,7 @@ export async function getTaskCompletionList(taskId: string): Promise<TaskComplet
 export async function getAssignments(classId: string, isTeacher = false): Promise<Assignment[]> {
   let query = supabase
     .from('assignments')
-    .select('*, questions:assignment_questions(*)')
+    .select('*, questions:assignment_questions(*), material:materials(*)')
     .eq('class_id', classId)
     .order('created_at', { ascending: false });
 
@@ -259,20 +301,23 @@ export async function createAssignmentWithQuestions(
 
   if (assignErr) throw assignErr;
 
-  const questionsToInsert = questions.map((q, index) => ({
-    ...q,
-    assignment_id: assignment.id,
-    order_index: index
-  }));
+  if (questions && questions.length > 0) {
+    const questionsToInsert = questions.map((q, index) => ({
+      ...q,
+      assignment_id: assignment.id,
+      order_index: index
+    }));
 
-  const { data: insertedQuestions, error: qErr } = await supabase
-    .from('assignment_questions')
-    .insert(questionsToInsert)
-    .select();
+    const { data: insertedQuestions, error: qErr } = await supabase
+      .from('assignment_questions')
+      .insert(questionsToInsert)
+      .select();
 
-  if (qErr) throw qErr;
+    if (qErr) throw qErr;
+    return { ...assignment, questions: insertedQuestions };
+  }
 
-  return { ...assignment, questions: insertedQuestions };
+  return assignment;
 }
 
 export async function finalizeAssignment(assignmentId: string): Promise<void> {
@@ -284,6 +329,51 @@ export async function finalizeAssignment(assignmentId: string): Promise<void> {
   if (error) throw error;
 }
 
+// --- STUDENT PROGRESS & ANALYTICS ---
+export async function recordStudentProgress(
+  assignmentId: string,
+  studentId: string,
+  status: 'not_started' | 'in_progress' | 'completed',
+  score: number = 0,
+  completionTimeSeconds: number = 0
+): Promise<StudentProgress> {
+  const { data, error } = await supabase
+    .from('student_progress')
+    .upsert({
+      assignment_id: assignmentId,
+      student_id: studentId,
+      status,
+      score,
+      completion_time_seconds: completionTimeSeconds,
+      completed_at: status === 'completed' ? new Date().toISOString() : null
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function getStudentProgressList(studentId: string): Promise<StudentProgress[]> {
+  const { data, error } = await supabase
+    .from('student_progress')
+    .select('*, assignment:assignments(*)')
+    .eq('student_id', studentId);
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getClassProgressSummary(classId: string): Promise<StudentProgress[]> {
+  const { data, error } = await supabase
+    .from('student_progress')
+    .select('*, student:profiles(*), assignment:assignments(*)')
+    .eq('assignment.class_id', classId);
+
+  if (error) throw error;
+  return data || [];
+}
+
 // --- SUBMISSIONS & QUESTION TIMERS ---
 export async function submitAssignment(
   assignmentId: string,
@@ -291,6 +381,7 @@ export async function submitAssignment(
   responses: { question_id: string; selected_options: string[]; time_spent_seconds: number; is_correct: boolean }[]
 ): Promise<AssignmentSubmission> {
   const totalScore = responses.reduce((sum, r) => sum + (r.is_correct ? 10 : 0), 0);
+  const totalTime = responses.reduce((sum, r) => sum + r.time_spent_seconds, 0);
 
   // Tạo submission
   const { data: submission, error: subErr } = await supabase
@@ -306,7 +397,10 @@ export async function submitAssignment(
 
   if (subErr) throw subErr;
 
-  // Tạo từng question response kèm bộ đếm thời gian
+  // Ghi nhận tiến độ vào student_progress
+  await recordStudentProgress(assignmentId, studentId, 'completed', totalScore, totalTime);
+
+  // Tạo từng question response
   const responsesToInsert = responses.map(r => ({
     submission_id: submission.id,
     question_id: r.question_id,
@@ -362,37 +456,18 @@ export async function updateTeacherGrading(
   if (error) throw error;
 }
 
-export async function updateAISuggestedGrading(
-  submissionId: string,
-  aiScore: number,
-  aiRemark: string
-): Promise<void> {
-  const { error } = await supabase
-    .from('assignment_submissions')
-    .update({
-      ai_suggested_score: aiScore,
-      ai_suggested_remark: aiRemark,
-      status: 'graded_by_ai'
-    })
-    .eq('id', submissionId);
-
-  if (error) throw error;
-}
-
-// --- LEADERBOARD & ANALYTICS ---
+// --- LEADERBOARD ---
 export async function getClassLeaderboard(classId: string): Promise<LeaderboardEntry[]> {
   const members = await getClassMembers(classId);
   if (!members || members.length === 0) return [];
 
   const studentIds = members.map(m => m.student_id);
 
-  // Lấy tổng nhiệm vụ hoàn thành
   const { data: completions } = await supabase
     .from('task_completions')
     .select('student_id')
     .in('student_id', studentIds);
 
-  // Lấy điểm các bài tập & bài kiểm tra
   const { data: submissions } = await supabase
     .from('assignment_submissions')
     .select('student_id, score, status, assignment:assignments(type)')
@@ -425,7 +500,6 @@ export async function getClassLeaderboard(classId: string): Promise<LeaderboardE
     };
   });
 
-  // Sắp xếp theo tổng điểm giảm dần
   leaderboard.sort((a, b) => b.total_points - a.total_points);
   leaderboard.forEach((entry, idx) => entry.rank = idx + 1);
 
@@ -433,24 +507,23 @@ export async function getClassLeaderboard(classId: string): Promise<LeaderboardE
 }
 
 // --- FILE UPLOAD TO SUPABASE STORAGE ---
-export async function uploadFileToStorage(bucket: 'materials' | 'question-images', file: File): Promise<string> {
+export async function uploadFileToStorage(bucket: 'materials' | 'question-images' | 'html5-games', file: File): Promise<string> {
   try {
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-    const filePath = `${fileName}`;
 
     const { error: uploadError } = await supabase.storage
       .from(bucket)
-      .upload(filePath, file);
+      .upload(fileName, file);
 
     if (uploadError) {
-      console.warn('Storage upload warning, using Object URL fallback:', uploadError.message);
+      console.warn('Storage upload warning, fallback to local URL:', uploadError.message);
       return URL.createObjectURL(file);
     }
 
     const { data: publicUrlData } = supabase.storage
       .from(bucket)
-      .getPublicUrl(filePath);
+      .getPublicUrl(fileName);
 
     return publicUrlData.publicUrl;
   } catch (err) {
