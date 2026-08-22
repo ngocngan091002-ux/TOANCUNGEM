@@ -45,7 +45,19 @@ CREATE TABLE IF NOT EXISTS public.class_members (
     UNIQUE (class_id, student_id)
 );
 
--- 4. BẢNG KHO HỌC LIỆU & GAME TƯƠNG TÁC (MATERIALS)
+-- 4. BẢNG KHO HỌC LIỆU & GAME TƯƠNG TÁC (MATERIALS & GAMES)
+CREATE TABLE IF NOT EXISTS public.games (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    description TEXT,
+    game_url TEXT NOT NULL,
+    class_id UUID REFERENCES public.classes(id) ON DELETE CASCADE,
+    teacher_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    max_plays INT DEFAULT 3,
+    likes_count INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS public.materials (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title TEXT NOT NULL,
