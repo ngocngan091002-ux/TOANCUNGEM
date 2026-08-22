@@ -208,8 +208,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
-        // Nếu đã đăng ký rồi -> Tự động Đăng nhập luôn!
-        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+        // Nếu đã đăng ký rồi hoặc dính email rate limit -> Tự động thử Đăng nhập luôn!
+        if (
+          error.message.includes('already registered') || 
+          error.message.includes('User already registered') ||
+          error.message.includes('rate limit') ||
+          error.message.includes('exceeded')
+        ) {
           return await loginWithEmail(cleanEmail, pass, role);
         }
         return { success: false, error: error.message };
