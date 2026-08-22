@@ -144,6 +144,7 @@ export interface AssignmentSubmission {
   teacher_remark?: string;
   status: 'submitted' | 'graded_by_ai' | 'finalized_by_teacher';
   student?: UserProfile;
+  assignment?: Assignment;
   responses?: QuestionResponse[];
 }
 
