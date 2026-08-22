@@ -17,7 +17,7 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 // --- AUTH HELPERS ---
 export async function getCurrentProfile(userId: string): Promise<UserProfile | null> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -32,7 +32,7 @@ export async function getCurrentProfile(userId: string): Promise<UserProfile | n
 
 export async function checkEmailExists(email: string): Promise<boolean> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('profiles')
       .select('id, email')
       .eq('email', email.trim().toLowerCase());
@@ -46,7 +46,7 @@ export async function checkEmailExists(email: string): Promise<boolean> {
 
 // --- ADMIN SERVICES ---
 export async function getAllProfiles(): Promise<UserProfile[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('profiles')
     .select('*')
     .order('created_at', { ascending: false });
@@ -56,7 +56,7 @@ export async function getAllProfiles(): Promise<UserProfile[]> {
 }
 
 export async function updateUserStatus(userId: string, status: 'approved' | 'rejected'): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('profiles')
     .update({ status })
     .eq('id', userId);
@@ -66,7 +66,7 @@ export async function updateUserStatus(userId: string, status: 'approved' | 'rej
 
 // --- CLASS SERVICES ---
 export async function getTeacherClasses(teacherId: string): Promise<ClassItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('classes')
     .select('*')
     .eq('teacher_id', teacherId)
@@ -77,7 +77,7 @@ export async function getTeacherClasses(teacherId: string): Promise<ClassItem[]>
 }
 
 export async function getStudentClasses(studentId: string): Promise<ClassItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('class_members')
     .select('class_id, classes (*)')
     .eq('student_id', studentId);
@@ -91,7 +91,7 @@ export async function createClass(name: string, grade: number = 2, teacherId: st
   const insertPayload: any = { name, grade, code, teacher_id: teacherId };
   if (description) insertPayload.description = description;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('classes')
     .insert([insertPayload])
     .select()
@@ -100,7 +100,7 @@ export async function createClass(name: string, grade: number = 2, teacherId: st
   if (error) {
     if (error.message.includes("Could not find the 'description' column") || (error as any).code === 'PGRST204') {
       delete insertPayload.description;
-      const { data: fallbackData, error: fallbackError } = await supabase
+      const { data: fallbackData, error: fallbackError } = await supabaseAdmin
         .from('classes')
         .insert([insertPayload])
         .select()
@@ -117,7 +117,7 @@ export async function createClass(name: string, grade: number = 2, teacherId: st
 
 export async function joinClassByCode(code: string, studentId: string): Promise<ClassItem> {
   const cleanCode = code.trim().toUpperCase();
-  const { data: cls, error: clsErr } = await supabase
+  const { data: cls, error: clsErr } = await supabaseAdmin
     .from('classes')
     .select('*')
     .eq('code', cleanCode)
@@ -229,7 +229,7 @@ export async function batchImportStudentsToClass(
 
 // --- MATERIALS & GAME HUB ---
 export async function getMaterials(classId?: string, isPublic = false): Promise<Material[]> {
-  let query = supabase.from('materials').select('*').order('created_at', { ascending: false });
+  let query = supabaseAdmin.from('materials').select('*').order('created_at', { ascending: false });
 
   if (classId) {
     query = query.or(`class_id.eq.${classId},is_public.eq.true`);
@@ -243,7 +243,7 @@ export async function getMaterials(classId?: string, isPublic = false): Promise<
 }
 
 export async function createMaterial(mat: Omit<Material, 'id' | 'created_at'>): Promise<Material> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('materials')
     .insert([mat])
     .select()
@@ -254,7 +254,7 @@ export async function createMaterial(mat: Omit<Material, 'id' | 'created_at'>): 
 }
 
 export async function getLearningMaterials(classId: string): Promise<LearningMaterial[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('learning_materials')
     .select('*')
     .eq('class_id', classId)
@@ -265,7 +265,7 @@ export async function getLearningMaterials(classId: string): Promise<LearningMat
 }
 
 export async function addLearningMaterial(material: Omit<LearningMaterial, 'id' | 'created_at'>): Promise<LearningMaterial> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('learning_materials')
     .insert([material])
     .select()
@@ -276,7 +276,7 @@ export async function addLearningMaterial(material: Omit<LearningMaterial, 'id' 
 }
 
 export async function getGames(classId: string): Promise<GameItem[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('games')
     .select('*')
     .eq('class_id', classId)
@@ -287,7 +287,7 @@ export async function getGames(classId: string): Promise<GameItem[]> {
 }
 
 export async function addGame(game: Omit<GameItem, 'id' | 'created_at'>): Promise<GameItem> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('games')
     .insert([game])
     .select()
@@ -299,7 +299,7 @@ export async function addGame(game: Omit<GameItem, 'id' | 'created_at'>): Promis
 
 // --- DAILY TASKS ---
 export async function getDailyTasks(classId: string, studentId?: string): Promise<DailyTask[]> {
-  const { data: tasks, error } = await supabase
+  const { data: tasks, error } = await supabaseAdmin
     .from('daily_tasks')
     .select('*')
     .eq('class_id', classId)
@@ -309,12 +309,12 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
   if (!tasks || tasks.length === 0) return [];
 
   const taskIds = tasks.map(t => t.id);
-  const { data: completions } = await supabase
+  const { data: completions } = await supabaseAdmin
     .from('task_completions')
     .select('task_id, student_id')
     .in('task_id', taskIds);
 
-  const { count: totalStudentsCount } = await supabase
+  const { count: totalStudentsCount } = await supabaseAdmin
     .from('class_members')
     .select('*', { count: 'exact', head: true })
     .eq('class_id', classId);
@@ -333,7 +333,7 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
 }
 
 export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>): Promise<DailyTask> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('daily_tasks')
     .insert([task])
     .select()
@@ -344,15 +344,15 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
 }
 
 export async function markTaskCompleted(taskId: string, studentId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('task_completions')
-    .insert([{ task_id: taskId, student_id: studentId }]);
+    .upsert([{ task_id: taskId, student_id: studentId }], { onConflict: 'task_id,student_id' });
 
   if (error && !error.message.includes('unique constraint')) throw error;
 }
 
 export async function getTaskCompletionList(taskId: string): Promise<TaskCompletion[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('task_completions')
     .select('*, student:profiles(*)')
     .eq('task_id', taskId);
@@ -363,7 +363,7 @@ export async function getTaskCompletionList(taskId: string): Promise<TaskComplet
 
 // --- ASSIGNMENTS & QUESTIONS ---
 export async function getAssignments(classId: string, isTeacher = false): Promise<Assignment[]> {
-  let query = supabase
+  let query = supabaseAdmin
     .from('assignments')
     .select('*, questions:assignment_questions(*), material:materials(*)')
     .eq('class_id', classId)
@@ -382,7 +382,7 @@ export async function createAssignmentWithQuestions(
   assignmentData: Omit<Assignment, 'id' | 'created_at'>,
   questions: Omit<AssignmentQuestion, 'id' | 'assignment_id'>[]
 ): Promise<Assignment> {
-  const { data: assignment, error: assignErr } = await supabase
+  const { data: assignment, error: assignErr } = await supabaseAdmin
     .from('assignments')
     .insert([assignmentData])
     .select()
@@ -397,7 +397,7 @@ export async function createAssignmentWithQuestions(
       order_index: index
     }));
 
-    const { data: insertedQuestions, error: qErr } = await supabase
+    const { data: insertedQuestions, error: qErr } = await supabaseAdmin
       .from('assignment_questions')
       .insert(questionsToInsert)
       .select();
@@ -410,7 +410,7 @@ export async function createAssignmentWithQuestions(
 }
 
 export async function finalizeAssignment(assignmentId: string): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('assignments')
     .update({ is_finalized: true })
     .eq('id', assignmentId);
@@ -426,7 +426,7 @@ export async function recordStudentProgress(
   score: number = 0,
   completionTimeSeconds: number = 0
 ): Promise<StudentProgress> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('student_progress')
     .upsert({
       assignment_id: assignmentId,
@@ -444,7 +444,7 @@ export async function recordStudentProgress(
 }
 
 export async function getStudentProgressList(studentId: string): Promise<StudentProgress[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('student_progress')
     .select('*, assignment:assignments(*)')
     .eq('student_id', studentId);
@@ -454,7 +454,7 @@ export async function getStudentProgressList(studentId: string): Promise<Student
 }
 
 export async function getClassProgressSummary(classId: string): Promise<StudentProgress[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('student_progress')
     .select('*, student:profiles(*), assignment:assignments(*)')
     .eq('assignment.class_id', classId);
@@ -473,7 +473,7 @@ export async function submitAssignment(
   const totalTime = responses.reduce((sum, r) => sum + r.time_spent_seconds, 0);
 
   // Tạo submission
-  const { data: submission, error: subErr } = await supabase
+  const { data: submission, error: subErr } = await supabaseAdmin
     .from('assignment_submissions')
     .insert([{
       assignment_id: assignmentId,
@@ -499,7 +499,7 @@ export async function submitAssignment(
     is_correct: r.is_correct
   }));
 
-  const { error: respErr } = await supabase
+  const { error: respErr } = await supabaseAdmin
     .from('question_responses')
     .insert(responsesToInsert);
 
@@ -509,7 +509,7 @@ export async function submitAssignment(
 }
 
 export async function getStudentSubmissions(studentId: string): Promise<AssignmentSubmission[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('assignment_submissions')
     .select('*, assignment:assignments(*), responses:question_responses(*)')
     .eq('student_id', studentId);
@@ -519,7 +519,7 @@ export async function getStudentSubmissions(studentId: string): Promise<Assignme
 }
 
 export async function getClassSubmissionsForTeacher(assignmentId: string): Promise<AssignmentSubmission[]> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('assignment_submissions')
     .select('*, student:profiles(*), responses:question_responses(*)')
     .eq('assignment_id', assignmentId);
@@ -533,7 +533,7 @@ export async function updateTeacherGrading(
   score: number,
   teacherRemark: string
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await supabaseAdmin
     .from('assignment_submissions')
     .update({
       score,
@@ -552,12 +552,12 @@ export async function getClassLeaderboard(classId: string): Promise<LeaderboardE
 
   const studentIds = members.map(m => m.student_id);
 
-  const { data: completions } = await supabase
+  const { data: completions } = await supabaseAdmin
     .from('task_completions')
     .select('student_id')
     .in('student_id', studentIds);
 
-  const { data: submissions } = await supabase
+  const { data: submissions } = await supabaseAdmin
     .from('assignment_submissions')
     .select('student_id, score, status, assignment:assignments(type)')
     .in('student_id', studentIds)
@@ -601,7 +601,7 @@ export async function uploadFileToStorage(bucket: 'materials' | 'question-images
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabaseAdmin.storage
       .from(bucket)
       .upload(fileName, file);
 
@@ -610,7 +610,7 @@ export async function uploadFileToStorage(bucket: 'materials' | 'question-images
       return URL.createObjectURL(file);
     }
 
-    const { data: publicUrlData } = supabase.storage
+    const { data: publicUrlData } = supabaseAdmin.storage
       .from(bucket)
       .getPublicUrl(fileName);
 
