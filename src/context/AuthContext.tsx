@@ -22,15 +22,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [activeView, setActiveView] = useState<ActiveView>('student');
 
   useEffect(() => {
+    const processSession = async (sessionUser: any) => {
+      if (!sessionUser) {
+        setUser(null);
+        return;
+      }
+
+      let profile = await getCurrentProfile(sessionUser.id);
+
+      // Nếu chưa có profile trong bảng profiles (ví dụ chưa chạy SQL Trigger), tự động tạo profile từ OAuth Meta Data
+      if (!profile) {
+        const savedRole = (localStorage.getItem('auth_selected_role') as UserRole) || 'student';
+        const isSuperAdmin = sessionUser.email?.toLowerCase() === 'ngocngan091002@gmail.com';
+        
+        const fallbackProfile: UserProfile = {
+          id: sessionUser.id,
+          email: sessionUser.email || '',
+          full_name: sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name || sessionUser.email?.split('@')[0] || 'Người dùng Google',
+          role: isSuperAdmin ? 'admin' : savedRole,
+          status: isSuperAdmin ? 'approved' : (savedRole === 'teacher' ? 'pending' : 'approved'),
+          avatar_url: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || ''
+        };
+
+        try {
+          await supabase.from('profiles').upsert(fallbackProfile);
+        } catch (e) {
+          console.warn('Upsert fallback profile warning:', e);
+        }
+
+        profile = fallbackProfile;
+      }
+
+      handleProfileLoaded(profile);
+    };
+
     // Check initial Supabase Session
     const initAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          const profile = await getCurrentProfile(session.user.id);
-          if (profile) {
-            handleProfileLoaded(profile);
-          }
+          await processSession(session.user);
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
@@ -41,13 +72,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen to Supabase Auth Changes
+    // Listen to Supabase Auth Changes (Google Login Redirect Callback)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
-        const profile = await getCurrentProfile(session.user.id);
-        if (profile) {
-          handleProfileLoaded(profile);
-        }
+        await processSession(session.user);
       } else {
         setUser(null);
       }
@@ -58,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const handleProfileLoaded = (profile: UserProfile) => {
-    // Admin mặc định
+    // Admin mặc định tối cao
     if (profile.email.toLowerCase() === 'ngocngan091002@gmail.com') {
       profile.role = 'admin';
       profile.status = 'approved';
@@ -101,48 +129,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithEmail = async (email: string, pass: string, selectedRole: UserRole): Promise<{ success: boolean; error?: string }> => {
     try {
+      const isSuperAdmin = email.trim().toLowerCase() === 'ngocngan091002@gmail.com';
+
       // 1. Kiểm tra Email xem đã đăng ký trong DB hay chưa
       const { data: profiles } = await supabase
         .from('profiles')
         .select('*')
         .eq('email', email.trim().toLowerCase());
 
-      const profile = profiles && profiles.length > 0 ? profiles[0] : null;
+      let profile = profiles && profiles.length > 0 ? profiles[0] : null;
 
-      // Nếu gmail chưa đăng ký -> Chặn đăng nhập theo yêu cầu!
-      if (!profile) {
-        return { 
-          success: false, 
-          error: 'Tài khoản chưa được đăng ký trong hệ thống. Vui lòng đăng ký tài khoản mới hoặc liên hệ Quản trị viên!' 
-        };
-      }
-
-      // 2. Kiểm tra trạng thái Giáo viên
-      if (profile.role === 'teacher' && profile.status === 'pending') {
-        return {
-          success: false,
-          error: 'Tài khoản Giáo viên của bạn đang chờ Quản trị viên duyệt. Vui lòng đợi thông báo!'
-        };
-      }
-
-      if (profile.status === 'rejected') {
-        return {
-          success: false,
-          error: 'Tài khoản của bạn đã bị từ chối truy cập.'
-        };
-      }
-
-      // 3. Tiến hành Auth Sign In
+      // 2. Tiến hành Auth Sign In
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: pass
       });
 
       if (error) {
+        if (!profile) {
+          return { 
+            success: false, 
+            error: 'Tài khoản chưa được đăng ký trong hệ thống. Thầy/Cô nhấp vào "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới để đăng ký trước nhé!' 
+          };
+        }
         return { success: false, error: 'Mật khẩu không chính xác. Vui lòng kiểm tra lại!' };
       }
 
       if (data.user) {
+        if (!profile) {
+          profile = {
+            id: data.user.id,
+            email: email.trim().toLowerCase(),
+            full_name: email.split('@')[0],
+            role: isSuperAdmin ? 'admin' : selectedRole,
+            status: isSuperAdmin ? 'approved' : (selectedRole === 'teacher' ? 'pending' : 'approved')
+          };
+        }
+
+        // Kiểm tra trạng thái Giáo viên
+        if (profile.role === 'teacher' && profile.status === 'pending' && !isSuperAdmin) {
+          return {
+            success: false,
+            error: 'Tài khoản Giáo viên của bạn đang chờ Quản trị viên duyệt. Vui lòng đợi thông báo!'
+          };
+        }
+
         handleProfileLoaded(profile);
         return { success: true };
       }
@@ -177,7 +208,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (data.user) {
-        // Chèn vào bảng profiles thủ công nếu trigger chưa kích hoạt
         await supabase.from('profiles').upsert({
           id: data.user.id,
           email: email.trim().toLowerCase(),
