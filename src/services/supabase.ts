@@ -128,7 +128,14 @@ export async function joinClassByCode(code: string, studentId: string): Promise<
     .from('class_members')
     .insert([{ class_id: cls.id, student_id: studentId }]);
 
-  if (joinErr && !joinErr.message.includes('unique constraint')) {
+  if (joinErr) {
+    if (
+      joinErr.message.includes('unique constraint') || 
+      joinErr.message.includes('duplicate key') ||
+      (joinErr as any).code === '23505'
+    ) {
+      return cls;
+    }
     throw joinErr;
   }
 
