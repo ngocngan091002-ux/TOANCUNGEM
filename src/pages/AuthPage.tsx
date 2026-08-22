@@ -67,14 +67,14 @@ export const AuthPage: React.FC = () => {
     }
   };
 
-  // NÚT ĐĂNG NHẬP NHANH MẪU CHO THẦY/CÔ TEST HỆ THỐNG TỨC THÌ
   const handleQuickFillAdmin = () => {
     setSelectedRole('admin');
+    setIsSignUp(false);
     setEmail('ngocngan091002@gmail.com');
     setPassword('12345678');
     setFullName('Quản Trị Viên Ngọc Ngân');
     setErrorMsg('');
-    setSuccessMsg('Đã tự động điền thông tin Admin! Thầy/Cô bấm "Đăng Ký Tài Khoản Mới" (nếu lần đầu) hoặc "Vào Hệ Thống" nhé.');
+    setSuccessMsg('🎉 Đã sẵn sàng tài khoản Admin! Thầy/Cô bấm nút cam "Vào Hệ Thống Học Tập" bên dưới để vào ngay nhé.');
   };
 
   return (
