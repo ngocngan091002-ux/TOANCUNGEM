@@ -322,6 +322,30 @@ export const StudentDashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* BANNER THÔNG BÁO BÀI TẬP TUẦN MỚI GIAO */}
+          {assignments.length > 0 && (
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-5 rounded-3xl shadow-xl border-4 border-amber-300 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
+                  🔔
+                </div>
+                <div>
+                  <h4 className="font-black text-base text-yellow-200">THÔNG BÁO THẦY/CÔ VỪA GIAO BÀI TẬP TUẦN MỚI!</h4>
+                  <p className="text-xs font-bold text-white/90">
+                    Lớp em vừa nhận được bài tập tuần mới: <strong className="text-yellow-300 font-extrabold underline">{assignments[0].title}</strong> ({assignments[0].questions?.length || 1} câu hỏi - Hạn đếm ngược: {assignments[0].time_limit_minutes || 15} phút).
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setActiveMenu('assignments'); setActiveAssignment(null); }}
+                className="px-5 py-3 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black text-xs rounded-2xl shadow-lg uppercase tracking-wider whitespace-nowrap transform active:scale-95 transition-all flex items-center gap-1.5"
+              >
+                📝 Mở Bài Tập Tuần Làm Ngay →
+              </button>
+            </div>
+          )}
+
           {/* HUY HIỆU LỚP ĐANG HỌC */}
           <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md flex items-center justify-between">
             <div className="flex items-center gap-2">

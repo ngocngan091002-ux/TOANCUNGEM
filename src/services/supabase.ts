@@ -138,13 +138,27 @@ export async function getTeacherClasses(teacherId: string): Promise<ClassItem[]>
 }
 
 export async function getStudentClasses(studentId: string): Promise<ClassItem[]> {
-  const { data, error } = await supabaseAdmin
-    .from('class_members')
-    .select('class_id, classes (*)')
-    .eq('student_id', studentId);
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('class_members')
+      .select('class_id, classes (*)')
+      .eq('student_id', studentId);
 
-  if (error) throw error;
-  return data?.map((item: any) => item.classes).filter(Boolean) || [];
+    const classes = data?.map((item: any) => item.classes).filter(Boolean) || [];
+    if (classes.length > 0) {
+      return classes;
+    }
+  } catch (err) {
+    console.warn('getStudentClasses exception:', err);
+  }
+
+  // Fallback: Lấy tất cả lớp học trong hệ thống nếu tài khoản chưa gia nhập lớp nào (như tài khoản GV/Admin xem thử)
+  const { data: allCls } = await supabaseAdmin
+    .from('classes')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  return allCls || [];
 }
 
 export async function createClass(name: string, grade: number = 2, teacherId: string, description?: string): Promise<ClassItem> {
@@ -540,18 +554,46 @@ export async function getTaskCompletionList(taskId: string): Promise<TaskComplet
 
 // --- ASSIGNMENTS & QUESTIONS ---
 export async function getAssignments(classId: string, isTeacher = false): Promise<Assignment[]> {
-  let query = supabaseAdmin
-    .from('assignments')
-    .select('*, questions:assignment_questions(*), material:materials(*)')
-    .eq('class_id', classId)
-    .order('created_at', { ascending: false });
+  try {
+    let { data, error } = await supabaseAdmin
+      .from('assignments')
+      .select('*, questions:assignment_questions(*), material:materials(*)')
+      .eq('class_id', classId)
+      .order('created_at', { ascending: false });
 
-  const { data, error } = await query;
-  if (error) {
-    console.error('getAssignments error:', error);
+    if (error || !data || data.length === 0) {
+      const { data: rawAssignments } = await supabaseAdmin
+        .from('assignments')
+        .select('*')
+        .eq('class_id', classId)
+        .order('created_at', { ascending: false });
+      
+      data = rawAssignments || [];
+    }
+
+    if (data && data.length > 0) {
+      const assignmentIds = data.map((a: any) => a.id);
+      const { data: allQuestions } = await supabaseAdmin
+        .from('assignment_questions')
+        .select('*')
+        .in('assignment_id', assignmentIds);
+
+      if (allQuestions && allQuestions.length > 0) {
+        data = data.map((a: any) => {
+          const qList = allQuestions.filter((q: any) => q.assignment_id === a.id);
+          return {
+            ...a,
+            questions: (a.questions && a.questions.length > 0) ? a.questions : qList
+          };
+        });
+      }
+    }
+
+    return data || [];
+  } catch (err) {
+    console.error('getAssignments exception:', err);
     return [];
   }
-  return data || [];
 }
 
 export async function createAssignmentWithQuestions(
