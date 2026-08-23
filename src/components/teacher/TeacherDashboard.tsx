@@ -569,7 +569,7 @@ export const TeacherDashboard: React.FC = () => {
           class_id: selectedClass.id,
           teacher_id: user?.id || '',
           title: finalTitle,
-          type: assignType || 'homework',
+          type: 'exercise',
           time_limit_minutes: timeLimitMinutes, // QUIZ-09: Đồng hồ đếm ngược
           shuffle_questions: shuffleQuestions, // QUIZ-08: Trộn câu hỏi
           is_finalized: true

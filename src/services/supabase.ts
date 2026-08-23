@@ -474,7 +474,13 @@ export async function createAssignmentWithQuestions(
   assignmentData: Omit<Assignment, 'id' | 'created_at'>,
   questions: Omit<AssignmentQuestion, 'id' | 'assignment_id'>[]
 ): Promise<Assignment> {
-  const payload: any = { ...assignmentData };
+  const allowedTypes = ['exercise', 'weekly_test', 'game_quiz'];
+  const safeType = allowedTypes.includes(assignmentData.type) ? assignmentData.type : 'exercise';
+
+  const payload: any = { 
+    ...assignmentData,
+    type: safeType
+  };
 
   let assignment: any = null;
 
