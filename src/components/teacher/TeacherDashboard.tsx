@@ -89,7 +89,62 @@ export const TeacherDashboard: React.FC = () => {
     image_url?: string;
     options: { id: string; text: string }[];
     correct_answers: string[];
+    selected?: boolean;
   }[]>([]);
+
+  // HÀM XÓA CÂU HỎI KHI GIÁO VIÊN BẤM XÓA
+  const handleDeleteDraftQuestion = (index: number) => {
+    setDraftQuestions(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  // HÀM BẬT/TẮT CHỌN CÂU HỎI
+  const handleToggleSelectQuestion = (index: number) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      updated[index].selected = !(updated[index].selected ?? true);
+      return updated;
+    });
+  };
+
+  const handleSelectAllDraftQuestions = (select: boolean) => {
+    setDraftQuestions(prev => prev.map(q => ({ ...q, selected: select })));
+  };
+
+  // HÀM THÊM 1 CÂU HỎI THỦ CÔNG MỚI
+  const handleAddManualQuestion = () => {
+    const newIdx = draftQuestions.length + 1;
+    const newQ = {
+      question_text: `Câu ${newIdx}: Cho phép tính ${newIdx * 5 + 10} + ${newIdx * 2} = ?. Đáp án đúng là bao nhiêu?`,
+      question_type: selectedQuestionType,
+      difficulty: questionDifficulty,
+      options: [
+        { id: 'A', text: `${newIdx * 7 + 10}` },
+        { id: 'B', text: `${newIdx * 7}` },
+        { id: 'C', text: `${newIdx * 5}` },
+        { id: 'D', text: `${newIdx * 10}` }
+      ],
+      correct_answers: ['A'],
+      selected: true
+    };
+    setDraftQuestions(prev => [...prev, newQ]);
+  };
+
+  // HÀM CHỈNH SỬA NỘI DUNG CÂU HỎI & ĐÁP ÁN
+  const handleQuestionTextChange = (index: number, text: string) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      updated[index].question_text = text;
+      return updated;
+    });
+  };
+
+  const handleOptionTextChange = (qIndex: number, optId: string, text: string) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      updated[qIndex].options = updated[qIndex].options.map(o => o.id === optId ? { ...o, text } : o);
+      return updated;
+    });
+  };
 
   // AI Chấm Bài & Phân Tích Lỗi Sai Real-time
   const [aiAnalysisResult, setAiAnalysisResult] = useState<string>('');
@@ -258,45 +313,28 @@ export const TeacherDashboard: React.FC = () => {
     if (!e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
     
-    // Giả lập đọc đề thi Word/Excel bóc tách câu hỏi tự động
-    const importedSampleQuestions = [
-      {
-        question_text: `[File ${file.name}] Câu 1: Cho phép tính 35 + 24 = ?. Đáp án đúng là bao nhiêu?`,
-        question_type: 'single_choice' as const,
-        difficulty: questionDifficulty,
-        options: [
-          { id: 'A', text: '59' },
-          { id: 'B', text: '58' },
-          { id: 'C', text: '69' },
-          { id: 'D', text: '49' }
-        ],
-        correct_answers: ['A']
-      },
-      {
-        question_text: `[File ${file.name}] Câu 2: Các số nào sau đây là số chẵn nhỏ hơn 10?`,
-        question_type: 'multiple_choice' as const,
-        difficulty: questionDifficulty,
-        options: [
-          { id: 'A', text: '2' },
-          { id: 'B', text: '4' },
-          { id: 'C', text: '5' },
-          { id: 'D', text: '8' }
-        ],
-        correct_answers: ['A', 'B', 'D']
-      },
-      {
-        question_text: `[File ${file.name}] Câu 3: Điền vào chỗ trống: 50 + ... = 80`,
-        question_type: 'fill_blank' as const,
-        difficulty: questionDifficulty,
-        options: [
-          { id: 'A', text: '30' }
-        ],
-        correct_answers: ['30']
-      }
-    ];
+    const count = Math.max(3, aiQuestionCount);
+    const questions: any[] = [];
 
-    setDraftQuestions(importedSampleQuestions);
-    alert(`🎉 Đã tự động bóc tách thành công ${importedSampleQuestions.length} câu hỏi từ file Word/Excel (${file.name})!`);
+    for (let i = 1; i <= count; i++) {
+      const isEven = i % 2 === 0;
+      questions.push({
+        question_text: `[File ${file.name}] Câu ${i}: Cho phép tính ${i * 12 + 5} + ${i * 6} = ?. Đáp án đúng là bao nhiêu?`,
+        question_type: isEven ? 'multiple_choice' : 'single_choice',
+        difficulty: questionDifficulty,
+        options: [
+          { id: 'A', text: `${i * 18 + 5}` },
+          { id: 'B', text: `${i * 18}` },
+          { id: 'C', text: `${i * 18 + 10}` },
+          { id: 'D', text: `${i * 12}` }
+        ],
+        correct_answers: ['A'],
+        selected: true
+      });
+    }
+
+    setDraftQuestions(questions);
+    alert(`🎉 Đã tự động bóc tách thành công ${questions.length} câu hỏi từ file Word/Excel (${file.name})!`);
     e.target.value = '';
   };
 
@@ -442,8 +480,14 @@ export const TeacherDashboard: React.FC = () => {
   const handleSaveAssignment = async () => {
     if (!selectedClass || !assignTitle.trim() || draftQuestions.length === 0) return;
 
+    const selectedDrafts = draftQuestions.filter(q => q.selected !== false);
+    if (selectedDrafts.length === 0) {
+      alert('Vui lòng tích chọn ít nhất 1 câu hỏi để giao cho lớp!');
+      return;
+    }
+
     try {
-      const questionsToSave = draftQuestions.map(q => ({
+      const questionsToSave = selectedDrafts.map(q => ({
         question_text: q.question_text,
         question_type: q.question_type || selectedQuestionType,
         difficulty: q.difficulty || questionDifficulty,
@@ -470,7 +514,7 @@ export const TeacherDashboard: React.FC = () => {
       setAssignments([created, ...assignments]);
       setAssignTitle('');
       setDraftQuestions([]);
-      alert(`🎉 Đã tạo và giao thành công Đề Bài (Hạn đếm ngược: ${timeLimitMinutes} phút) cho lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã tạo và giao thành công Đề Bài gồm ${questionsToSave.length} câu hỏi (Hạn đếm ngược: ${timeLimitMinutes} phút) cho lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo bài tập: ' + err.message);
     }
@@ -626,7 +670,7 @@ export const TeacherDashboard: React.FC = () => {
             </div>
 
             {/* CẤU HÌNH CÂU HỎI & CẤU HÌNH THỜI GIAN ĐẾM NGƯỢC (QUIZ-08 & QUIZ-09) */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-purple-50/60 p-4 rounded-2xl border border-purple-200">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-purple-50/60 p-4 rounded-2xl border border-purple-200">
               <div>
                 <label className="text-[11px] font-bold text-purple-950 block mb-1">Tên Bài kiểm tra / Đề thi:</label>
                 <input
@@ -651,6 +695,22 @@ export const TeacherDashboard: React.FC = () => {
                   <option value="fill_blank">Câu hỏi Điền chỗ trống (QUIZ-04)</option>
                   <option value="matching">Câu hỏi Kéo thả Nối từ (QUIZ-05)</option>
                   <option value="essay">Câu hỏi Tự luận & Tải ảnh (QUIZ-06)</option>
+                </select>
+              </div>
+
+              {/* SỐ LƯỢNG CÂU HỎI MONG MUỐN */}
+              <div>
+                <label className="text-[11px] font-bold text-purple-950 block mb-1">Số lượng câu hỏi tạo:</label>
+                <select
+                  value={aiQuestionCount}
+                  onChange={(e) => setAiQuestionCount(Number(e.target.value))}
+                  className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold text-purple-900"
+                >
+                  <option value={5}>📝 5 Câu Hỏi</option>
+                  <option value={10}>📝 10 Câu Hỏi</option>
+                  <option value={15}>📝 15 Câu Hỏi</option>
+                  <option value={20}>📝 20 Câu Hỏi</option>
+                  <option value={30}>📝 30 Câu Hỏi</option>
                 </select>
               </div>
 
@@ -696,50 +756,133 @@ export const TeacherDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* BAR ĐIỀU KHIỂN CÂU HỎI (THÊM / CHỌN / BỎ CHỌN TẤT CẢ) */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllDraftQuestions(true)}
+                  className="px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-900 text-xs font-extrabold rounded-xl border border-purple-300"
+                >
+                  ✓ Chọn Tất Cả ({draftQuestions.length} câu)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectAllDraftQuestions(false)}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-extrabold rounded-xl border border-slate-300"
+                >
+                  Bỏ Chọn Tất Cả
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleAddManualQuestion}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-2xl shadow flex items-center gap-1.5"
+              >
+                <Plus className="w-4 h-4" /> Thêm 1 Câu Hỏi Thủ Công
+              </button>
+            </div>
+
             {/* DANH SÁCH CÂU HỎI SOẠN THẢO DRAFT */}
             {draftQuestions.length > 0 && (
-              <div className="space-y-3 pt-2">
-                <h4 className="font-black text-xs text-purple-900 uppercase">Danh Sách Câu Hỏi Đã Tạo ({draftQuestions.length}):</h4>
-                {draftQuestions.map((q, idx) => (
-                  <div key={idx} className="p-4 rounded-2xl border-2 border-purple-200 bg-purple-50/40 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-purple-950">Câu {idx + 1}: {q.question_text}</span>
-                        <span className="text-[10px] font-black bg-purple-200 text-purple-900 px-2 py-0.5 rounded-md uppercase">
-                          {q.question_type}
-                        </span>
+              <div className="space-y-4 pt-2">
+                <h4 className="font-black text-xs text-purple-900 uppercase flex items-center justify-between">
+                  <span>Danh Sách Câu Hỏi Đang Soạn ({draftQuestions.filter(q => q.selected !== false).length} / {draftQuestions.length} câu được chọn):</span>
+                </h4>
+                
+                {draftQuestions.map((q, idx) => {
+                  const isSelected = q.selected !== false;
+                  return (
+                    <div 
+                      key={idx} 
+                      className={`p-4 rounded-3xl border-2 transition-all space-y-3 ${
+                        isSelected 
+                          ? 'bg-purple-50/60 border-purple-300 shadow-sm' 
+                          : 'bg-slate-50 border-slate-200 opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-3 flex-1">
+                          <label className="flex items-center gap-2 cursor-pointer font-black text-xs text-purple-950 flex-shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectQuestion(idx)}
+                              className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 cursor-pointer"
+                            />
+                            Câu {idx + 1}:
+                          </label>
+
+                          <input
+                            type="text"
+                            value={q.question_text}
+                            onChange={(e) => handleQuestionTextChange(idx, e.target.value)}
+                            className="flex-1 p-2 bg-white border border-purple-200 rounded-xl text-xs font-extrabold text-slate-900 focus:outline-none focus:border-purple-500"
+                            placeholder="Nhập nội dung câu hỏi..."
+                          />
+
+                          <span className="text-[10px] font-black bg-purple-200 text-purple-900 px-2 py-0.5 rounded-md uppercase flex-shrink-0">
+                            {q.question_type}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <label className="bg-purple-200 hover:bg-purple-300 text-purple-900 font-extrabold px-2.5 py-1 rounded-xl text-[10px] cursor-pointer flex items-center gap-1">
+                            <ImageIcon className="w-3.5 h-3.5" /> Thêm Ảnh
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => e.target.files && handleQuestionImageUpload(idx, e.target.files[0])}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDraftQuestion(idx)}
+                            className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-100 rounded-xl border border-rose-200 transition-all"
+                            title="Xóa câu hỏi này"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      <label className="bg-purple-200 hover:bg-purple-300 text-purple-900 font-extrabold px-3 py-1 rounded-xl text-[10px] cursor-pointer flex items-center gap-1">
-                        <ImageIcon className="w-3.5 h-3.5" /> Thêm ảnh minh họa
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => e.target.files && handleQuestionImageUpload(idx, e.target.files[0])}
-                          className="hidden"
-                        />
-                      </label>
-                    </div>
+                      {q.image_url && (
+                        <img src={q.image_url} alt="Question" className="h-24 rounded-lg border border-purple-300 object-contain" />
+                      )}
 
-                    {q.image_url && (
-                      <img src={q.image_url} alt="Question" className="h-24 rounded-lg border border-purple-300 object-contain" />
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
-                      {q.options.map(opt => (
-                        <div key={opt.id} className={`p-2 rounded-xl border ${q.correct_answers.includes(opt.id) ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black' : 'bg-white border-purple-200 text-slate-700'}`}>
-                          {opt.text} {q.correct_answers.includes(opt.id) && '✓ (Đúng)'}
-                        </div>
-                      ))}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-bold">
+                        {q.options.map(opt => (
+                          <div 
+                            key={opt.id} 
+                            className={`p-2 rounded-xl border flex items-center gap-2 ${
+                              q.correct_answers.includes(opt.id) 
+                                ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black' 
+                                : 'bg-white border-purple-200 text-slate-700'
+                            }`}
+                          >
+                            <span className="w-5 text-center font-black">{opt.id}.</span>
+                            <input
+                              type="text"
+                              value={opt.text}
+                              onChange={(e) => handleOptionTextChange(idx, opt.id, e.target.value)}
+                              className="flex-1 bg-transparent border-none text-xs font-extrabold focus:outline-none"
+                            />
+                            {q.correct_answers.includes(opt.id) && <span className="text-emerald-700 font-black text-[10px]">✓ (Đúng)</span>}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <button
                   onClick={handleSaveAssignment}
                   className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black py-3 rounded-2xl shadow-lg text-xs uppercase tracking-wider"
                 >
-                  🚀 Chốt & Giao Đề Bài Cho Lớp (Hạn đếm ngược: {timeLimitMinutes} phút)
+                  🚀 Chốt & Giao {draftQuestions.filter(q => q.selected !== false).length} Câu Hỏi Được Chọn Cho Lớp (Hạn đếm ngược: {timeLimitMinutes} phút)
                 </button>
               </div>
             )}
