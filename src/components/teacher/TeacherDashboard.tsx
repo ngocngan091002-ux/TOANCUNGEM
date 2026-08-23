@@ -565,10 +565,13 @@ export const TeacherDashboard: React.FC = () => {
         order_index: 0
       }));
 
+      const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const safeTeacherId = isUuid(user?.id) ? user!.id : selectedClass.teacher_id;
+
       const created = await createAssignmentWithQuestions(
         {
           class_id: selectedClass.id,
-          teacher_id: user?.id || '',
+          teacher_id: safeTeacherId,
           title: finalTitle,
           type: 'exercise',
           time_limit_minutes: timeLimitMinutes, // QUIZ-09: Đồng hồ đếm ngược

@@ -530,10 +530,20 @@ export async function createAssignmentWithQuestions(
   const allowedTypes = ['exercise', 'weekly_test', 'game_quiz'];
   const safeType = allowedTypes.includes(assignmentData.type) ? assignmentData.type : 'exercise';
 
+  const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const payload: any = { 
-    ...assignmentData,
-    type: safeType
+    class_id: assignmentData.class_id,
+    title: assignmentData.title,
+    type: safeType,
+    time_limit_minutes: assignmentData.time_limit_minutes,
+    shuffle_questions: assignmentData.shuffle_questions,
+    is_finalized: assignmentData.is_finalized !== false
   };
+
+  if (isUuid(assignmentData.teacher_id)) {
+    payload.teacher_id = assignmentData.teacher_id;
+  }
 
   let assignment: any = null;
 
