@@ -15,7 +15,7 @@ import {
   Plus, Users, BookOpen, Gamepad2, 
   Sparkles, CheckCircle2, Upload, 
   Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send, Calendar,
-  Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3
+  Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3, X, School, GraduationCap
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
@@ -26,6 +26,7 @@ export const TeacherDashboard: React.FC = () => {
 
   // Modal & Tab State
   const [showClassModal, setShowClassModal] = useState<boolean>(false);
+  const [showClassListModal, setShowClassListModal] = useState<boolean>(false);
   const [newClassName, setNewClassName] = useState<string>('');
   const [activeTab, setActiveTab] = useState<string>('tasks');
 
@@ -495,9 +496,13 @@ export const TeacherDashboard: React.FC = () => {
       {/* KHU VỰC CHỌN LỚP HỌC */}
       <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="p-3 bg-amber-500 text-white rounded-2xl">
-            <Users className="w-6 h-6" />
-          </div>
+          <button
+            onClick={() => setShowClassListModal(true)}
+            className="p-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-2xl shadow-md transition-all flex items-center justify-center cursor-pointer group"
+            title="Nhấp vào đây để xem danh sách tất cả các lớp học"
+          >
+            <Users className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          </button>
           <div>
             <label className="text-[11px] font-black text-amber-900 uppercase tracking-wider block">LỚP HỌC ĐANG CHỌN:</label>
             <select
@@ -1216,6 +1221,167 @@ export const TeacherDashboard: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XEM DANH SÁCH TẤT CẢ CÁC LỚP HỌC & HỌC SINH */}
+      {showClassListModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 p-6 w-full max-w-4xl shadow-2xl space-y-6 my-8 max-h-[90vh] overflow-y-auto">
+            
+            <div className="flex items-center justify-between border-b border-amber-200 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-amber-500 text-white rounded-2xl shadow">
+                  <Users className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">DANH SÁCH TẤT CẢ LỚP HỌC CỦA GIÁO VIÊN ({classes.length} Lớp)</h3>
+                  <p className="text-xs font-bold text-slate-500">Xem mã gia nhập, sĩ số học sinh và chọn lớp làm việc 1-click</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowClassListModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* DANH SÁCH CÁC THẺ LỚP HỌC */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {classes.map(c => {
+                const isCurrent = selectedClass?.id === c.id;
+                return (
+                  <div
+                    key={c.id}
+                    className={`p-4 rounded-3xl border-2 transition-all space-y-3 relative ${
+                      isCurrent
+                        ? 'bg-amber-50 border-amber-500 shadow-md ring-2 ring-amber-300'
+                        : 'bg-white border-amber-200 hover:border-amber-400 hover:shadow-sm'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-sm text-slate-900 flex items-center gap-1.5">
+                        <School className="w-4 h-4 text-amber-600" />
+                        {c.name}
+                      </h4>
+                      {isCurrent && (
+                        <span className="bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                          Đang Chọn
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-xs font-bold text-slate-600 bg-white/80 p-2.5 rounded-2xl border border-amber-200">
+                      <div className="flex items-center justify-between">
+                        <span>Mã Lớp (Join Code):</span>
+                        <span className="font-black text-amber-900 bg-amber-200 px-2 py-0.5 rounded-lg tracking-widest">{c.code}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Khối lớp:</span>
+                        <span className="font-black text-slate-800">Khối 2</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Trạng thái:</span>
+                        <span className={`font-black ${c.is_locked ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          {c.is_locked ? '🔒 Đã Khóa' : '🔓 Đang Mở'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedClass(c);
+                        setShowClassListModal(false);
+                      }}
+                      className={`w-full py-2 rounded-2xl font-extrabold text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all ${
+                        isCurrent
+                          ? 'bg-amber-500 text-white'
+                          : 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300'
+                      }`}
+                    >
+                      {isCurrent ? '✓ Lớp Đang Được Chọn' : '👉 Chọn Lớp Này'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* DANH SÁCH HỌC SINH TRONG LỚP ĐANG CHỌN */}
+            {selectedClass && (
+              <div className="space-y-3 pt-4 border-t border-amber-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <h4 className="font-black text-sm text-slate-800 flex items-center gap-2">
+                    <GraduationCap className="w-5 h-5 text-emerald-600" />
+                    DANH SÁCH HỌC SINH TRONG LỚP: <span className="text-amber-600">{selectedClass.name}</span> ({students.length} Học Sinh)
+                  </h4>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleExportExcel}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl shadow text-xs flex items-center gap-1"
+                    >
+                      <Download className="w-3.5 h-3.5" /> Xuất Excel
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowClassListModal(false);
+                        setShowClassModal(true);
+                      }}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-3 py-1.5 rounded-xl shadow text-xs flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Tạo Lớp Mới
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50/50 rounded-2xl border border-amber-200 overflow-hidden">
+                  <table className="w-full text-left text-xs font-bold">
+                    <thead className="bg-amber-200/60 text-amber-950 uppercase text-[10px] tracking-wider">
+                      <tr>
+                        <th className="p-3">STT</th>
+                        <th className="p-3">Họ và Tên Học Sinh</th>
+                        <th className="p-3">Mã Học Sinh</th>
+                        <th className="p-3">Số Điện Thoại PH</th>
+                        <th className="p-3 text-center">Sao Nề Nếp</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-200/60 text-slate-800">
+                      {students.length > 0 ? (
+                        students.map((st, idx) => (
+                          <tr key={st.id} className="hover:bg-amber-100/40">
+                            <td className="p-3 font-black text-amber-900">{idx + 1}</td>
+                            <td className="p-3 font-extrabold text-slate-900 flex items-center gap-2">
+                              <div className="w-7 h-7 bg-amber-500 text-white rounded-full flex items-center justify-center text-[11px] font-black">
+                                {st.full_name.charAt(0)}
+                              </div>
+                              {st.full_name}
+                            </td>
+                            <td className="p-3 font-mono text-amber-900">{st.student_code || 'Chưa có'}</td>
+                            <td className="p-3 text-slate-600">{st.phone || 'Chưa cập nhật'}</td>
+                            <td className="p-3 text-center">
+                              <span className="inline-flex items-center gap-1 bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-md text-[11px] font-black border border-yellow-300">
+                                ⭐ {conductStars[st.id] || 10} Sao
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="p-6 text-center text-slate-500">
+                            Lớp học này chưa có học sinh nào. Giáo viên có thể chia sẻ Mã Lớp <b>{selectedClass.code}</b> hoặc Import file Excel học sinh nhé!
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       )}
