@@ -233,18 +233,32 @@ DROP POLICY IF EXISTS "Teachers update own classes" ON public.classes;
 DROP POLICY IF EXISTS "Allow authenticated insert classes" ON public.classes;
 DROP POLICY IF EXISTS "Allow authenticated classes" ON public.classes;
 
--- New Open Policies
-CREATE POLICY "Allow authenticated profiles" ON public.profiles FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated classes" ON public.classes FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated class_members" ON public.class_members FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated materials" ON public.materials FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated assignments" ON public.assignments FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated student_progress" ON public.student_progress FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated assignment_questions" ON public.assignment_questions FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated assignment_submissions" ON public.assignment_submissions FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated question_responses" ON public.question_responses FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated daily_tasks" ON public.daily_tasks FOR ALL USING (auth.role() = 'authenticated');
-CREATE POLICY "Allow authenticated task_completions" ON public.task_completions FOR ALL USING (auth.role() = 'authenticated');
+-- New Open Policies 100% (Cho phép Insert/Select/Update/Delete mọi bảng)
+DROP POLICY IF EXISTS "Allow all profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow all classes" ON public.classes;
+DROP POLICY IF EXISTS "Allow all class_members" ON public.class_members;
+DROP POLICY IF EXISTS "Allow all materials" ON public.materials;
+DROP POLICY IF EXISTS "Allow all assignments" ON public.assignments;
+DROP POLICY IF EXISTS "Allow all student_progress" ON public.student_progress;
+DROP POLICY IF EXISTS "Allow all assignment_questions" ON public.assignment_questions;
+DROP POLICY IF EXISTS "Allow all assignment_submissions" ON public.assignment_submissions;
+DROP POLICY IF EXISTS "Allow all question_responses" ON public.question_responses;
+DROP POLICY IF EXISTS "Allow all daily_tasks" ON public.daily_tasks;
+DROP POLICY IF EXISTS "Allow all task_completions" ON public.task_completions;
+DROP POLICY IF EXISTS "Allow all games" ON public.games;
+
+CREATE POLICY "Allow all profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all classes" ON public.classes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all class_members" ON public.class_members FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all materials" ON public.materials FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all assignments" ON public.assignments FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all student_progress" ON public.student_progress FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all assignment_questions" ON public.assignment_questions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all assignment_submissions" ON public.assignment_submissions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all question_responses" ON public.question_responses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all daily_tasks" ON public.daily_tasks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all task_completions" ON public.task_completions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all games" ON public.games FOR ALL USING (true) WITH CHECK (true);
 
 -- ========================================================
 -- STORAGE BUCKETS SETUP (TẠO TỰ ĐỘNG BẰNG SQL)

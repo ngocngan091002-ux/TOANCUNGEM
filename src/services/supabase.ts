@@ -348,6 +348,7 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
     due_date: safeDueDate
   };
 
+  // 1. Thử chèn qua supabaseAdmin
   const { data, error } = await supabaseAdmin
     .from('daily_tasks')
     .insert([payload])
@@ -355,15 +356,28 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
     .single();
 
   if (error) {
-    console.warn('createDailyTask warning, trying fallback without teacher_id:', error.message);
+    console.warn('createDailyTask admin insert warning, trying fallback without teacher_id:', error.message);
     delete payload.teacher_id;
+    
+    // 2. Fallback 1: Chèn không kèm teacher_id qua supabaseAdmin
     const { data: fbData, error: fbErr } = await supabaseAdmin
       .from('daily_tasks')
       .insert([payload])
       .select()
       .single();
 
-    if (fbErr) throw fbErr;
+    if (fbErr) {
+      console.warn('createDailyTask fallback 1 warning, trying fallback with supabase client:', fbErr.message);
+      // 3. Fallback 2: Chèn qua client supabase thường
+      const { data: fb2Data, error: fb2Err } = await supabase
+        .from('daily_tasks')
+        .insert([payload])
+        .select()
+        .single();
+
+      if (fb2Err) throw fb2Err;
+      return fb2Data;
+    }
     return fbData;
   }
   return data;
