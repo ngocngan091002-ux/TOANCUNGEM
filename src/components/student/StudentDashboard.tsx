@@ -248,13 +248,15 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const uncompletedCount = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id)).length;
+
   const menuItems = [
     { id: 'home', label: '🏠 Trang chủ' },
     { id: 'tasks', label: '📚 Nhiệm vụ hôm nay' },
-    { id: 'assignments', label: '📝 Bài tập' },
-    { id: 'games', label: '🎮 Kho Trò Chơi (GAME-01->10)' },
+    { id: 'assignments', label: '📝 Bài Tập Tuần', badge: uncompletedCount },
+    { id: 'games', label: '🎮 Kho Trò Chơi' },
     { id: 'materials', label: '📖 Học liệu' },
-    { id: 'ai', label: '🤖 Trợ lý Toán học AI' },
+    { id: 'ai', label: '🤖 Trợ lý AI' },
     { id: 'results', label: '📊 Kết quả & tiến bộ' },
     { id: 'leaderboard', label: '🏆 Bảng xếp hạng' },
     { id: 'profile', label: '👤 Hồ sơ' },
@@ -271,13 +273,18 @@ export const StudentDashboard: React.FC = () => {
           <button
             key={item.id}
             onClick={() => { setActiveMenu(item.id); setActiveAssignment(null); }}
-            className={`whitespace-nowrap px-3.5 py-2 rounded-2xl font-black text-xs transition-all ${
+            className={`whitespace-nowrap px-3.5 py-2 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${
               activeMenu === item.id
                 ? 'bg-amber-500 text-white shadow-md scale-105'
                 : 'text-amber-900 hover:bg-amber-100/60'
             }`}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.badge && item.badge > 0 ? (
+              <span className="px-2 py-0.5 bg-rose-600 text-white rounded-full text-[10px] font-black animate-pulse shadow">
+                {item.badge}
+              </span>
+            ) : null}
           </button>
         ))}
       </div>

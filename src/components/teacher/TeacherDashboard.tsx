@@ -638,7 +638,7 @@ export const TeacherDashboard: React.FC = () => {
           class_id: selectedClass.id,
           teacher_id: safeTeacherId,
           title: finalTitle,
-          type: 'exercise',
+          type: 'weekly_test',
           time_limit_minutes: timeLimitMinutes, // QUIZ-09: Đồng hồ đếm ngược
           shuffle_questions: shuffleQuestions, // QUIZ-08: Trộn câu hỏi
           is_finalized: true
@@ -752,7 +752,7 @@ export const TeacherDashboard: React.FC = () => {
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
         {[
           { id: 'tasks', label: '📋 Nhiệm Vụ Hằng Ngày' },
-          { id: 'assignments', label: '📝 Ngân Hàng Đề & Quiz Engine (QUIZ-01->10)' },
+          { id: 'assignments', label: '📝 Bài Tập Tuần' },
           { id: 'attendance', label: '✅ Điểm Danh & Nề Nếp' },
           { id: 'groups', label: '👥 Chia Nhóm Lớp' },
           { id: 'class_settings', label: '⚙️ Cấu Hình Lớp & TKB' },
