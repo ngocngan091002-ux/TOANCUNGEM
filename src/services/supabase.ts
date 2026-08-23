@@ -283,6 +283,13 @@ export async function removeStudentFromClass(classId: string, studentId: string)
       console.error('removeStudentFromClass error:', error);
       return false;
     }
+
+    // Tự động xóa khỏi bảng profiles để đồng bộ 100% số lượng Thống kê & Danh sách học sinh
+    await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', studentId);
+
     return true;
   } catch (err) {
     console.error('removeStudentFromClass exception:', err);
