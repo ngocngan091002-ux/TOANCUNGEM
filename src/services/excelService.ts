@@ -77,66 +77,70 @@ export function parseStudentExcel(file: File): Promise<{ full_name: string; emai
     reader.onload = (e) => {
       try {
         const buffer = e.target?.result;
-        const workbook = XLSX.read(buffer, { type: 'binary' });
+        const workbook = XLSX.read(buffer, { type: 'array' });
         const firstSheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[firstSheetName];
 
         const json: any[] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-        if (json.length <= 1) {
+        if (!json || json.length === 0) {
           resolve([]);
           return;
         }
 
-        // Đọc header hàng 0
-        const headers: string[] = json[0].map((h: any) => String(h).toLowerCase().trim());
-        
-        // Nhận diện cột chuẩn xác
-        let nameIdx = headers.findIndex(h => h === 'họ và tên' || h === 'họ tên' || h === 'tên học sinh' || h === 'ho va ten' || h === 'name' || h === 'full_name');
-        if (nameIdx === -1) {
-          nameIdx = headers.findIndex(h => (h.includes('họ') && h.includes('tên')) || (h.includes('tên') && !h.includes('đăng nhập') && !h.includes('mã')));
-        }
-        if (nameIdx === -1) {
-          nameIdx = 2; // Default to Column C (Họ và Tên)
-        }
-
-        let emailIdx = headers.findIndex(h => h.includes('email') || h.includes('thư') || h.includes('tài khoản'));
-        if (emailIdx === -1) emailIdx = 3; // Default to Column D
-
-        let phoneIdx = headers.findIndex(h => h.includes('điện thoại') || h.includes('sđt') || h.includes('phone'));
-        if (phoneIdx === -1) phoneIdx = 4; // Default to Column E
-
-        let codeIdx = headers.findIndex(h => h === 'mã học sinh' || h === 'mã hs' || h === 'ma hoc sinh' || (h.includes('mã') && !h.includes('tên')));
-        if (codeIdx === -1) codeIdx = 1; // Default to Column B
-
         const parsedStudents: { full_name: string; email: string; phone?: string; student_code?: string }[] = [];
 
-        for (let i = 1; i < json.length; i++) {
+        // Bỏ qua hàng tiêu đề nếu có
+        const firstRowStr = json[0] ? json[0].join(' ').toLowerCase() : '';
+        const startRow = (firstRowStr.includes('tên') || firstRowStr.includes('email') || firstRowStr.includes('mã')) ? 1 : 0;
+
+        for (let i = startRow; i < json.length; i++) {
           const row = json[i];
           if (!row || row.length === 0) continue;
 
-          let rawName = String(row[nameIdx] || '').trim();
-          let rawEmail = String(row[emailIdx] || '').trim();
-          let rawPhone = String(row[phoneIdx] || '').trim();
-          let rawCode = String(row[codeIdx] || '').trim();
+          let full_name = '';
+          let email = '';
+          let phone = '';
+          let student_code = '';
 
-          // Nếu name bị nhầm với mã học sinh (VD: HS2026_01), fallback sang cột C
-          if (!rawName || rawName.startsWith('HS2026_') || rawName.match(/^HS\d+/i)) {
-            rawName = String(row[2] || row[1] || '').trim();
+          // Quét thông minh từng ô trong hàng
+          for (let j = 0; j < row.length; j++) {
+            const cellVal = String(row[j] || '').trim();
+            if (!cellVal) continue;
+
+            if (cellVal.includes('@') && cellVal.includes('.')) {
+              email = cellVal.toLowerCase();
+            } else if (cellVal.match(/^0\d{8,10}$/)) {
+              phone = cellVal;
+            } else if (cellVal.startsWith('HS2026_') || cellVal.match(/^HS\d+/i)) {
+              student_code = cellVal;
+            } else if (!full_name && cellVal.length >= 2 && !cellVal.match(/^\d+$/) && !cellVal.toLowerCase().includes('tên') && cellVal !== '123456') {
+              full_name = cellVal;
+            }
           }
 
-          if (!rawName) continue;
+          // Fallback tên nếu ô chưa nhận diện được
+          if (!full_name) {
+            for (let j = 0; j < row.length; j++) {
+              const cellVal = String(row[j] || '').trim();
+              if (cellVal && !cellVal.includes('@') && cellVal !== '123456' && !cellVal.toLowerCase().includes('mã')) {
+                full_name = cellVal;
+                break;
+              }
+            }
+          }
 
-          if (!rawEmail) {
-            // Tự tạo email giả lập chuẩn nếu không có email
-            const unsignedName = rawName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
-            rawEmail = `${unsignedName}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
+          if (!full_name || full_name.length < 2) continue;
+
+          if (!email) {
+            const unsignedName = full_name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
+            email = `${unsignedName}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
           }
 
           parsedStudents.push({
-            full_name: rawName,
-            email: rawEmail,
-            phone: rawPhone,
-            student_code: rawCode || `HS2026_${i}`
+            full_name,
+            email,
+            phone,
+            student_code: student_code || `HS2026_${parsedStudents.length + 1}`
           });
         }
 
@@ -146,6 +150,6 @@ export function parseStudentExcel(file: File): Promise<{ full_name: string; emai
       }
     };
     reader.onerror = (err) => reject(err);
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 }
