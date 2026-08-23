@@ -546,12 +546,11 @@ export async function getAssignments(classId: string, isTeacher = false): Promis
     .eq('class_id', classId)
     .order('created_at', { ascending: false });
 
-  if (!isTeacher) {
-    query = query.eq('is_finalized', true);
-  }
-
   const { data, error } = await query;
-  if (error) throw error;
+  if (error) {
+    console.error('getAssignments error:', error);
+    return [];
+  }
   return data || [];
 }
 

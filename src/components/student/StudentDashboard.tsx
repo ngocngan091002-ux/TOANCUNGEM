@@ -374,6 +374,88 @@ export const StudentDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* 3. BÀI TẬP VÀ BÀI KIỂM TRA TUẦN CỦA GIÁO VIÊN GIAO */}
+      {activeMenu === 'assignments' && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <FileText className="w-5 h-5 text-amber-600" />
+              DANH SÁCH BÀI TẬP & ĐỀ KIỂM TRA ĐÃ GIAO ({assignments.length})
+            </h3>
+            <button
+              onClick={() => loadClassContent(selectedClassId)}
+              className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold rounded-xl text-xs flex items-center gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Tải lại bài tập
+            </button>
+          </div>
+
+          {assignments.length === 0 ? (
+            <div className="bg-amber-50/60 p-8 rounded-2xl text-center space-y-2 border border-amber-200">
+              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+                <FileText className="w-6 h-6" />
+              </div>
+              <h4 className="font-black text-sm text-slate-700">Chưa có bài tập tuần nào được giao cho em!</h4>
+              <p className="text-xs font-bold text-slate-500">Khi Giáo viên giao bài tập tuần hoặc đề kiểm tra, các đề bài sẽ xuất hiện ngay tại đây.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {assignments.map(a => {
+                const sub = submissions.find(s => s.assignment_id === a.id);
+                return (
+                  <div key={a.id} className="p-5 rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50/60 to-orange-50/30 space-y-3 flex flex-col justify-between shadow-sm hover:border-amber-400 transition-all">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                          {a.type === 'weekly_test' ? '📝 Bài Tập Tuần' : '🎯 Bài Kiểm Tra Trắc Nghiệm'}
+                        </span>
+
+                        {sub ? (
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            ✓ Đã Nộp ({sub.score}/100 Điểm)
+                          </span>
+                        ) : (
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                            ⏱️ Chưa Làm
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="font-extrabold text-base text-slate-900">{a.title}</h4>
+                      
+                      <div className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                        <span className="flex items-center gap-1 text-amber-800">
+                          <Clock className="w-3.5 h-3.5" /> Thời gian: {a.time_limit_minutes || 15} phút
+                        </span>
+                        <span className="flex items-center gap-1 text-purple-800">
+                          <HelpCircle className="w-3.5 h-3.5" /> {a.questions?.length || 0} câu hỏi
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      {sub ? (
+                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900">
+                          <span>Điểm số: <strong className="text-sm font-black text-emerald-700">{sub.score} / 100</strong></span>
+                          <span>Trạng thái: Đã chấm</span>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleStartAssignment(a)}
+                          className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl shadow-md text-xs uppercase tracking-wider transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-4 h-4 fill-white" /> BẮT ĐẦU LÀM BÀI NGAY
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 4. KHO TRÒ CHƠI HỌC TẬP TƯƠNG TÁC (GAME-01 ĐẾN GAME-10) */}
       {activeMenu === 'games' && (
         <div className="space-y-6">
@@ -538,6 +620,108 @@ export const StudentDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL LÀM BÀI TRẮC NGHIỆM CHO HỌC SINH */}
+      {activeAssignment && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            
+            {/* QUIZ HEADER */}
+            <div className="p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg">{activeAssignment.title}</h3>
+                <span className="text-xs font-bold opacity-90 flex items-center gap-2">
+                  ⏱️ Thời gian đếm ngược: {activeAssignment.time_limit_minutes || 15} phút | Câu hỏi {currentQuestionIndex + 1} / {activeAssignment.questions?.length || 0}
+                </span>
+              </div>
+
+              <button
+                onClick={() => setActiveAssignment(null)}
+                className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* QUIZ BODY */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-6">
+              {activeAssignment.questions && activeAssignment.questions.length > 0 ? (
+                (() => {
+                  const q = activeAssignment.questions[currentQuestionIndex];
+                  const selectedOpts = userAnswers[q.id] || [];
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between text-xs font-black text-purple-900">
+                        <span>CÂU HỎI {currentQuestionIndex + 1}:</span>
+                        <span>(10 Điểm)</span>
+                      </div>
+
+                      <h4 className="text-base font-black text-slate-900 bg-amber-50 p-4 rounded-2xl border border-amber-200">
+                        {q.question_text}
+                      </h4>
+
+                      {q.image_url && (
+                        <img src={q.image_url} alt="Question diagram" className="max-h-60 w-auto rounded-2xl border-2 border-purple-200 mx-auto my-2 shadow object-contain" />
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                        {q.options?.map(opt => {
+                          const isChecked = selectedOpts.includes(opt.id);
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => handleSelectOption(q.id, opt.id)}
+                              className={`p-4 rounded-2xl border-2 text-left font-extrabold text-xs transition-all flex items-center justify-between ${
+                                isChecked
+                                  ? 'bg-amber-500 text-white border-amber-600 shadow-md scale-102'
+                                  : 'bg-white text-slate-800 border-amber-200 hover:bg-amber-50'
+                              }`}
+                            >
+                              <span><strong className="text-sm mr-2">{opt.id}.</strong> {opt.text}</span>
+                              {isChecked && <CheckCircle2 className="w-5 h-5 text-white" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div className="text-center py-8 font-bold text-slate-400">Đề bài không có câu hỏi nào.</div>
+              )}
+            </div>
+
+            {/* QUIZ FOOTER NAV */}
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-between">
+              <button
+                disabled={currentQuestionIndex === 0}
+                onClick={() => setCurrentQuestionIndex(prev => prev - 1)}
+                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-xl font-bold text-xs disabled:opacity-40"
+              >
+                ← Câu trước
+              </button>
+
+              {currentQuestionIndex < (activeAssignment.questions?.length || 0) - 1 ? (
+                <button
+                  onClick={() => setCurrentQuestionIndex(prev => prev + 1)}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs shadow"
+                >
+                  Câu tiếp theo →
+                </button>
+              ) : (
+                <button
+                  onClick={handleSubmitAssignment}
+                  disabled={isSubmitting}
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-lg uppercase"
+                >
+                  {isSubmitting ? 'Đang nộp bài...' : '🎯 NỘP BÀI THI'}
+                </button>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
