@@ -87,10 +87,65 @@ export const TeacherDashboard: React.FC = () => {
     question_type?: 'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay';
     difficulty?: 'easy' | 'medium' | 'hard';
     image_url?: string;
-    options: { id: string; text: string }[];
+    options: { id: string; text: string; image_url?: string }[];
     correct_answers: string[];
     selected?: boolean;
   }[]>([]);
+
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+
+  // HÀM ĐỔI ĐÁP ÁN ĐÚNG KHI GIÁO VIÊN BẤM VÀO NÚT CHỌN ĐÁP ÁN A, B, C, D
+  const handleToggleCorrectAnswer = (qIndex: number, optId: string) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      const q = { ...updated[qIndex] };
+      if (q.question_type === 'multiple_choice') {
+        if (q.correct_answers.includes(optId)) {
+          q.correct_answers = q.correct_answers.filter(id => id !== optId);
+        } else {
+          q.correct_answers = [...q.correct_answers, optId];
+        }
+      } else {
+        q.correct_answers = [optId];
+      }
+      updated[qIndex] = q;
+      return updated;
+    });
+  };
+
+  // UPLOAD ẢNH CHO TỪNG ĐÁP ÁN
+  const handleOptionImageUpload = async (qIndex: number, optId: string, file: File) => {
+    try {
+      const imageUrl = await uploadFileToStorage('question-images', file);
+      setDraftQuestions(prev => {
+        const updated = [...prev];
+        updated[qIndex].options = updated[qIndex].options.map(o => o.id === optId ? { ...o, image_url: imageUrl } : o);
+        return updated;
+      });
+    } catch (err: any) {
+      alert('Lỗi upload ảnh đáp án: ' + err.message);
+    }
+  };
+
+  // XÓA ẢNH CÂU HỎI
+  const handleRemoveQuestionImage = (qIndex: number) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      const q = { ...updated[qIndex] };
+      delete q.image_url;
+      updated[qIndex] = q;
+      return updated;
+    });
+  };
+
+  // XÓA ẢNH ĐÁP ÁN
+  const handleRemoveOptionImage = (qIndex: number, optId: string) => {
+    setDraftQuestions(prev => {
+      const updated = [...prev];
+      updated[qIndex].options = updated[qIndex].options.map(o => o.id === optId ? { ...o, image_url: undefined } : o);
+      return updated;
+    });
+  };
 
   // HÀM XÓA CÂU HỎI KHI GIÁO VIÊN BẤM XÓA
   const handleDeleteDraftQuestion = (index: number) => {
@@ -849,30 +904,105 @@ export const TeacherDashboard: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* 1. KHU VỰC HIỂN THỊ ẢNH CÂU HỎI KÍCH THƯỚC LỚN */}
                       {q.image_url && (
-                        <img src={q.image_url} alt="Question" className="h-24 rounded-lg border border-purple-300 object-contain" />
+                        <div className="relative group inline-block my-2">
+                          <img 
+                            src={q.image_url} 
+                            alt="Question Diagram" 
+                            onClick={() => setPreviewImageUrl(q.image_url!)}
+                            className="max-h-72 w-auto max-w-full rounded-2xl border-2 border-purple-300 shadow-md object-contain cursor-pointer hover:opacity-90 transition-all" 
+                          />
+                          <div className="flex items-center gap-2 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewImageUrl(q.image_url!)}
+                              className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-900 font-extrabold text-[10px] rounded-lg border border-purple-300 flex items-center gap-1"
+                            >
+                              🔍 Phóng To Xem Ảnh
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveQuestionImage(idx)}
+                              className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold text-[10px] rounded-lg border border-rose-300"
+                            >
+                              ❌ Xóa Ảnh
+                            </button>
+                          </div>
+                        </div>
                       )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-bold">
-                        {q.options.map(opt => (
-                          <div 
-                            key={opt.id} 
-                            className={`p-2 rounded-xl border flex items-center gap-2 ${
-                              q.correct_answers.includes(opt.id) 
-                                ? 'bg-emerald-100 border-emerald-400 text-emerald-900 font-black' 
-                                : 'bg-white border-purple-200 text-slate-700'
-                            }`}
-                          >
-                            <span className="w-5 text-center font-black">{opt.id}.</span>
-                            <input
-                              type="text"
-                              value={opt.text}
-                              onChange={(e) => handleOptionTextChange(idx, opt.id, e.target.value)}
-                              className="flex-1 bg-transparent border-none text-xs font-extrabold focus:outline-none"
-                            />
-                            {q.correct_answers.includes(opt.id) && <span className="text-emerald-700 font-black text-[10px]">✓ (Đúng)</span>}
-                          </div>
-                        ))}
+                      {/* 2. GRID CÁC ĐÁP ÁN A, B, C, D (CHO PHÉP ĐỔI ĐÁP ÁN ĐÚNG & THÊM ẢNH ĐÁP ÁN) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] font-bold">
+                        {q.options.map(opt => {
+                          const isCorrect = q.correct_answers.includes(opt.id);
+                          return (
+                            <div 
+                              key={opt.id} 
+                              className={`p-3 rounded-2xl border-2 transition-all space-y-2 ${
+                                isCorrect 
+                                  ? 'bg-emerald-100/90 border-emerald-500 text-emerald-950 font-black shadow-sm' 
+                                  : 'bg-white border-purple-200 text-slate-800 hover:border-purple-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-black text-xs text-purple-950">{opt.id}.</span>
+                                
+                                <input
+                                  type="text"
+                                  value={opt.text}
+                                  onChange={(e) => handleOptionTextChange(idx, opt.id, e.target.value)}
+                                  className="flex-1 bg-transparent border-b border-purple-200 focus:border-purple-500 text-xs font-extrabold px-1 py-0.5 focus:outline-none"
+                                  placeholder={`Nhập đáp án ${opt.id}...`}
+                                />
+
+                                {/* NÚT BẤM CHỌN ĐÁP ÁN ĐÚNG */}
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleCorrectAnswer(idx, opt.id)}
+                                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all flex items-center gap-1 ${
+                                    isCorrect 
+                                      ? 'bg-emerald-600 text-white shadow-sm' 
+                                      : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-300'
+                                  }`}
+                                >
+                                  {isCorrect ? '✅ ĐÁP ÁN ĐÚNG' : '🔘 Chọn Làm Đáp Án Đúng'}
+                                </button>
+
+                                {/* UPLOAD ẢNH CHO ĐÁP ÁN */}
+                                <label className="p-1 text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200 rounded-lg cursor-pointer flex-shrink-0" title="Thêm ảnh cho đáp án này">
+                                  <ImageIcon className="w-3.5 h-3.5" />
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => e.target.files && handleOptionImageUpload(idx, opt.id, e.target.files[0])}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+
+                              {/* HIỂN THỊ ẢNH CỦA ĐÁP ÁN NẾU CÓ */}
+                              {opt.image_url && (
+                                <div className="relative group inline-block">
+                                  <img 
+                                    src={opt.image_url} 
+                                    alt={`Option ${opt.id}`} 
+                                    onClick={() => setPreviewImageUrl(opt.image_url!)}
+                                    className="max-h-36 w-auto rounded-xl border border-purple-300 object-contain shadow-sm cursor-pointer hover:opacity-90" 
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveOptionImage(idx, opt.id)}
+                                    className="absolute -top-1 -right-1 bg-rose-600 text-white p-0.5 rounded-full text-[9px] font-black shadow"
+                                    title="Xóa ảnh đáp án"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -1529,6 +1659,29 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL PHÓNG TO XEM ẢNH FULL-SCREEN */}
+      {previewImageUrl && (
+        <div 
+          className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" 
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div 
+            className="relative max-w-5xl max-h-[90vh] bg-white p-3 rounded-3xl overflow-hidden shadow-2xl space-y-2 border-4 border-purple-300" 
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b pb-2 px-2">
+              <span className="font-black text-xs text-purple-900 uppercase">📷 Chế Độ Xem Ảnh Phóng To Chi Tiết</span>
+              <button 
+                onClick={() => setPreviewImageUrl(null)} 
+                className="bg-rose-600 hover:bg-rose-700 text-white p-1.5 rounded-full font-black shadow transition-transform hover:scale-110"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img src={previewImageUrl} alt="Full Screen Preview" className="max-h-[80vh] w-auto max-w-full object-contain rounded-2xl mx-auto shadow-inner" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
