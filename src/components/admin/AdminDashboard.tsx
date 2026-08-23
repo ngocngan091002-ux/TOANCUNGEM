@@ -125,6 +125,16 @@ export const AdminDashboard: React.FC = () => {
         console.warn('Auth admin user creation warning:', authErr);
       }
 
+      const newTeacherProf: UserProfile = {
+        id: targetId,
+        email: cleanEmail,
+        full_name: teacherName.trim(),
+        role: 'teacher',
+        status: 'approved',
+        phone: teacherPhone.trim()
+      };
+
+      setProfiles(prev => [newTeacherProf, ...prev.filter(p => p.email !== cleanEmail)]);
       setActionMsg(`🎉 Đã kích hoạt thành công tài khoản Giáo viên: ${cleanEmail} (Mật khẩu cấp: ${teacherPassword})!`);
       setShowAddTeacherModal(false);
       setTeacherName('');
