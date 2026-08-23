@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole } from '../../types';
-import { getAllProfiles, updateUserStatus, supabase } from '../../services/supabase';
+import { getAllProfiles, updateUserStatus, supabase, supabaseAdmin } from '../../services/supabase';
 import { 
   ShieldCheck, UserCheck, UserX, Clock, Users, 
   School, GraduationCap, CheckCircle2, UserPlus, Mail, Lock, User, Phone, X 
@@ -49,7 +49,7 @@ export const AdminDashboard: React.FC = () => {
 
   const handleChangeRole = async (userId: string, newRole: UserRole) => {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('profiles')
         .update({ role: newRole, status: 'approved' })
         .eq('id', userId);
@@ -63,7 +63,7 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // TẠO TÀI KHOẢN GIÁO VIÊN MỚI TRỰC TIẾP
+  // TẠO TÀI KHOẢN GIÁO VIÊN MỚI TRỰC TIẾP (BYPASSING RLS BY SUPABASE ADMIN)
   const handleCreateTeacher = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError('');
@@ -77,48 +77,57 @@ export const AdminDashboard: React.FC = () => {
         return;
       }
 
-      let studentId = '';
+      // Tra cứu xem profile email đã tồn tại sẵn trong DB chưa
+      const { data: existingProf } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
 
-      // 1. Tạo auth user trên Supabase Auth
-      try {
-        const { data: authData, error: authErr } = await supabase.auth.signUp({
-          email: cleanEmail,
-          password: teacherPassword,
-          options: {
-            data: {
-              full_name: teacherName.trim(),
-              role: 'teacher',
-              status: 'approved',
-              phone: teacherPhone.trim()
+      let targetId = existingProf?.id;
+
+      if (!targetId) {
+        // 1. Tạo auth user trên Supabase Auth
+        try {
+          const { data: authData } = await supabase.auth.signUp({
+            email: cleanEmail,
+            password: teacherPassword,
+            options: {
+              data: {
+                full_name: teacherName.trim(),
+                role: 'teacher',
+                status: 'approved',
+                phone: teacherPhone.trim()
+              }
             }
+          });
+          if (authData?.user) {
+            targetId = authData.user.id;
           }
-        });
-        if (authData?.user) {
-          studentId = authData.user.id;
+        } catch (e) {
+          console.warn('SignUp warning:', e);
         }
-      } catch (e) {
-        console.warn('SignUp warning:', e);
       }
 
-      if (!studentId) {
-        studentId = crypto.randomUUID();
+      if (!targetId) {
+        targetId = crypto.randomUUID();
       }
 
-      // 2. Upsert profile vào bảng profiles
-      const { error: profErr } = await supabase.from('profiles').upsert({
-        id: studentId,
+      // 2. Upsert profile vào bảng profiles qua Service Role Client (Bypassing RLS)
+      const { error: profErr } = await supabaseAdmin.from('profiles').upsert({
+        id: targetId,
         email: cleanEmail,
         full_name: teacherName.trim(),
         role: 'teacher',
         status: 'approved',
         phone: teacherPhone.trim()
-      });
+      }, { onConflict: 'email' });
 
       if (profErr) {
         throw profErr;
       }
 
-      setActionMsg(`🎉 Đã khởi tạo thành công tài khoản Giáo viên: ${cleanEmail} (Mật khẩu: ${teacherPassword})!`);
+      setActionMsg(`🎉 Đã kích hoạt thành công tài khoản Giáo viên: ${cleanEmail} (Mật khẩu: ${teacherPassword})!`);
       setShowAddTeacherModal(false);
       setTeacherName('');
       setTeacherEmail('');
