@@ -539,27 +539,24 @@ export const AdminDashboard: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-3 text-center">
-                    {p.email.toLowerCase() !== 'ngocngan091002@gmail.com' && (
+                    {p.email.toLowerCase() === 'ngocngan091002@gmail.com' ? (
+                      <span className="px-3 py-1 bg-purple-100 text-purple-800 border border-purple-300 rounded-xl font-black text-[11px]">
+                        👑 Quản Trị Viên Tối Cao
+                      </span>
+                    ) : p.role === 'student' ? (
+                      <span className="px-3 py-1 bg-emerald-100 text-emerald-800 border border-emerald-300 rounded-xl font-black text-[11px] inline-flex items-center gap-1">
+                        🎓 Học Sinh (Đã Cố Định)
+                      </span>
+                    ) : (
                       <div className="inline-flex gap-1.5">
-                        <button
-                          onClick={() => handleChangeRole(p.id, 'teacher')}
-                          className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all ${
-                            p.role === 'teacher'
-                              ? 'bg-amber-500 text-white shadow'
-                              : 'bg-amber-100 text-amber-900 hover:bg-amber-200'
-                          }`}
-                        >
-                          Thành Giáo Viên
-                        </button>
+                        <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-500 text-white shadow">
+                          👨‍🏫 Giáo Viên
+                        </span>
                         <button
                           onClick={() => handleChangeRole(p.id, 'student')}
-                          className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all ${
-                            p.role === 'student'
-                              ? 'bg-emerald-500 text-white shadow'
-                              : 'bg-emerald-100 text-emerald-900 hover:bg-emerald-200'
-                          }`}
+                          className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-900 hover:bg-emerald-200 transition-all border border-emerald-300"
                         >
-                          Thành Học Sinh
+                          Chuyển Thành Học Sinh
                         </button>
                       </div>
                     )}
