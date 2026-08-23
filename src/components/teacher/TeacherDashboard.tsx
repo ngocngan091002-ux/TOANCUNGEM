@@ -791,7 +791,7 @@ export const TeacherDashboard: React.FC = () => {
               <div className="flex items-center gap-2">
                 {/* QUIZ-07: IMPORT ĐỀ THI TỪ FILE WORD / EXCEL */}
                 <label className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 cursor-pointer">
-                  <Upload className="w-4 h-4" /> Import Đề Từ Word (.docx) / Excel (QUIZ-07)
+                  <Upload className="w-4 h-4" /> Import Đề Từ Word (.docx) / Excel
                   <input
                     type="file"
                     accept=".docx, .xlsx, .csv"
@@ -806,18 +806,18 @@ export const TeacherDashboard: React.FC = () => {
                   className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5"
                 >
                   <Sparkles className="w-4 h-4 text-yellow-300" />
-                  {aiLoading ? 'AI đang tạo câu hỏi...' : 'AI Tự Động Rút Đề (QUIZ-10)'}
+                  {aiLoading ? 'AI đang tạo bài tập...' : 'AI Tự Động Rút Đề Bài Tập Tuần'}
                 </button>
               </div>
             </div>
 
-            {/* CẤU HÌNH CÂU HỎI & CẤU HÌNH THỜI GIAN ĐẾM NGƯỢC (QUIZ-08 & QUIZ-09) */}
+            {/* CẤU HÌNH CÂU HỎI & CẤU HÌNH THỜI GIAN ĐẾM NGƯỢC */}
             <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-purple-50/60 p-4 rounded-2xl border border-purple-200">
               <div>
-                <label className="text-[11px] font-bold text-purple-950 block mb-1">Tên Bài kiểm tra / Đề thi:</label>
+                <label className="text-[11px] font-bold text-purple-950 block mb-1">Tên Bài Tập Tuần:</label>
                 <input
                   type="text"
-                  placeholder="VD: Kiểm Tra Toán Lớp 2 Giữa Kỳ"
+                  placeholder="VD: Bài Tập Tuần 1 - Ôn Tập Toán Lớp 2"
                   value={assignTitle}
                   onChange={(e) => setAssignTitle(e.target.value)}
                   className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold"
@@ -825,18 +825,18 @@ export const TeacherDashboard: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-purple-950 block mb-1">Loại Câu Hỏi (QUIZ-01 đến 06):</label>
+                <label className="text-[11px] font-bold text-purple-950 block mb-1">Dạng Bài Tập Tuần:</label>
                 <select
                   value={selectedQuestionType}
                   onChange={(e: any) => setSelectedQuestionType(e.target.value)}
                   className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold"
                 >
-                  <option value="single_choice">Trắc nghiệm 1 đáp án (QUIZ-01)</option>
-                  <option value="multiple_choice">Trắc nghiệm Nhiều đáp án (QUIZ-02)</option>
-                  <option value="true_false">Câu hỏi Đúng / Sai (QUIZ-03)</option>
-                  <option value="fill_blank">Câu hỏi Điền chỗ trống (QUIZ-04)</option>
-                  <option value="matching">Câu hỏi Kéo thả Nối từ (QUIZ-05)</option>
-                  <option value="essay">Câu hỏi Tự luận & Tải ảnh (QUIZ-06)</option>
+                  <option value="single_choice">Trắc nghiệm 1 đáp án</option>
+                  <option value="multiple_choice">Trắc nghiệm nhiều đáp án</option>
+                  <option value="true_false">Câu hỏi Đúng / Sai</option>
+                  <option value="fill_blank">Điền chỗ trống</option>
+                  <option value="matching">Nối từ & Nối ô</option>
+                  <option value="essay">Tự luận & Tải ảnh bài làm</option>
                 </select>
               </div>
 
