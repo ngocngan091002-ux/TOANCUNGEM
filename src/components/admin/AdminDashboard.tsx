@@ -1,15 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, UserRole } from '../../types';
-import { getAllProfiles, updateUserStatus, supabase, supabaseAdmin } from '../../services/supabase';
+import { UserProfile, UserRole, ClassItem } from '../../types';
+import { 
+  getAllProfiles, updateUserStatus, supabase, supabaseAdmin, 
+  getTeacherClasses, getClassMembers, batchImportStudentsToClass 
+} from '../../services/supabase';
+import { parseStudentExcel, exportClassToExcel } from '../../services/excelService';
 import { 
   ShieldCheck, UserCheck, UserX, Clock, Users, 
-  School, GraduationCap, CheckCircle2, UserPlus, Mail, Lock, User, Phone, X 
+  School, GraduationCap, CheckCircle2, UserPlus, Mail, Lock, User, Phone, X,
+  FileSpreadsheet, Upload, Download
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [actionMsg, setActionMsg] = useState<string>('');
+
+  // STATE NẠP DỮ LIỆU LỚP HỌC VÀ HỌC SINH CHO ADMIN
+  const [classes, setClasses] = useState<ClassItem[]>([]);
+  const [selectedClassId, setSelectedClassId] = useState<string>('');
+  const [classStudents, setClassStudents] = useState<UserProfile[]>([]);
+  const [excelLoading, setExcelLoading] = useState<boolean>(false);
 
   // STATE MODAL TẠO TÀI KHOẢN GIÁO VIÊN MỚI
   const [showAddTeacherModal, setShowAddTeacherModal] = useState<boolean>(false);
@@ -22,7 +33,68 @@ export const AdminDashboard: React.FC = () => {
 
   useEffect(() => {
     fetchProfiles();
+    fetchClassesAdmin();
   }, []);
+
+  useEffect(() => {
+    if (selectedClassId) {
+      fetchClassStudents(selectedClassId);
+    }
+  }, [selectedClassId]);
+
+  const fetchClassesAdmin = async () => {
+    try {
+      const cls = await getTeacherClasses('');
+      setClasses(cls);
+      if (cls.length > 0) {
+        const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+        setSelectedClassId(targetCls.id);
+      }
+    } catch (err) {
+      console.error('Fetch classes admin error:', err);
+    }
+  };
+
+  const fetchClassStudents = async (classId: string) => {
+    try {
+      const members = await getClassMembers(classId);
+      const stList = members.map(m => m.student).filter(Boolean) as UserProfile[];
+      setClassStudents(stList);
+    } catch (err) {
+      console.error('Fetch class students error:', err);
+    }
+  };
+
+  const handleImportExcelAdmin = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedClassId || !e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const targetClass = classes.find(c => c.id === selectedClassId);
+    setExcelLoading(true);
+
+    try {
+      const studentList = await parseStudentExcel(file);
+      if (!studentList || studentList.length === 0) {
+        alert('File Excel không có dữ liệu học sinh hoặc sai định dạng!');
+        setExcelLoading(false);
+        return;
+      }
+
+      const count = await batchImportStudentsToClass(selectedClassId, studentList);
+      alert(`🎉 [ADMIN] Đã thêm thành công ${count} / ${studentList.length} học sinh vào lớp ${targetClass?.name || ''}!`);
+      await fetchClassStudents(selectedClassId);
+      await fetchProfiles();
+    } catch (err: any) {
+      alert('Lỗi đọc file Excel: ' + err.message);
+    } finally {
+      setExcelLoading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleExportExcelAdmin = () => {
+    const targetClass = classes.find(c => c.id === selectedClassId);
+    exportClassToExcel(targetClass?.name || 'Lop_Hoc', classStudents);
+  };
 
   const fetchProfiles = async () => {
     setLoading(true);
@@ -216,6 +288,95 @@ export const AdminDashboard: React.FC = () => {
             <div className="text-2xl font-black text-slate-800">{students.length}</div>
             <div className="text-xs font-extrabold text-emerald-800">Học sinh đã đăng ký</div>
           </div>
+        </div>
+      </div>
+
+      {/* KHU VỰC QUẢN LÝ & NHẬP DANH SÁCH HỌC SINH TỪ EXCEL CHO ADMIN */}
+      <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-3xl border-4 border-amber-300 p-6 shadow-lg space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h3 className="text-xl font-black text-amber-900 flex items-center gap-2">
+              <FileSpreadsheet className="w-6 h-6 text-amber-600" />
+              NẠP DANH SÁCH HỌC SINH EXCEL / CSV DÀNH CHO ADMIN
+            </h3>
+            <p className="text-xs font-bold text-amber-700 mt-1">
+              Quản trị viên có thể nhập 1-Click file Excel 33+ học sinh vào bất kỳ Lớp Học nào trong hệ thống!
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            {classes.length > 0 && (
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                className="bg-white border-2 border-amber-300 rounded-2xl px-4 py-2.5 text-xs font-black text-amber-900 focus:outline-none focus:border-amber-500 shadow-sm"
+              >
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} (Mã: {c.code})</option>
+                ))}
+              </select>
+            )}
+
+            <label className={`cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-2xl shadow flex items-center gap-2 text-xs transition-all ${excelLoading ? 'opacity-50 cursor-wait' : ''}`}>
+              <Upload className="w-4 h-4" />
+              {excelLoading ? 'Đang đọc Excel...' : 'Nạp Excel 33+ Học Sinh'}
+              <input
+                type="file"
+                accept=".xlsx, .xls, .csv"
+                className="hidden"
+                disabled={excelLoading}
+                onChange={handleImportExcelAdmin}
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* BẢNG DANH SÁCH HỌC SINH CỦA LỚP ĐƯỢC CHỌN */}
+        <div className="bg-white rounded-2xl border-2 border-amber-200 p-4 shadow-inner">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-black text-slate-800">
+              DANH SÁCH HỌC SINH TRONG LỚP ({classStudents.length} HỌC SINH):
+            </span>
+            {classStudents.length > 0 && (
+              <button
+                onClick={handleExportExcelAdmin}
+                className="bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5"
+              >
+                <Download className="w-4 h-4" /> Xuất File Excel Lớp
+              </button>
+            )}
+          </div>
+
+          {classStudents.length === 0 ? (
+            <div className="text-center py-6 text-xs font-bold text-slate-400">
+              Lớp học chưa có học sinh nào. Bấm nút "Nạp Excel 33+ Học Sinh" ở trên để đưa danh sách học sinh vào lớp!
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-64 overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-amber-100 text-amber-900 font-black">
+                  <tr>
+                    <th className="p-2.5 rounded-l-xl">STT</th>
+                    <th className="p-2.5">Mã HS</th>
+                    <th className="p-2.5">Họ và Tên</th>
+                    <th className="p-2.5">Email / Tên Đăng Nhập</th>
+                    <th className="p-2.5 text-center rounded-r-xl">Mật Khẩu Phụ Huynh</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100">
+                  {classStudents.map((st, idx) => (
+                    <tr key={st.id || idx} className="hover:bg-amber-50/50 font-bold text-slate-700">
+                      <td className="p-2.5 font-black text-slate-500">{idx + 1}</td>
+                      <td className="p-2.5 font-mono text-amber-700">{st.student_code || `HS2026_${idx+1}`}</td>
+                      <td className="p-2.5 font-extrabold text-slate-900">{st.full_name}</td>
+                      <td className="p-2.5 font-mono text-slate-600">{st.email}</td>
+                      <td className="p-2.5 text-center font-mono text-emerald-700">{st.parent_pin || '123456'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
