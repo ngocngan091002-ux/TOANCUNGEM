@@ -374,9 +374,13 @@ export async function getLearningMaterials(classId: string): Promise<LearningMat
 }
 
 export async function addLearningMaterial(material: Omit<LearningMaterial, 'id' | 'created_at'>): Promise<LearningMaterial> {
+  const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const payload: any = { ...material };
+  if (!isUuid(payload.teacher_id)) delete payload.teacher_id;
+
   const { data, error } = await supabaseAdmin
     .from('learning_materials')
-    .insert([material])
+    .insert([payload])
     .select()
     .single();
 
@@ -396,9 +400,13 @@ export async function getGames(classId: string): Promise<GameItem[]> {
 }
 
 export async function addGame(game: Omit<GameItem, 'id' | 'created_at'>): Promise<GameItem> {
+  const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const payload: any = { ...game };
+  if (!isUuid(payload.teacher_id)) delete payload.teacher_id;
+
   const { data, error } = await supabaseAdmin
     .from('games')
-    .insert([game])
+    .insert([payload])
     .select()
     .single();
 
@@ -446,12 +454,17 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
     ? task.due_date.trim() 
     : new Date().toISOString().split('T')[0];
 
+  const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   const payload: any = {
     class_id: task.class_id,
-    teacher_id: task.teacher_id,
     title: task.title,
     due_date: safeDueDate
   };
+
+  if (isUuid(task.teacher_id)) {
+    payload.teacher_id = task.teacher_id;
+  }
 
   // 1. Thử chèn qua supabaseAdmin
   const { data, error } = await supabaseAdmin
@@ -471,18 +484,7 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
       .select()
       .single();
 
-    if (fbErr) {
-      console.warn('createDailyTask fallback 1 warning, trying fallback with supabase client:', fbErr.message);
-      // 3. Fallback 2: Chèn qua client supabase thường
-      const { data: fb2Data, error: fb2Err } = await supabase
-        .from('daily_tasks')
-        .insert([payload])
-        .select()
-        .single();
-
-      if (fb2Err) throw fb2Err;
-      return fb2Data;
-    }
+    if (fbErr) throw fbErr;
     return fbData;
   }
   return data;

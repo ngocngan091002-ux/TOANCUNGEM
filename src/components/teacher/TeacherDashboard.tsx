@@ -428,11 +428,13 @@ export const TeacherDashboard: React.FC = () => {
 
     try {
       const createdList: DailyTask[] = [];
+      const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+      const safeTeacherId = isUuid(user?.id) ? user!.id : selectedClass.teacher_id;
 
       for (const title of validTitles) {
         const task = await createDailyTask({
           class_id: selectedClass.id,
-          teacher_id: user!.id,
+          teacher_id: safeTeacherId,
           title: title,
           due_date: batchDueDate || todayStr
         });
