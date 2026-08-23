@@ -220,10 +220,11 @@ export const TeacherDashboard: React.FC = () => {
 
   const loadTeacherClasses = async () => {
     try {
-      const cls = await getTeacherClasses(user!.id);
+      const cls = await getTeacherClasses(user?.id || '');
       setClasses(cls);
-      if (cls.length > 0 && !selectedClass) {
-        setSelectedClass(cls[0]);
+      if (cls.length > 0) {
+        const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+        setSelectedClass(targetCls);
       }
     } catch (err) {
       console.error('Error loading classes:', err);

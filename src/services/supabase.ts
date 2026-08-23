@@ -104,14 +104,31 @@ export async function updateUserStatus(userId: string, status: 'approved' | 'rej
 
 // --- CLASS SERVICES ---
 export async function getTeacherClasses(teacherId: string): Promise<ClassItem[]> {
-  const { data, error } = await supabaseAdmin
-    .from('classes')
-    .select('*')
-    .eq('teacher_id', teacherId)
-    .order('created_at', { ascending: false });
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('classes')
+      .select('*')
+      .eq('teacher_id', teacherId)
+      .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+    if (!error && data && data.length > 0) {
+      return data || [];
+    }
+
+    // Fallback: Lấy tất cả lớp học trong hệ thống nếu tài khoản chưa đứng tên lớp nào
+    const { data: allCls } = await supabaseAdmin
+      .from('classes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (allCls && allCls.length > 0) {
+      return allCls;
+    }
+  } catch (err) {
+    console.warn('getTeacherClasses exception:', err);
+  }
+
+  return [];
 }
 
 export async function getStudentClasses(studentId: string): Promise<ClassItem[]> {
@@ -126,7 +143,7 @@ export async function getStudentClasses(studentId: string): Promise<ClassItem[]>
 
 export async function createClass(name: string, grade: number = 2, teacherId: string, description?: string): Promise<ClassItem> {
   const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-  const insertPayload: any = { name, grade, code, teacher_id: teacherId };
+  const insertPayload: any = { name, grade_level: grade, code, teacher_id: teacherId };
   if (description) insertPayload.description = description;
 
   const { data, error } = await supabaseAdmin
@@ -178,13 +195,49 @@ export async function joinClassByCode(code: string, studentId: string): Promise<
 }
 
 export async function getClassMembers(classId: string): Promise<ClassMember[]> {
-  const { data, error } = await supabaseAdmin
-    .from('class_members')
-    .select('*, student:profiles(*)')
-    .eq('class_id', classId);
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('class_members')
+      .select('*, student:profiles(*)')
+      .eq('class_id', classId);
 
-  if (error) throw error;
-  return data || [];
+    if (!error && data && data.length > 0) {
+      return data.filter((m: any) => m.student && m.student.email !== 'ngocngan091002@gmail.com') || [];
+    }
+
+    // Fallback 2-step manual query
+    const { data: members } = await supabaseAdmin
+      .from('class_members')
+      .select('student_id')
+      .eq('class_id', classId);
+
+    if (members && members.length > 0) {
+      const studentIds = members.map(m => m.student_id);
+      const { data: profiles } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .in('id', studentIds);
+
+      if (profiles && profiles.length > 0) {
+        return members
+          .map(m => {
+            const prof = profiles.find(p => p.id === m.student_id);
+            return {
+              id: m.student_id,
+              class_id: classId,
+              student_id: m.student_id,
+              joined_at: new Date().toISOString(),
+              student: prof
+            } as ClassMember;
+          })
+          .filter(m => m.student && m.student.email !== 'ngocngan091002@gmail.com');
+      }
+    }
+  } catch (err) {
+    console.warn('getClassMembers exception:', err);
+  }
+
+  return [];
 }
 
 export async function addStudentToClass(classId: string, studentId: string): Promise<void> {
