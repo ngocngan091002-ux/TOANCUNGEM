@@ -46,9 +46,10 @@ export const AdminDashboard: React.FC = () => {
     try {
       const cls = await getTeacherClasses('');
       setClasses(cls);
-      if (cls.length > 0) {
-        const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+      const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+      if (targetCls) {
         setSelectedClassId(targetCls.id);
+        await fetchClassStudents(targetCls.id);
       }
     } catch (err) {
       console.error('Fetch classes admin error:', err);
@@ -66,9 +67,22 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleImportExcelAdmin = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!selectedClassId || !e.target.files || e.target.files.length === 0) return;
+    if (!e.target.files || e.target.files.length === 0) return;
+
+    let targetId = selectedClassId;
+    if (!targetId && classes.length > 0) {
+      const found = classes.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || classes[0];
+      targetId = found.id;
+      setSelectedClassId(targetId);
+    }
+
+    if (!targetId) {
+      alert('Vui lòng chọn hoặc tạo Lớp Học trước khi nạp Excel!');
+      return;
+    }
+
     const file = e.target.files[0];
-    const targetClass = classes.find(c => c.id === selectedClassId);
+    const targetClass = classes.find(c => c.id === targetId);
     setExcelLoading(true);
 
     try {
@@ -79,9 +93,9 @@ export const AdminDashboard: React.FC = () => {
         return;
       }
 
-      const count = await batchImportStudentsToClass(selectedClassId, studentList);
-      alert(`🎉 [ADMIN] Đã thêm thành công ${count} / ${studentList.length} học sinh vào lớp ${targetClass?.name || ''}!`);
-      await fetchClassStudents(selectedClassId);
+      const count = await batchImportStudentsToClass(targetId, studentList);
+      alert(`🎉 [ADMIN] Đã nạp thành công ${count} / ${studentList.length} học sinh vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
+      await fetchClassStudents(targetId);
       await fetchProfiles();
     } catch (err: any) {
       alert('Lỗi đọc file Excel: ' + err.message);
