@@ -15,7 +15,7 @@ import {
   Plus, Users, BookOpen, Gamepad2, 
   Sparkles, CheckCircle2, Upload, 
   Download, Image as ImageIcon, RefreshCw, Brain, Trash2, Send, Calendar,
-  Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3, X, School, GraduationCap
+  Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3, X, School, GraduationCap, Eye
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
@@ -81,6 +81,18 @@ export const TeacherDashboard: React.FC = () => {
   const [shuffleQuestions, setShuffleQuestions] = useState<boolean>(true); // QUIZ-08: Trộn câu hỏi & đáp án
   const [questionDifficulty, setQuestionDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium'); // QUIZ-10: Độ khó
   const [selectedQuestionType, setSelectedQuestionType] = useState<'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay'>('single_choice'); // QUIZ-01 -> QUIZ-06
+  const [selectedViewAssignment, setSelectedViewAssignment] = useState<Assignment | null>(null);
+
+  const handleDeleteAssignment = async (assignId: string, title: string) => {
+    if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa bài tập tuần "${title}"?`)) return;
+    try {
+      await supabaseAdmin.from('assignments').delete().eq('id', assignId);
+      setAssignments(assignments.filter(a => a.id !== assignId));
+      alert('🎉 Đã xóa bài tập tuần!');
+    } catch (err: any) {
+      alert('Lỗi xóa bài tập: ' + err.message);
+    }
+  };
 
   const [draftQuestions, setDraftQuestions] = useState<{
     question_text: string;
@@ -1104,6 +1116,83 @@ export const TeacherDashboard: React.FC = () => {
               </div>
             )}
           </div>
+
+          {/* DANH SÁCH BÀI TẬP TUẦN ĐÃ GIAO CHO LỚP */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+              <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-amber-600" />
+                DANH SÁCH BÀI TẬP TUẦN ĐÃ GIAO CHO LỚP ({assignments.length})
+              </h3>
+              <span className="text-xs font-bold text-slate-500">Bấm nút "👁️ Xem bài đã giao" để xem lại chi tiết đề thi và đáp án</span>
+            </div>
+
+            {assignments.length === 0 ? (
+              <div className="text-center py-8 text-xs font-bold text-slate-400 bg-amber-50/50 rounded-2xl border border-amber-200">
+                Chưa có bài tập tuần nào được giao cho lớp này. Hãy sử dụng bộ khung phía trên để giao bài đầu tiên!
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-amber-100 text-amber-900 font-black">
+                    <tr>
+                      <th className="p-3 rounded-l-xl">STT</th>
+                      <th className="p-3">Tên Bài Tập Tuần</th>
+                      <th className="p-3">Ngày Giao</th>
+                      <th className="p-3 text-center">Số Câu Hỏi</th>
+                      <th className="p-3 text-center">Thời Gian Đếm Ngược</th>
+                      <th className="p-3 text-center">Trạng Thái</th>
+                      <th className="p-3 text-right rounded-r-xl">Hành Động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 font-extrabold text-slate-700">
+                    {assignments.map((a, idx) => (
+                      <tr key={a.id} className="hover:bg-amber-50/60 transition-colors">
+                        <td className="p-3 font-black text-amber-900">{idx + 1}</td>
+                        <td className="p-3 font-black text-slate-900">{a.title}</td>
+                        <td className="p-3 text-slate-600">
+                          {a.created_at ? new Date(a.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(a.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-1 bg-purple-100 text-purple-900 rounded-xl border border-purple-300">
+                            {a.questions?.length || 0} câu
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-1 bg-amber-100 text-amber-900 rounded-xl border border-amber-300 flex items-center justify-center gap-1 mx-auto w-max">
+                            <Clock className="w-3 h-3" /> {a.time_limit_minutes || 15} phút
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 rounded-xl border border-emerald-300">
+                            ✓ Đã giao cho lớp
+                          </span>
+                        </td>
+                        <td className="p-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              onClick={() => setSelectedViewAssignment(a)}
+                              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-xl text-xs flex items-center gap-1 shadow"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Xem bài đã giao
+                            </button>
+
+                            <button
+                              onClick={() => handleDeleteAssignment(a.id, a.title)}
+                              className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-xl border border-rose-300 transition-colors"
+                              title="Xóa bài tập tuần này"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -1851,6 +1940,88 @@ export const TeacherDashboard: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XEM CHI TIẾT BÀI TẬP TUẦN ĐÃ GIAO */}
+      {selectedViewAssignment && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            <div className="p-4 bg-amber-500 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-6 h-6" />
+                <div>
+                  <h3 className="font-black text-base">{selectedViewAssignment.title}</h3>
+                  <span className="text-xs font-bold opacity-90">
+                    ⏱️ Hạn thời gian: {selectedViewAssignment.time_limit_minutes || 15} phút | 📅 Ngày giao: {selectedViewAssignment.created_at ? new Date(selectedViewAssignment.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(selectedViewAssignment.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedViewAssignment(null)}
+                className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <h4 className="font-black text-sm text-slate-800">
+                  DANH SÁCH CÂU HỎI TRONG ĐỀ BÀI ({selectedViewAssignment.questions?.length || 0} CÂU HỎI):
+                </h4>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-3 py-1 rounded-xl border border-emerald-300">
+                  ✓ Đã chốt giao cho lớp
+                </span>
+              </div>
+
+              {selectedViewAssignment.questions && selectedViewAssignment.questions.length > 0 ? (
+                selectedViewAssignment.questions.map((q, idx) => (
+                  <div key={q.id || idx} className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/50 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-black text-amber-900">
+                      <span>CÂU {idx + 1}: {q.question_text}</span>
+                      <span className="bg-amber-200 px-2 py-0.5 rounded-lg text-[10px]">10 Điểm</span>
+                    </div>
+
+                    {q.image_url && (
+                      <img src={q.image_url} alt="Question diagram" className="max-h-48 w-auto rounded-xl border border-amber-300 mx-auto my-2" />
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
+                      {q.options?.map(opt => {
+                        const isCorrect = q.correct_answers?.includes(opt.id);
+                        return (
+                          <div
+                            key={opt.id}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                              isCorrect
+                                ? 'bg-emerald-100 text-emerald-950 border-emerald-400 font-extrabold shadow-sm'
+                                : 'bg-white text-slate-700 border-amber-200'
+                            }`}
+                          >
+                            <span><strong>{opt.id}.</strong> {opt.text}</span>
+                            {isCorrect && <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-md font-black">✓ ĐÁP ÁN ĐÚNG</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-6 text-xs font-bold text-slate-400">Đề bài không có thông tin chi tiết câu hỏi.</div>
+              )}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
+              <button
+                onClick={() => setSelectedViewAssignment(null)}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow"
+              >
+                Đóng Cửa Sổ
+              </button>
+            </div>
           </div>
         </div>
       )}
