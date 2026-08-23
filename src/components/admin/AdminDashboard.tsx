@@ -425,6 +425,7 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-2.5">Mã HS</th>
                     <th className="p-2.5">Họ và Tên</th>
                     <th className="p-2.5">Email / Tên Đăng Nhập</th>
+                    <th className="p-2.5 text-center">SĐT Phụ Huynh</th>
                     <th className="p-2.5 text-center rounded-r-xl">Mật Khẩu Phụ Huynh</th>
                   </tr>
                 </thead>
@@ -435,6 +436,7 @@ export const AdminDashboard: React.FC = () => {
                       <td className="p-2.5 font-mono text-amber-700">{st.student_code || `HS2026_${idx+1}`}</td>
                       <td className="p-2.5 font-extrabold text-slate-900">{st.full_name}</td>
                       <td className="p-2.5 font-mono text-slate-600">{st.email}</td>
+                      <td className="p-2.5 text-center font-mono text-blue-700">{st.phone || '0905180506'}</td>
                       <td className="p-2.5 text-center font-mono text-emerald-700">{st.parent_pin || '123456'}</td>
                     </tr>
                   ))}
