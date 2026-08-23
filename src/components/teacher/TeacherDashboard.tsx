@@ -782,10 +782,10 @@ export const TeacherDashboard: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200 pb-3">
               <div>
                 <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-purple-600" />
-                  QUIZ ENGINE & NGÂN HÀNG CÂU HỎI ĐA DẠNG (QUIZ-01 ĐẾN QUIZ-10)
+                  <FileText className="w-5 h-5 text-amber-600" />
+                  BÀI TẬP TUẦN & SOẠN ĐỀ KIỂM TRA CHO LỚP
                 </h3>
-                <p className="text-xs font-bold text-slate-500">Soạn thảo Trắc nghiệm, Đúng/Sai, Điền chỗ trống, Tự luận & Đếm ngược 15-45 phút</p>
+                <p className="text-xs font-bold text-slate-500">Giáo viên tạo bài tập tuần trắc nghiệm, điền chỗ trống, nạp đề từ Word/Excel hoặc dùng AI rút đề tự động cho học sinh</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -1099,7 +1099,7 @@ export const TeacherDashboard: React.FC = () => {
                   onClick={handleSaveAssignment}
                   className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black py-3 rounded-2xl shadow-lg text-xs uppercase tracking-wider"
                 >
-                  🚀 Chốt & Giao {draftQuestions.filter(q => q.selected !== false).length} Câu Hỏi Được Chọn Cho Lớp (Hạn đếm ngược: {timeLimitMinutes} phút)
+                  🚀 Chốt & Giao Bài Tập Tuần Cho Lớp ({draftQuestions.filter(q => q.selected !== false).length} Câu Hỏi Được Chọn - Hạn đếm ngược: {timeLimitMinutes} phút)
                 </button>
               </div>
             )}
