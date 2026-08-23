@@ -27,7 +27,7 @@ export const Header: React.FC = () => {
                 Khối Lớp 2
               </span>
             </h1>
-            <p className="text-xs text-amber-700 font-semibold">Học Toán Tương Tác & Trợ Lý AI Nông Nhiệt</p>
+            <p className="text-xs text-amber-700 font-semibold">Học Toán Tương Tác & Trợ Lý AI Nồng Nhiệt</p>
           </div>
         </div>
 
