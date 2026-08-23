@@ -385,7 +385,7 @@ export const AdminDashboard: React.FC = () => {
               NẠP DANH SÁCH HỌC SINH EXCEL / CSV DÀNH CHO ADMIN
             </h3>
             <p className="text-xs font-bold text-amber-700 mt-1">
-              Quản trị viên có thể nhập 1-Click file Excel 33+ học sinh vào bất kỳ Lớp Học nào trong hệ thống!
+              Quản trị viên có thể nhập 1-Click file Excel danh sách học sinh vào bất kỳ Lớp Học nào trong hệ thống!
             </p>
           </div>
 
@@ -411,7 +411,7 @@ export const AdminDashboard: React.FC = () => {
 
             <label className={`cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-2xl shadow flex items-center gap-2 text-xs transition-all ${excelLoading ? 'opacity-50 cursor-wait' : ''}`}>
               <Upload className="w-4 h-4" />
-              {excelLoading ? 'Đang đọc Excel...' : 'Nạp Excel 33+ Học Sinh'}
+              {excelLoading ? 'Đang đọc Excel...' : 'Nạp Excel Học Sinh'}
               <input
                 type="file"
                 accept=".xlsx, .xls, .csv"
@@ -441,7 +441,7 @@ export const AdminDashboard: React.FC = () => {
 
           {classStudents.length === 0 ? (
             <div className="text-center py-6 text-xs font-bold text-slate-400">
-              Lớp học chưa có học sinh nào. Bấm nút "Nạp Excel 33+ Học Sinh" ở trên để đưa danh sách học sinh vào lớp!
+              Lớp học chưa có học sinh nào. Bấm nút "Nạp Excel Học Sinh" ở trên để đưa danh sách học sinh vào lớp!
             </div>
           ) : (
             <div className="overflow-x-auto max-h-64 overflow-y-auto">
