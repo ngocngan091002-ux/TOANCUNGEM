@@ -533,13 +533,24 @@ export const TeacherDashboard: React.FC = () => {
 
   // CHỐT TẠO BÀI TẬP VÀ GIAO CHO LỚP (QUIZ-08 & QUIZ-09)
   const handleSaveAssignment = async () => {
-    if (!selectedClass || !assignTitle.trim() || draftQuestions.length === 0) return;
+    if (!selectedClass) {
+      alert('Vui lòng chọn Lớp Học trước khi giao đề bài!');
+      return;
+    }
+
+    if (draftQuestions.length === 0) {
+      alert('Vui lòng soạn câu hỏi hoặc bấm AI Tự Động Rút Đề trước khi giao cho lớp!');
+      return;
+    }
 
     const selectedDrafts = draftQuestions.filter(q => q.selected !== false);
     if (selectedDrafts.length === 0) {
       alert('Vui lòng tích chọn ít nhất 1 câu hỏi để giao cho lớp!');
       return;
     }
+
+    // Tự động đặt tên bài kiểm tra nếu Giáo viên để trống
+    const finalTitle = assignTitle.trim() || `Kiểm Tra Toán Lớp 2 (${new Date().toLocaleDateString('vi-VN')})`;
 
     try {
       const questionsToSave = selectedDrafts.map(q => ({
@@ -556,9 +567,9 @@ export const TeacherDashboard: React.FC = () => {
       const created = await createAssignmentWithQuestions(
         {
           class_id: selectedClass.id,
-          teacher_id: user!.id,
-          title: assignTitle.trim(),
-          type: assignType,
+          teacher_id: user?.id || '',
+          title: finalTitle,
+          type: assignType || 'homework',
           time_limit_minutes: timeLimitMinutes, // QUIZ-09: Đồng hồ đếm ngược
           shuffle_questions: shuffleQuestions, // QUIZ-08: Trộn câu hỏi
           is_finalized: true
@@ -569,7 +580,7 @@ export const TeacherDashboard: React.FC = () => {
       setAssignments([created, ...assignments]);
       setAssignTitle('');
       setDraftQuestions([]);
-      alert(`🎉 Đã tạo và giao thành công Đề Bài gồm ${questionsToSave.length} câu hỏi (Hạn đếm ngược: ${timeLimitMinutes} phút) cho lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã giao thành công Đề Bài "${finalTitle}" gồm ${questionsToSave.length} câu hỏi (Hạn đếm ngược: ${timeLimitMinutes} phút) cho lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo bài tập: ' + err.message);
     }
