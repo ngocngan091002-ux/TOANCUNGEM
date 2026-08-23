@@ -6,7 +6,7 @@ import {
   getLearningMaterials, addLearningMaterial, getGames, addGame, 
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
-  batchImportStudentsToClass, supabase, supabaseAdmin 
+  batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin 
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -339,6 +339,7 @@ export const TeacherDashboard: React.FC = () => {
   const [singleStudentName, setSingleStudentName] = useState<string>('');
   const [singleStudentEmail, setSingleStudentEmail] = useState<string>('');
   const [singleStudentCode, setSingleStudentCode] = useState<string>('');
+  const [singleStudentPassword, setSingleStudentPassword] = useState<string>('123456');
 
   const handleAddSingleStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -350,6 +351,7 @@ export const TeacherDashboard: React.FC = () => {
     try {
       const name = singleStudentName.trim();
       const code = singleStudentCode.trim() || `HS2026_${students.length + 1}`;
+      const pwd = singleStudentPassword.trim() || '123456';
       let email = singleStudentEmail.trim().toLowerCase();
 
       if (!email) {
@@ -360,17 +362,38 @@ export const TeacherDashboard: React.FC = () => {
       await batchImportStudentsToClass(selectedClass.id, [{
         full_name: name,
         email: email,
-        student_code: code
+        student_code: code,
+        password: pwd
       }]);
 
-      alert(`🎉 Đã thêm thành công học sinh "${name}" (Mã: ${code}) vào lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã thêm thành công học sinh "${name}" (Mã: ${code}, Mật khẩu: ${pwd}) vào lớp ${selectedClass.name}!`);
       setShowAddSingleStudentModal(false);
       setSingleStudentName('');
       setSingleStudentEmail('');
       setSingleStudentCode('');
+      setSingleStudentPassword('123456');
       await loadClassData(selectedClass.id);
     } catch (err: any) {
       alert('Lỗi thêm học sinh: ' + err.message);
+    }
+  };
+
+  const handleRemoveStudentFromClass = async (studentId: string, studentName: string) => {
+    if (!selectedClass) return;
+    if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp ${selectedClass.name}?`)) {
+      return;
+    }
+
+    try {
+      const ok = await removeStudentFromClass(selectedClass.id, studentId);
+      if (ok) {
+        alert(`🎉 Đã xóa học sinh "${studentName}" ra khỏi lớp ${selectedClass.name}!`);
+        await loadClassData(selectedClass.id);
+      } else {
+        alert('Lỗi xóa học sinh. Vui lòng thử lại!');
+      }
+    } catch (err: any) {
+      alert('Lỗi xóa học sinh: ' + err.message);
     }
   };
 
@@ -1797,6 +1820,18 @@ export const TeacherDashboard: React.FC = () => {
                   value={singleStudentEmail}
                   onChange={(e) => setSingleStudentEmail(e.target.value)}
                   className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Mật Khẩu Đăng Nhập / Phụ Huynh (*):</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Mặc định: 123456"
+                  value={singleStudentPassword}
+                  onChange={(e) => setSingleStudentPassword(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500 font-mono text-emerald-800"
                 />
               </div>
 

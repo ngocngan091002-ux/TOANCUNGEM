@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ClassItem } from '../../types';
 import { 
   getAllProfiles, updateUserStatus, supabase, supabaseAdmin, 
-  getTeacherClasses, getClassMembers, batchImportStudentsToClass 
+  getTeacherClasses, getClassMembers, batchImportStudentsToClass, removeStudentFromClass 
 } from '../../services/supabase';
 import { parseStudentExcel, exportClassToExcel } from '../../services/excelService';
 import { 
   ShieldCheck, UserCheck, UserX, Clock, Users, 
   School, GraduationCap, CheckCircle2, UserPlus, Mail, Lock, User, Phone, X,
-  FileSpreadsheet, Upload, Download
+  FileSpreadsheet, Upload, Download, Trash2
 } from 'lucide-react';
 
 export const AdminDashboard: React.FC = () => {
@@ -71,6 +71,7 @@ export const AdminDashboard: React.FC = () => {
   const [singleStudentNameAdmin, setSingleStudentNameAdmin] = useState<string>('');
   const [singleStudentEmailAdmin, setSingleStudentEmailAdmin] = useState<string>('');
   const [singleStudentCodeAdmin, setSingleStudentCodeAdmin] = useState<string>('');
+  const [singleStudentPasswordAdmin, setSingleStudentPasswordAdmin] = useState<string>('123456');
 
   const handleAddSingleStudentAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,6 +86,7 @@ export const AdminDashboard: React.FC = () => {
     try {
       const name = singleStudentNameAdmin.trim();
       const code = singleStudentCodeAdmin.trim() || `HS2026_${classStudents.length + 1}`;
+      const pwd = singleStudentPasswordAdmin.trim() || '123456';
       let email = singleStudentEmailAdmin.trim().toLowerCase();
 
       if (!email) {
@@ -95,18 +97,43 @@ export const AdminDashboard: React.FC = () => {
       await batchImportStudentsToClass(targetId, [{
         full_name: name,
         email: email,
-        student_code: code
+        student_code: code,
+        password: pwd
       }]);
 
-      alert(`🎉 [ADMIN] Đã thêm thành công học sinh "${name}" (Mã: ${code}) vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
+      alert(`🎉 [ADMIN] Đã thêm thành công học sinh "${name}" (Mã: ${code}, Mật khẩu: ${pwd}) vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
       setShowAddSingleStudentAdminModal(false);
       setSingleStudentNameAdmin('');
       setSingleStudentEmailAdmin('');
       setSingleStudentCodeAdmin('');
+      setSingleStudentPasswordAdmin('123456');
       await fetchClassStudents(targetId);
       await fetchProfiles();
     } catch (err: any) {
       alert('Lỗi thêm học sinh: ' + err.message);
+    }
+  };
+
+  const handleRemoveStudentAdmin = async (studentId: string, studentName: string) => {
+    const targetId = selectedClassId || (classes[0] ? classes[0].id : '');
+    const targetClass = classes.find(c => c.id === targetId);
+    if (!targetId) return;
+
+    if (!window.confirm(`⚠️ [ADMIN] Thầy/Cô có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp ${targetClass?.name || 'Lớp Hai 4'}?`)) {
+      return;
+    }
+
+    try {
+      const ok = await removeStudentFromClass(targetId, studentId);
+      if (ok) {
+        alert(`🎉 [ADMIN] Đã xóa học sinh "${studentName}" ra khỏi lớp!`);
+        await fetchClassStudents(targetId);
+        await fetchProfiles();
+      } else {
+        alert('Lỗi xóa học sinh. Vui lòng thử lại!');
+      }
+    } catch (err: any) {
+      alert('Lỗi xóa học sinh: ' + err.message);
     }
   };
 
@@ -426,7 +453,8 @@ export const AdminDashboard: React.FC = () => {
                     <th className="p-2.5">Họ và Tên</th>
                     <th className="p-2.5">Email / Tên Đăng Nhập</th>
                     <th className="p-2.5 text-center">SĐT Phụ Huynh</th>
-                    <th className="p-2.5 text-center rounded-r-xl">Mật Khẩu Phụ Huynh</th>
+                    <th className="p-2.5 text-center">Mật Khẩu Phụ Huynh</th>
+                    <th className="p-2.5 text-center rounded-r-xl">Hành Động</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-amber-100">
@@ -438,6 +466,15 @@ export const AdminDashboard: React.FC = () => {
                       <td className="p-2.5 font-mono text-slate-600">{st.email}</td>
                       <td className="p-2.5 text-center font-mono text-blue-700">{st.phone || '0905180506'}</td>
                       <td className="p-2.5 text-center font-mono text-emerald-700">{st.parent_pin || '123456'}</td>
+                      <td className="p-2.5 text-center">
+                        <button
+                          onClick={() => handleRemoveStudentAdmin(st.id, st.full_name)}
+                          className="bg-rose-100 hover:bg-rose-200 text-rose-800 font-extrabold px-2.5 py-1 rounded-xl text-[11px] border border-rose-300 transition-all flex items-center gap-1 mx-auto"
+                          title="Xóa học sinh này ra khỏi lớp"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Xóa Khỏi Lớp
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -717,6 +754,18 @@ export const AdminDashboard: React.FC = () => {
                   value={singleStudentEmailAdmin}
                   onChange={(e) => setSingleStudentEmailAdmin(e.target.value)}
                   className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Mật Khẩu Đăng Nhập / Phụ Huynh (*):</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Mặc định: 123456"
+                  value={singleStudentPasswordAdmin}
+                  onChange={(e) => setSingleStudentPasswordAdmin(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500 font-mono text-emerald-800"
                 />
               </div>
 

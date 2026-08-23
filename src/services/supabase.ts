@@ -256,10 +256,30 @@ export async function addStudentToClass(classId: string, studentId: string): Pro
   }
 }
 
+// XÓA HỌC SINH RA KHỎI LỚP (DÀNH CHO GIÁO VIÊN VÀ QUẢN TRỊ VIÊN)
+export async function removeStudentFromClass(classId: string, studentId: string): Promise<boolean> {
+  try {
+    const { error } = await supabaseAdmin
+      .from('class_members')
+      .delete()
+      .eq('class_id', classId)
+      .eq('student_id', studentId);
+
+    if (error) {
+      console.error('removeStudentFromClass error:', error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('removeStudentFromClass exception:', err);
+    return false;
+  }
+}
+
 // BATCH IMPORT 33+ HỌC SINH 1-CLICK TỪ FILE EXCEL (XỬ LÝ TỪNG HỌC SINH CHI TIẾT)
 export async function batchImportStudentsToClass(
   classId: string, 
-  studentList: { full_name: string; email: string; phone?: string; student_code?: string }[]
+  studentList: { full_name: string; email: string; phone?: string; student_code?: string; password?: string; parent_pin?: string }[]
 ): Promise<number> {
   if (!classId || !studentList || studentList.length === 0) return 0;
 
@@ -268,6 +288,7 @@ export async function batchImportStudentsToClass(
   for (const st of studentList) {
     const cleanEmail = st.email.trim().toLowerCase();
     if (!cleanEmail) continue;
+    const pin = st.password || st.parent_pin || '123456';
 
     try {
       // 1. Kiểm tra xem profile với email này đã có sẵn trong DB chưa
@@ -291,7 +312,8 @@ export async function batchImportStudentsToClass(
             role: 'student',
             status: 'approved',
             student_code: st.student_code || '',
-            phone: st.phone || ''
+            phone: st.phone || '',
+            parent_pin: pin
           }]);
 
         if (insErr) {
@@ -301,7 +323,8 @@ export async function batchImportStudentsToClass(
             .update({
               full_name: st.full_name,
               student_code: st.student_code || '',
-              phone: st.phone || ''
+              phone: st.phone || '',
+              parent_pin: pin
             })
             .eq('email', cleanEmail);
           
@@ -319,7 +342,8 @@ export async function batchImportStudentsToClass(
           .update({
             full_name: st.full_name,
             student_code: st.student_code || '',
-            phone: st.phone || ''
+            phone: st.phone || '',
+            parent_pin: pin
           })
           .eq('id', studentId);
       }
