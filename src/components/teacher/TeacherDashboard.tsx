@@ -334,6 +334,46 @@ export const TeacherDashboard: React.FC = () => {
     ]);
   };
 
+  // STATE MODAL THÊM 1 HỌC SINH THỦ CÔNG FOR TEACHER
+  const [showAddSingleStudentModal, setShowAddSingleStudentModal] = useState<boolean>(false);
+  const [singleStudentName, setSingleStudentName] = useState<string>('');
+  const [singleStudentEmail, setSingleStudentEmail] = useState<string>('');
+  const [singleStudentCode, setSingleStudentCode] = useState<string>('');
+
+  const handleAddSingleStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClass || !singleStudentName.trim()) {
+      alert('Vui lòng nhập Họ và Tên học sinh!');
+      return;
+    }
+
+    try {
+      const name = singleStudentName.trim();
+      const code = singleStudentCode.trim() || `HS2026_${students.length + 1}`;
+      let email = singleStudentEmail.trim().toLowerCase();
+
+      if (!email) {
+        const unsigned = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
+        email = `${unsigned}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
+      }
+
+      await batchImportStudentsToClass(selectedClass.id, [{
+        full_name: name,
+        email: email,
+        student_code: code
+      }]);
+
+      alert(`🎉 Đã thêm thành công học sinh "${name}" (Mã: ${code}) vào lớp ${selectedClass.name}!`);
+      setShowAddSingleStudentModal(false);
+      setSingleStudentName('');
+      setSingleStudentEmail('');
+      setSingleStudentCode('');
+      await loadClassData(selectedClass.id);
+    } catch (err: any) {
+      alert('Lỗi thêm học sinh: ' + err.message);
+    }
+  };
+
   // EXCEL EXPORT & IMPORT
   const handleExportExcel = () => {
     if (!selectedClass) return;
@@ -662,6 +702,13 @@ export const TeacherDashboard: React.FC = () => {
             className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 transition-all"
           >
             <Download className="w-4 h-4" /> Xuất Excel Lớp
+          </button>
+
+          <button
+            onClick={() => setShowAddSingleStudentModal(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 transition-all"
+          >
+            <UserPlus className="w-4 h-4" /> Thêm 1 Học Sinh Thủ Công
           </button>
 
           <label className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold px-4 py-2 rounded-2xl shadow text-xs flex items-center gap-1.5 cursor-pointer transition-all">
@@ -1696,6 +1743,79 @@ export const TeacherDashboard: React.FC = () => {
               </button>
             </div>
             <img src={previewImageUrl} alt="Full Screen Preview" className="max-h-[80vh] w-auto max-w-full object-contain rounded-2xl mx-auto shadow-inner" />
+          </div>
+        </div>
+      )}
+      {/* MODAL GIÁO VIÊN THÊM 1 HỌC SINH THỦ CÔNG */}
+      {showAddSingleStudentModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-200 p-6 sm:p-8 w-full max-w-md shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowAddSingleStudentModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800">THÊM HỌC SINH MỚI VÀO LỚP</h3>
+              <p className="text-xs font-bold text-slate-500">Giáo viên nhập Họ tên học sinh để thêm trực tiếp vào {selectedClass?.name}</p>
+            </div>
+
+            <form onSubmit={handleAddSingleStudent} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Họ và Tên Học Sinh (*):</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Nguyễn Văn Nam"
+                  value={singleStudentName}
+                  onChange={(e) => setSingleStudentName(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Mã Học Sinh (tùy chọn):</label>
+                <input
+                  type="text"
+                  placeholder={`Mặc định: HS2026_${students.length + 1}`}
+                  value={singleStudentCode}
+                  onChange={(e) => setSingleStudentCode(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Email / Tên Đăng Nhập (tùy chọn):</label>
+                <input
+                  type="email"
+                  placeholder="VD: nam.nguyen@toancungem.edu.vn (tự tạo nếu trống)"
+                  value={singleStudentEmail}
+                  onChange={(e) => setSingleStudentEmail(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSingleStudentModal(false)}
+                  className="px-4 py-2.5 rounded-2xl font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-2xl font-black text-xs text-white bg-amber-500 hover:bg-amber-600 shadow-md"
+                >
+                  Thêm Học Sinh Trực Tiếp
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

@@ -66,6 +66,50 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
+  // STATE MODAL THÊM 1 HỌC SINH THỦ CÔNG FOR ADMIN
+  const [showAddSingleStudentAdminModal, setShowAddSingleStudentAdminModal] = useState<boolean>(false);
+  const [singleStudentNameAdmin, setSingleStudentNameAdmin] = useState<string>('');
+  const [singleStudentEmailAdmin, setSingleStudentEmailAdmin] = useState<string>('');
+  const [singleStudentCodeAdmin, setSingleStudentCodeAdmin] = useState<string>('');
+
+  const handleAddSingleStudentAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const targetId = selectedClassId || (classes[0] ? classes[0].id : '');
+    const targetClass = classes.find(c => c.id === targetId);
+
+    if (!targetId || !singleStudentNameAdmin.trim()) {
+      alert('Vui lòng chọn Lớp Học và nhập Họ và Tên học sinh!');
+      return;
+    }
+
+    try {
+      const name = singleStudentNameAdmin.trim();
+      const code = singleStudentCodeAdmin.trim() || `HS2026_${classStudents.length + 1}`;
+      let email = singleStudentEmailAdmin.trim().toLowerCase();
+
+      if (!email) {
+        const unsigned = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').replace(/\s+/g, '').toLowerCase();
+        email = `${unsigned}${Math.floor(100 + Math.random() * 900)}@toancungem.edu.vn`;
+      }
+
+      await batchImportStudentsToClass(targetId, [{
+        full_name: name,
+        email: email,
+        student_code: code
+      }]);
+
+      alert(`🎉 [ADMIN] Đã thêm thành công học sinh "${name}" (Mã: ${code}) vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
+      setShowAddSingleStudentAdminModal(false);
+      setSingleStudentNameAdmin('');
+      setSingleStudentEmailAdmin('');
+      setSingleStudentCodeAdmin('');
+      await fetchClassStudents(targetId);
+      await fetchProfiles();
+    } catch (err: any) {
+      alert('Lỗi thêm học sinh: ' + err.message);
+    }
+  };
+
   const handleImportExcelAdmin = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
@@ -330,6 +374,13 @@ export const AdminDashboard: React.FC = () => {
                 ))}
               </select>
             )}
+
+            <button
+              onClick={() => setShowAddSingleStudentAdminModal(true)}
+              className="bg-amber-500 hover:bg-amber-600 text-white font-black px-4 py-2.5 rounded-2xl shadow flex items-center gap-2 text-xs transition-all"
+            >
+              <UserPlus className="w-4 h-4" /> Thêm 1 Học Sinh Thủ Công
+            </button>
 
             <label className={`cursor-pointer bg-emerald-600 hover:bg-emerald-700 text-white font-black px-4 py-2.5 rounded-2xl shadow flex items-center gap-2 text-xs transition-all ${excelLoading ? 'opacity-50 cursor-wait' : ''}`}>
               <Upload className="w-4 h-4" />
@@ -616,6 +667,79 @@ export const AdminDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* MODAL ADMIN THÊM 1 HỌC SINH THỦ CÔNG */}
+      {showAddSingleStudentAdminModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-200 p-6 sm:p-8 w-full max-w-md shadow-2xl relative space-y-4">
+            <button
+              onClick={() => setShowAddSingleStudentAdminModal(false)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-slate-600 rounded-full"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                <UserPlus className="w-6 h-6" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800">[ADMIN] THÊM HỌC SINH VÀO LỚP</h3>
+              <p className="text-xs font-bold text-slate-500">Quản trị viên nhập Họ tên học sinh để nạp trực tiếp vào {classes.find(c => c.id === selectedClassId)?.name || 'Lớp Hai 4'}</p>
+            </div>
+
+            <form onSubmit={handleAddSingleStudentAdmin} className="space-y-3">
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Họ và Tên Học Sinh (*):</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="VD: Trần Văn Nam"
+                  value={singleStudentNameAdmin}
+                  onChange={(e) => setSingleStudentNameAdmin(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Mã Học Sinh (tùy chọn):</label>
+                <input
+                  type="text"
+                  placeholder={`Mặc định: HS2026_${classStudents.length + 1}`}
+                  value={singleStudentCodeAdmin}
+                  onChange={(e) => setSingleStudentCodeAdmin(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1">Email / Tên Đăng Nhập (tùy chọn):</label>
+                <input
+                  type="email"
+                  placeholder="VD: nam.tran@toancungem.edu.vn (tự tạo nếu trống)"
+                  value={singleStudentEmailAdmin}
+                  onChange={(e) => setSingleStudentEmailAdmin(e.target.value)}
+                  className="w-full px-3 py-2.5 bg-amber-50/50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSingleStudentAdminModal(false)}
+                  className="px-4 py-2.5 rounded-2xl font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-2xl font-black text-xs text-white bg-amber-500 hover:bg-amber-600 shadow-md"
+                >
+                  Nạp Học Sinh Trực Tiếp
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
