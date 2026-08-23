@@ -197,76 +197,90 @@ export async function addStudentToClass(classId: string, studentId: string): Pro
   }
 }
 
-// BATCH IMPORT 33+ HỌC SINH 1-CLICK TỪ FILE EXCEL
+// BATCH IMPORT 33+ HỌC SINH 1-CLICK TỪ FILE EXCEL (XỬ LÝ TỪNG HỌC SINH CHI TIẾT)
 export async function batchImportStudentsToClass(
   classId: string, 
   studentList: { full_name: string; email: string; phone?: string; student_code?: string }[]
 ): Promise<number> {
   if (!classId || !studentList || studentList.length === 0) return 0;
 
-  const emailList = studentList.map(st => st.email.trim().toLowerCase());
+  let successCount = 0;
 
-  // 1. Tra cứu danh sách profile đã có sẵn trong DB để giữ nguyên ID
-  const { data: existingProfiles } = await supabaseAdmin
-    .from('profiles')
-    .select('id, email')
-    .in('email', emailList);
-
-  const existingMap: Record<string, string> = {};
-  if (existingProfiles) {
-    existingProfiles.forEach(p => {
-      existingMap[p.email.toLowerCase()] = p.id;
-    });
-  }
-
-  // 2. Chuẩn bị mảng profiles để Batch Upsert
-  const profilesToUpsert = studentList.map(st => {
+  for (const st of studentList) {
     const cleanEmail = st.email.trim().toLowerCase();
-    const existingId = existingMap[cleanEmail];
+    if (!cleanEmail) continue;
 
-    return {
-      id: existingId || crypto.randomUUID(),
-      email: cleanEmail,
-      full_name: st.full_name,
-      role: 'student' as const,
-      status: 'approved' as const,
-      student_code: st.student_code,
-      phone: st.phone || ''
-    };
-  });
+    try {
+      // 1. Kiểm tra xem profile với email này đã có sẵn trong DB chưa
+      const { data: existing } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email')
+        .eq('email', cleanEmail)
+        .maybeSingle();
 
-  // Batch Upsert qua Service Role Client (bypassing RLS)
-  const { error: pErr } = await supabaseAdmin
-    .from('profiles')
-    .upsert(profilesToUpsert, { onConflict: 'email' });
+      let studentId = existing?.id;
 
-  if (pErr) console.warn('Admin Profiles Upsert Warning:', pErr.message);
+      if (!studentId) {
+        studentId = crypto.randomUUID();
+        // Thử insert profile mới
+        const { error: insErr } = await supabaseAdmin
+          .from('profiles')
+          .insert([{
+            id: studentId,
+            email: cleanEmail,
+            full_name: st.full_name,
+            role: 'student',
+            status: 'approved',
+            student_code: st.student_code || '',
+            phone: st.phone || ''
+          }]);
 
-  // 3. Lấy lại tất cả profile IDs theo danh sách email
-  const { data: createdProfiles, error: fetchErr } = await supabaseAdmin
-    .from('profiles')
-    .select('id, email, full_name')
-    .in('email', emailList);
+        if (insErr) {
+          // Nếu trùng email thì cập nhật profile có sẵn theo Email
+          await supabaseAdmin
+            .from('profiles')
+            .update({
+              full_name: st.full_name,
+              student_code: st.student_code || '',
+              phone: st.phone || ''
+            })
+            .eq('email', cleanEmail);
+          
+          const { data: reGet } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+          if (reGet) studentId = reGet.id;
+        }
+      } else {
+        // Cập nhật họ tên & thông tin cho profile đã tồn tại
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            full_name: st.full_name,
+            student_code: st.student_code || '',
+            phone: st.phone || ''
+          })
+          .eq('id', studentId);
+      }
 
-  if (fetchErr || !createdProfiles || createdProfiles.length === 0) {
-    return 0;
+      if (studentId) {
+        // 2. Liên kết học sinh vào bảng class_members của Lớp
+        const { error: memErr } = await supabaseAdmin
+          .from('class_members')
+          .upsert([{ class_id: classId, student_id: studentId }], { onConflict: 'class_id,student_id' });
+
+        if (!memErr) {
+          successCount++;
+        }
+      }
+    } catch (e) {
+      console.warn('Import single student warning:', cleanEmail, e);
+    }
   }
 
-  // 4. Batch Insert vào bảng class_members qua Service Role Client
-  const memberRows = createdProfiles.map(p => ({
-    class_id: classId,
-    student_id: p.id
-  }));
-
-  const { error: mErr } = await supabaseAdmin
-    .from('class_members')
-    .upsert(memberRows, { onConflict: 'class_id,student_id' });
-
-  if (mErr) {
-    console.warn('Admin Class Members Upsert Warning:', mErr.message);
-  }
-
-  return createdProfiles.length;
+  return successCount;
 }
 
 // --- MATERIALS & GAME HUB ---
