@@ -846,6 +846,7 @@ export const TeacherDashboard: React.FC = () => {
           type: 'weekly_test',
           time_limit_minutes: timeLimitMinutes, // QUIZ-09: Đồng hồ đếm ngược
           shuffle_questions: shuffleQuestions, // QUIZ-08: Trộn câu hỏi
+          target_group: targetGroup, // ⭐ Đánh dấu nhóm đối tượng nhận bài (all | group_1 | group_2 | group_3 | group_4)
           is_finalized: true
         },
         questionsToSave

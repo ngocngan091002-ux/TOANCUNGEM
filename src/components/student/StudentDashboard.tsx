@@ -112,7 +112,41 @@ export const StudentDashboard: React.FC = () => {
       setGames(g);
 
       const a = await getAssignments(classId);
-      setAssignments(a);
+      
+      // ⭐ LỌC BÀI TẬP THEO NHÓM HỌC SINH ĐƯỢC PHÂN CÔNG
+      const savedGroupsStr = localStorage.getItem(`toan_cung_em_student_groups_${classId}`);
+      let studentGroup = 'Chưa xếp nhóm';
+      if (savedGroupsStr && user?.id) {
+        try {
+          const groupMap = JSON.parse(savedGroupsStr);
+          studentGroup = groupMap[user.id] || 'Chưa xếp nhóm';
+        } catch (e) {}
+      }
+
+      const filteredAssignments = a.filter(assign => {
+        // 1. Bài tập giao cho Cả lớp hoặc không giới hạn nhóm => 100% học sinh nhận được
+        if (!assign.target_group || assign.target_group === 'all') return true;
+
+        // 2. Bài tập giao đích danh cho Nhóm 1, Nhóm 2, Nhóm 3, Nhóm 4
+        const targetName = assign.target_group === 'group_1' ? 'Nhóm 1' :
+                           assign.target_group === 'group_2' ? 'Nhóm 2' :
+                           assign.target_group === 'group_3' ? 'Nhóm 3' :
+                           assign.target_group === 'group_4' ? 'Nhóm 4' : '';
+
+        if (targetName && studentGroup === targetName) return true;
+
+        // 3. Phụ trợ: kiểm tra nếu tiêu đề bài tập có ghi rõ tên nhóm (VD: "(Nhóm 1)")
+        if (assign.title && assign.title.includes(`(${studentGroup})`)) return true;
+
+        // 4. Nếu bài tập giao cho nhóm khác mà học sinh này không thuộc nhóm đó => Ẩn đi
+        if (assign.target_group.startsWith('group_') || (assign.title && assign.title.includes('(Nhóm '))) {
+          return false;
+        }
+
+        return true;
+      });
+
+      setAssignments(filteredAssignments);
 
       const sub = await getStudentSubmissions(user!.id);
       setSubmissions(sub);

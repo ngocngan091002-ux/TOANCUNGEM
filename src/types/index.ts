@@ -167,6 +167,7 @@ export interface Assignment {
   type: 'exercise' | 'weekly_test' | 'game_quiz';
   time_limit_minutes?: number;
   shuffle_questions?: boolean;
+  target_group?: string;
   is_finalized: boolean;
   created_at?: string;
   material?: Material;
