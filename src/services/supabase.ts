@@ -3,7 +3,8 @@ import {
   UserProfile, ClassItem, ClassMember, Material, LearningMaterial, 
   GameItem, DailyTask, TaskCompletion, Assignment, 
   AssignmentQuestion, AssignmentSubmission, QuestionResponse, 
-  StudentProgress, LeaderboardEntry, AIWeaknessSummary 
+  StudentProgress, LeaderboardEntry, AIWeaknessSummary,
+  PointLogRecord, CustomPointReason
 } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://pvhpxgczjmzwahidabzy.supabase.co';
@@ -915,4 +916,77 @@ export async function uploadFileToStorage(bucket: 'materials' | 'question-images
     console.error('File upload exception:', err);
     return URL.createObjectURL(file);
   }
+}
+
+// --- TÍCH ĐIỂM HỌC SINH & THI ĐUA ---
+export async function addStudentPointLog(payload: {
+  class_id?: string;
+  student_id: string;
+  student_name?: string;
+  points_change: number;
+  stars_change?: number;
+  reason: string;
+  icon?: string;
+  type: 'reward' | 'penalty';
+  created_by?: string;
+}): Promise<PointLogRecord> {
+  const insertPayload = {
+    class_id: payload.class_id,
+    student_id: payload.student_id,
+    points_change: payload.points_change,
+    stars_change: payload.stars_change || (payload.type === 'reward' ? Math.max(1, payload.points_change) : -1),
+    reason: payload.reason,
+    icon: payload.icon || (payload.type === 'reward' ? '⭐' : '⚠️'),
+    type: payload.type,
+    created_by: payload.created_by,
+    created_at: new Date().toISOString()
+  };
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('student_points_log')
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('addStudentPointLog DB insert warning:', err);
+  }
+
+  return { id: crypto.randomUUID(), ...insertPayload };
+}
+
+export async function getStudentPointLogs(studentId: string): Promise<PointLogRecord[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('student_points_log')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('getStudentPointLogs exception:', err);
+  }
+  return [];
+}
+
+export async function getClassPointLogs(classId?: string): Promise<PointLogRecord[]> {
+  try {
+    let query = supabaseAdmin.from('student_points_log').select('*, student:profiles(full_name, student_code)').order('created_at', { ascending: false });
+    if (classId) {
+      query = query.eq('class_id', classId);
+    }
+    const { data, error } = await query;
+    if (!error && data) {
+      return data.map((d: any) => ({
+        ...d,
+        student_name: d.student?.full_name || d.student_name
+      }));
+    }
+  } catch (err) {
+    console.warn('getClassPointLogs exception:', err);
+  }
+  return [];
 }

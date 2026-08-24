@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion } from '../../types';
+import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason } from '../../types';
 import { 
   getTeacherClasses, createClass, getClassMembers, 
   getDailyTasks, createDailyTask, 
   getLearningMaterials, addLearningMaterial, getGames, addGame, 
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
-  batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin 
+  batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
+  addStudentPointLog, getClassPointLogs
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -83,6 +84,30 @@ export const TeacherDashboard: React.FC = () => {
   const [selectedQuestionType, setSelectedQuestionType] = useState<'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay'>('single_choice'); // QUIZ-01 -> QUIZ-06
   const [selectedViewAssignment, setSelectedViewAssignment] = useState<Assignment | null>(null);
   const [targetGroup, setTargetGroup] = useState<string>('all');
+
+  // ⭐ TÍCH ĐIỂM & THI ĐUA HỌC SINH STATES
+  const [pointLogs, setPointLogs] = useState<PointLogRecord[]>([]);
+  const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'all'>('all');
+  const [showReasonModal, setShowReasonModal] = useState<boolean>(false);
+
+  // Danh sách lý do tích điểm
+  const [customReasons, setCustomReasons] = useState<CustomPointReason[]>([
+    { id: 'r1', title: 'Phát biểu hay', points: 1, icon: '⭐', type: 'reward' },
+    { id: 'r2', title: 'Hoàn thành bài tập', points: 2, icon: '📚', type: 'reward' },
+    { id: 'r3', title: 'Hoàn thành nhiệm vụ', points: 3, icon: '🎯', type: 'reward' },
+    { id: 'r4', title: 'Có cách giải sáng tạo', points: 3, icon: '💡', type: 'reward' },
+    { id: 'r5', title: 'Giúp đỡ bạn', points: 2, icon: '🤝', type: 'reward' },
+    { id: 'r6', title: 'Thành tích nổi bật', points: 5, icon: '🏆', type: 'reward' },
+    { id: 'p1', title: 'Chưa hoàn thành nhiệm vụ', points: -1, icon: '⚠️', type: 'penalty' },
+    { id: 'p2', title: 'Quên đồ dùng học tập', points: -1, icon: '⚠️', type: 'penalty' },
+    { id: 'p3', title: 'Chưa thực hiện nội quy', points: -2, icon: '⚠️', type: 'penalty' }
+  ]);
+
+  // Form tạo lý do tích điểm mới
+  const [newReasonTitle, setNewReasonTitle] = useState<string>('');
+  const [newReasonPoints, setNewReasonPoints] = useState<number>(2);
+  const [newReasonIcon, setNewReasonIcon] = useState<string>('🎨');
+  const [newReasonType, setNewReasonType] = useState<'reward' | 'penalty'>('reward');
 
   const handleDeleteAssignment = async (assignId: string, title: string) => {
     if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa bài tập tuần "${title}"?`)) return;
@@ -313,6 +338,9 @@ export const TeacherDashboard: React.FC = () => {
 
       const a = await getAssignments(classId, true);
       setAssignments(a);
+
+      const pLogs = await getClassPointLogs(classId);
+      setPointLogs(pLogs);
     } catch (err) {
       console.error('Error loading class data:', err);
     }
@@ -330,6 +358,84 @@ export const TeacherDashboard: React.FC = () => {
     } catch (err: any) {
       alert('Lỗi tạo lớp: ' + err.message);
     }
+  };
+
+  // ⭐ HÀM CỘNG / TRỪ ĐIỂM HỌC SINH VÀ LƯU SUPABASE DB VĨNH VIỄN
+  const handleAwardPoints = async (st: UserProfile, reasonObj: { title: string; points: number; icon: string; type: 'reward' | 'penalty' }) => {
+    try {
+      const newLog = await addStudentPointLog({
+        class_id: selectedClass?.id,
+        student_id: st.id,
+        student_name: st.full_name,
+        points_change: reasonObj.points,
+        stars_change: reasonObj.type === 'reward' ? Math.max(1, reasonObj.points) : -1,
+        reason: reasonObj.title,
+        icon: reasonObj.icon,
+        type: reasonObj.type,
+        created_by: user?.id
+      });
+
+      setPointLogs(prev => [newLog, ...prev]);
+
+      const currentStars = conductStars[st.id] || 10;
+      const updatedStars = Math.max(0, currentStars + (reasonObj.type === 'reward' ? Math.max(1, reasonObj.points) : -1));
+      setConductStars(prev => ({ ...prev, [st.id]: updatedStars }));
+
+      alert(`🎉 Đã ${reasonObj.points >= 0 ? 'cộng +' + reasonObj.points : 'trừ ' + reasonObj.points} điểm cho ${st.full_name} (${reasonObj.title})!`);
+    } catch (err: any) {
+      alert('Lỗi cộng điểm: ' + err.message);
+    }
+  };
+
+  // THÊM LÝ DO TÍCH ĐIỂM TÙY CHỈNH
+  const handleAddCustomReason = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newReasonTitle.trim()) return;
+
+    const newReason: CustomPointReason = {
+      id: crypto.randomUUID(),
+      title: newReasonTitle.trim(),
+      points: newReasonType === 'penalty' ? -Math.abs(newReasonPoints) : Math.abs(newReasonPoints),
+      icon: newReasonIcon.trim() || (newReasonType === 'reward' ? '⭐' : '⚠️'),
+      type: newReasonType
+    };
+
+    setCustomReasons(prev => [newReason, ...prev]);
+    setNewReasonTitle('');
+    alert('🎉 Đã thêm lý do tích điểm mới thành công!');
+  };
+
+  const handleDeleteCustomReason = (id: string) => {
+    setCustomReasons(prev => prev.filter(r => r.id !== id));
+  };
+
+  // TÍNH TỔNG ĐIỂM & ĐẾM LỊCH SỬ CHO TỪNG HỌC SINH
+  const getStudentStats = (studentId: string) => {
+    const studentLogs = pointLogs.filter(l => l.student_id === studentId);
+    
+    const now = new Date();
+    const filteredLogs = studentLogs.filter(l => {
+      if (!l.created_at) return true;
+      const logDate = new Date(l.created_at);
+      if (timeFilter === 'today') return logDate.toDateString() === now.toDateString();
+      if (timeFilter === 'week') {
+        const diff = (now.getTime() - logDate.getTime()) / (1000 * 3600 * 24);
+        return diff <= 7;
+      }
+      if (timeFilter === 'month') return logDate.getMonth() === now.getMonth() && logDate.getFullYear() === now.getFullYear();
+      return true;
+    });
+
+    const totalPointsChange = filteredLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
+    const basePoints = 100 + totalPointsChange;
+    const totalStars = (conductStars[studentId] || 10) + filteredLogs.filter(l => l.type === 'reward').length;
+
+    return {
+      totalPoints: Math.max(0, basePoints),
+      stars: totalStars,
+      rewardCount: filteredLogs.filter(l => l.type === 'reward').length,
+      penaltyCount: filteredLogs.filter(l => l.type === 'penalty').length
+    };
   };
 
   // CLAS-07: KHÓA / MỞ GIA NHẬP LỚP HỌC
@@ -797,7 +903,7 @@ export const TeacherDashboard: React.FC = () => {
         {[
           { id: 'tasks', label: '📋 Nhiệm Vụ Hằng Ngày' },
           { id: 'assignments', label: '📝 Bài Tập Tuần' },
-          { id: 'attendance', label: '✅ Điểm Danh & Nề Nếp' },
+          { id: 'attendance', label: '⭐ Tích Điểm & Thi Đua' },
           { id: 'groups', label: '👥 Chia Nhóm Lớp' },
           { id: 'class_settings', label: '⚙️ Cấu Hình Lớp & TKB' },
           { id: 'materials', label: '📖 Upload Học Liệu' },
@@ -1333,88 +1439,314 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* CLAS-05 & CLAS-06: ĐIỂM DANH THỜI GIAN THỰC & SỔ NỀ NẾP */}
+      {/* ⭐ CHỨC NĂNG TÍCH ĐIỂM & THI ĐUA HỌC SINH */}
       {activeTab === 'attendance' && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
-            <div>
-              <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-                <UserCheck className="w-5 h-5 text-emerald-600" /> ĐIỂM DANH THỜI GIAN THỰC & SỔ NỀ NẾP
-              </h3>
-              <p className="text-xs font-bold text-slate-500">Điểm danh ngày {new Date().toLocaleDateString('vi-VN')} & Thưởng Sao ý thức</p>
-            </div>
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-amber-200 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Award className="w-6 h-6 text-amber-500 fill-amber-400" /> ⭐ TÍCH ĐIỂM & THI ĐUA HỌC SINH
+                </h3>
+                <p className="text-xs font-bold text-slate-500">Theo dõi điểm thưởng, điểm trừ và thành tích của học sinh</p>
+              </div>
 
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-bold text-slate-700">Lý do chấm nề nếp:</label>
-              <select
-                value={conductReason}
-                onChange={(e) => setConductReason(e.target.value)}
-                className="p-2 bg-amber-50 border border-amber-300 rounded-xl text-xs font-bold"
-              >
-                <option value="Phát biểu hăng hái">⭐ Phát biểu hăng hái (+1)</option>
-                <option value="Hoàn thành xuất sắc bài tập">⭐ Hoàn thành xuất sắc (+1)</option>
-                <option value="Giúp đỡ bạn học">⭐ Giúp đỡ bạn học (+1)</option>
-                <option value="Nói chuyện riêng trong giờ">⚠️ Nói chuyện riêng (-1)</option>
-                <option value="Chưa làm bài tập nhà">⚠️ Chưa làm bài tập (-1)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {students.map(st => (
-              <div key={st.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-amber-500 text-white rounded-full flex items-center justify-center font-black text-sm">
-                    {st.full_name.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="font-extrabold text-sm text-slate-900">{st.full_name}</h4>
-                    <span className="text-[11px] font-bold text-slate-500">Mã HS: {st.student_code || 'Chưa có'}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* BỘ LỌC THỜI GIAN */}
+                <div className="flex items-center bg-amber-50 p-1 rounded-2xl border border-amber-300">
                   {[
-                    { key: 'present', label: 'Có mặt', bg: 'bg-emerald-600 text-white' },
-                    { key: 'late', label: 'Đi trễ', bg: 'bg-amber-500 text-white' },
-                    { key: 'absent_excused', label: 'Vắng có phép', bg: 'bg-blue-600 text-white' },
-                    { key: 'absent_unexcused', label: 'Vắng không phép', bg: 'bg-rose-600 text-white' },
-                  ].map(opt => (
+                    { id: 'today', label: 'Hôm nay' },
+                    { id: 'week', label: 'Tuần này' },
+                    { id: 'month', label: 'Tháng này' },
+                    { id: 'all', label: 'Tất cả' },
+                  ].map(f => (
                     <button
-                      key={opt.key}
-                      onClick={() => setAttendanceRecords({ ...attendanceRecords, [st.id]: opt.key as any })}
-                      className={`px-2.5 py-1.5 rounded-xl text-[10px] font-black transition-all ${
-                        attendanceRecords[st.id] === opt.key ? opt.bg : 'bg-white text-slate-600 border border-slate-200'
+                      key={f.id}
+                      onClick={() => setTimeFilter(f.id as any)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold transition-all ${
+                        timeFilter === f.id ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-amber-100'
                       }`}
                     >
-                      {opt.label}
+                      {f.label}
                     </button>
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 bg-amber-100 px-3 py-1.5 rounded-xl border border-amber-300 text-amber-950 font-black text-xs">
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                    {conductStars[st.id] || 10} Sao
+                {/* NÚT TÙY CHỈNH LÝ DO */}
+                <button
+                  onClick={() => setShowReasonModal(true)}
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-extrabold rounded-2xl text-xs shadow flex items-center gap-1.5 transition-all"
+                >
+                  <Edit3 className="w-4 h-4" /> ⚙️ Quản lý lý do tích điểm
+                </button>
+              </div>
+            </div>
+
+            {/* DANH SÁCH LÝ DO TÍCH ĐIỂM NHANH DÀNH CHO GIÁO VIÊN */}
+            <div className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200 space-y-2">
+              <span className="text-xs font-black text-amber-950 block">⚡ BỘ LÝ DO TÍCH ĐIỂM NHANH:</span>
+              <div className="flex flex-wrap gap-2">
+                {customReasons.map(r => (
+                  <span
+                    key={r.id}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm border ${
+                      r.points >= 0
+                        ? 'bg-emerald-100 text-emerald-950 border-emerald-300'
+                        : 'bg-rose-100 text-rose-950 border-rose-300'
+                    }`}
+                  >
+                    <span>{r.icon}</span>
+                    <span>{r.title}</span>
+                    <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${r.points >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                      {r.points >= 0 ? `+${r.points}` : r.points}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            {/* THẺ HỌC SINH TÍCH ĐIỂM */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+              {students.map((st, idx) => {
+                const stats = getStudentStats(st.id);
+                // Tính xếp hạng trong lớp
+                const allStats = students.map(s => ({ id: s.id, points: getStudentStats(s.id).totalPoints }));
+                allStats.sort((a, b) => b.points - a.points);
+                const rank = allStats.findIndex(s => s.id === st.id) + 1;
+
+                const code = st.student_code || `HS2026_${String(idx + 1).padStart(2, '0')}`;
+
+                return (
+                  <div key={st.id} className="bg-white p-5 rounded-3xl border-2 border-amber-200 hover:border-amber-400 shadow-sm hover:shadow-md transition-all space-y-4">
+                    {/* HỌ VÀ TÊN & THÔNG TIN */}
+                    <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-orange-500 text-white rounded-2xl flex items-center justify-center font-black text-lg shadow-sm border-2 border-amber-200">
+                          {st.full_name.charAt(0)}
+                        </div>
+                        <div>
+                          <h4 className="font-black text-sm text-slate-900 line-clamp-1">{st.full_name}</h4>
+                          <span className="text-[11px] font-extrabold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
+                            Mã HS: {code}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className={`px-2.5 py-1 rounded-xl text-xs font-black flex items-center justify-end gap-1 ${
+                          rank === 1 ? 'bg-amber-400 text-amber-950' : rank === 2 ? 'bg-slate-200 text-slate-800' : rank === 3 ? 'bg-amber-200 text-amber-900' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {rank === 1 ? '🥇 Hạng 1' : rank === 2 ? '🥈 Hạng 2' : rank === 3 ? '🥉 Hạng 3' : `#${rank}`}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* HIỂN THỊ ĐIỂM & SAO NỔI BẬT */}
+                    <div className="grid grid-cols-2 gap-2 bg-amber-50/80 p-3 rounded-2xl border border-amber-200 text-center">
+                      <div>
+                        <span className="text-[10px] font-bold text-amber-800 block">TỔNG ĐIỂM:</span>
+                        <span className="font-black text-lg text-amber-900 flex items-center justify-center gap-1">
+                          🏆 {stats.totalPoints} <span className="text-xs">điểm</span>
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-amber-800 block">SỐ SAO ĐẠT ĐƯỢC:</span>
+                        <span className="font-black text-lg text-amber-900 flex items-center justify-center gap-1">
+                          ⭐ {stats.stars} <span className="text-xs">sao</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* BỘ NÚT TÍCH ĐIỂM NHANH */}
+                    <div className="space-y-1.5 pt-1">
+                      <span className="text-[10px] font-black text-slate-700 block">CỘNG / TRỪ ĐIỂM TỰ ĐỘNG:</span>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {customReasons.slice(0, 6).map(r => (
+                          <button
+                            key={r.id}
+                            onClick={() => handleAwardPoints(st, r)}
+                            className={`p-1.5 rounded-xl text-[10px] font-black transition-all flex items-center justify-between shadow-xs border active:scale-95 ${
+                              r.points >= 0
+                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border-emerald-300'
+                                : 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-300'
+                            }`}
+                          >
+                            <span className="truncate">{r.icon} {r.title}</span>
+                            <span className={`px-1 rounded font-extrabold ${r.points >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                              {r.points >= 0 ? `+${r.points}` : r.points}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* DROPDOWN CHỌN TẤT CẢ LÝ DO */}
+                      <select
+                        onChange={(e) => {
+                          if (!e.target.value) return;
+                          const selected = customReasons.find(r => r.id === e.target.value);
+                          if (selected) handleAwardPoints(st, selected);
+                          e.target.value = '';
+                        }}
+                        className="w-full mt-1.5 p-2 bg-amber-100 border border-amber-300 rounded-xl text-xs font-black text-amber-950 focus:outline-none"
+                      >
+                        <option value="">➕ Chọn lý do tích điểm khác...</option>
+                        {customReasons.map(r => (
+                          <option key={r.id} value={r.id}>
+                            {r.icon} {r.title} ({r.points >= 0 ? `+${r.points}` : r.points} điểm)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
+                );
+              })}
+            </div>
+          </div>
 
-                  <button
-                    onClick={() => handleRewardStar(st, 1)}
-                    className="p-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 rounded-xl border border-emerald-300 font-black text-xs"
-                  >
-                    +1 ⭐
-                  </button>
+          {/* 🏆 BẢNG XẾP HẠNG VÀ DANH HIỆU TRONG LỚP */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
+              <Award className="w-5 h-5 text-amber-500 fill-amber-400" /> 🏆 BẢNG XẾP HẠNG & DANH HIỆU TRONG LỚP
+            </h3>
 
-                  <button
-                    onClick={() => handleRewardStar(st, -1)}
-                    className="p-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-xl border border-rose-300 font-black text-xs"
-                  >
-                    -1 ⚠️
-                  </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                {(() => {
+                  const sorted = [...students].map(st => ({
+                    ...st,
+                    stats: getStudentStats(st.id)
+                  })).sort((a, b) => b.stats.totalPoints - a.stats.totalPoints);
+
+                  const titles = [
+                    '🌟 Ngôi sao chăm chỉ',
+                    '📚 Siêu nhân hoàn thành nhiệm vụ',
+                    '💡 Nhà tư duy sáng tạo',
+                    '🤝 Người bạn tuyệt vời',
+                    '🧮 Cao thủ Toán học'
+                  ];
+
+                  return sorted.map((st, idx) => (
+                    <div
+                      key={st.id}
+                      className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${
+                        idx === 0
+                          ? 'bg-amber-100/90 border-amber-400 font-black'
+                          : idx === 1
+                          ? 'bg-slate-100 border-slate-300 font-extrabold'
+                          : idx === 2
+                          ? 'bg-amber-50 border-amber-200 font-bold'
+                          : 'bg-white border-slate-200 text-xs font-bold'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-black text-sm w-6 text-center">
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                        </span>
+                        <div>
+                          <h5 className="font-black text-xs text-slate-900">{st.full_name}</h5>
+                          <span className="text-[10px] font-bold text-amber-800 block">
+                            {titles[idx % titles.length]}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="font-black text-xs text-amber-900 block">{st.stats.totalPoints} Điểm</span>
+                        <span className="text-[10px] font-extrabold text-slate-500">⭐ {st.stats.stars} sao</span>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              {/* NHẬT KÝ TÍCH ĐIỂM THỜI GIAN THỰC */}
+              <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200 space-y-3">
+                <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📜 NHẬT KÝ TÍCH ĐIỂM GẦN ĐÂY:</h4>
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                  {pointLogs.length === 0 ? (
+                    <p className="text-xs font-bold text-slate-500 italic text-center py-6">Chưa có lịch sử tích điểm nào. Hãy bấm nút cộng điểm cho học sinh!</p>
+                  ) : (
+                    pointLogs.map((log, lIdx) => (
+                      <div key={log.id || lIdx} className="bg-white p-2.5 rounded-xl border border-amber-200 text-xs flex items-center justify-between gap-2 shadow-xs">
+                        <div>
+                          <span className="font-black text-slate-900">{log.student_name || 'Học sinh'}</span>
+                          <p className="text-[10px] font-bold text-slate-500">
+                            {log.icon || '⭐'} {log.reason} • {log.created_at ? new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${log.points_change >= 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'}`}>
+                          {log.points_change >= 0 ? `+${log.points_change}` : log.points_change} điểm
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
               </div>
-            ))}
+            </div>
           </div>
+
+          {/* MODAL QUẢN LÝ LÝ DO TÍCH ĐIỂM TÙY CHỈNH */}
+          {showReasonModal && (
+            <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white max-w-lg w-full p-6 rounded-3xl border-4 border-amber-300 shadow-2xl space-y-4">
+                <div className="flex items-center justify-between border-b border-amber-200 pb-3">
+                  <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    ⚙️ QUẢN LÝ LÝ DO TÍCH ĐIỂM
+                  </h3>
+                  <button onClick={() => setShowReasonModal(false)} className="p-1 hover:bg-slate-100 rounded-full">
+                    <X className="w-5 h-5 text-slate-500" />
+                  </button>
+                </div>
+
+                {/* FORM TẠO LÝ DO MỚI */}
+                <form onSubmit={handleAddCustomReason} className="bg-amber-50 p-4 rounded-2xl border border-amber-200 space-y-3">
+                  <h4 className="font-black text-xs text-amber-950">➕ THÊM LÝ DO TÍCH ĐIỂM MỚI:</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Tên lý do (VD: Giải Toán nhanh)..."
+                      value={newReasonTitle}
+                      onChange={(e) => setNewReasonTitle(e.target.value)}
+                      className="col-span-2 p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold"
+                    />
+                    <input
+                      type="number"
+                      required
+                      placeholder="Số điểm (VD: 2)..."
+                      value={newReasonPoints}
+                      onChange={(e) => setNewReasonPoints(Number(e.target.value))}
+                      className="p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold"
+                    />
+                    <select
+                      value={newReasonType}
+                      onChange={(e: any) => setNewReasonType(e.target.value)}
+                      className="p-2 bg-white border border-amber-300 rounded-xl text-xs font-bold"
+                    >
+                      <option value="reward">⭐ Điểm Thưởng (+)</option>
+                      <option value="penalty">⚠️ Điểm Trừ (-)</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-2 rounded-xl text-xs shadow">
+                    Lưu Lý Do Mới
+                  </button>
+                </form>
+
+                {/* DANH SÁCH LÝ DO ĐANG CÓ */}
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  <h4 className="font-black text-xs text-slate-700">DANH SÁCH LÝ DO TÍCH ĐIỂM HIỆN CÓ:</h4>
+                  {customReasons.map(r => (
+                    <div key={r.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs">
+                      <span className="font-bold">{r.icon} {r.title} ({r.points >= 0 ? `+${r.points}` : r.points} điểm)</span>
+                      <button onClick={() => handleDeleteCustomReason(r.id)} className="text-rose-600 hover:text-rose-800 p-1">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

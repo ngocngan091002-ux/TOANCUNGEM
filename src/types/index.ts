@@ -50,6 +50,31 @@ export interface ConductRecord {
   created_at?: string;
 }
 
+export interface PointLogRecord {
+  id?: string;
+  class_id?: string;
+  student_id: string;
+  student_name?: string;
+  points_change: number;
+  stars_change?: number;
+  reason: string;
+  icon?: string;
+  type: 'reward' | 'penalty';
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface CustomPointReason {
+  id: string;
+  class_id?: string;
+  teacher_id?: string;
+  title: string;
+  points: number;
+  icon: string;
+  type: 'reward' | 'penalty';
+  created_at?: string;
+}
+
 export interface ClassMember {
   id: string;
   class_id: string;

@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, AssignmentSubmission } from '../../types';
+import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, AssignmentSubmission, PointLogRecord } from '../../types';
 import { 
   getStudentClasses, joinClassByCode, 
   getDailyTasks, markTaskCompleted, 
   getLearningMaterials, getGames, getAssignments, 
   submitAssignment, getStudentSubmissions, getClassLeaderboard, 
-  updateUserStatus, supabase, supabaseAdmin 
+  updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs 
 } from '../../services/supabase';
 import { askAIMathAssistant } from '../../services/aiService';
 import { useAuth } from '../../context/AuthContext';
@@ -32,6 +32,7 @@ export const StudentDashboard: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [submissions, setSubmissions] = useState<AssignmentSubmission[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [myPointLogs, setMyPointLogs] = useState<PointLogRecord[]>([]);
 
   // Active Assignment / Quiz Mode
   const [activeAssignment, setActiveAssignment] = useState<Assignment | null>(null);
@@ -106,6 +107,9 @@ export const StudentDashboard: React.FC = () => {
 
       const lb = await getClassLeaderboard(classId);
       setLeaderboard(lb);
+
+      const pLogs = await getStudentPointLogs(user!.id);
+      setMyPointLogs(pLogs);
     } catch (err) {
       console.error('Error loading class content:', err);
     }
@@ -252,6 +256,23 @@ export const StudentDashboard: React.FC = () => {
 
   const uncompletedCount = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id)).length;
 
+  // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY VÀ HUY HIỆU CÁ NHÂN CỦA HỌC SINH
+  const myPointsFromLogs = myPointLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
+  const myTotalPoints = Math.max(0, 100 + myPointsFromLogs);
+  const myStars = 10 + myPointLogs.filter(l => l.type === 'reward').length;
+
+  const myRankInClass = leaderboard.length > 0
+    ? (leaderboard.findIndex(item => item.student_id === user?.id || item.email === user?.email) + 1 || 1)
+    : 1;
+
+  const studentBadges = [
+    { title: 'Ngôi sao đầu tiên', minPoints: 10, icon: '⭐' },
+    { title: 'Học sinh chăm chỉ', minPoints: 30, icon: '📚' },
+    { title: 'Chiến binh Toán học', minPoints: 50, icon: '⚔️' },
+    { title: 'Cao thủ Toán học', minPoints: 100, icon: '🧮' },
+    { title: 'Ngôi sao xuất sắc', minPoints: 200, icon: '👑' },
+  ];
+
   const menuItems = [
     { id: 'home', label: '🏠 Trang chủ' },
     { id: 'tasks', label: '📚 Nhiệm vụ hôm nay' },
@@ -355,6 +376,99 @@ export const StudentDashboard: React.FC = () => {
               </button>
             </div>
           )}
+
+          {/* ⭐ BANNER THÔNG TIN TÍCH ĐIỂM HỌC SINH */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-amber-950 p-5 rounded-3xl shadow-lg border-2 border-amber-300 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase text-amber-950 opacity-80 block">⭐ ĐIỂM TÍCH LŨY:</span>
+                <h3 className="text-2xl font-black text-white">{myTotalPoints} <span className="text-sm font-bold text-amber-100">ĐIỂM</span></h3>
+                <span className="text-[11px] font-extrabold text-amber-950">⭐ {myStars} Sao thưởng</span>
+              </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
+                🏆
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-3xl shadow-lg border-2 border-purple-300 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase text-purple-200 opacity-90 block">🏆 HẠNG TRONG LỚP:</span>
+                <h3 className="text-2xl font-black text-yellow-300">HẠNG #{myRankInClass}</h3>
+                <span className="text-[11px] font-extrabold text-purple-100">Thi đua sôi nổi</span>
+              </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
+                🥇
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-rose-500 to-pink-600 text-white p-5 rounded-3xl shadow-lg border-2 border-pink-300 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase text-rose-200 opacity-90 block">🔥 CHUỖI THÀNH TÍCH:</span>
+                <h3 className="text-2xl font-black text-white">5 NGÀY</h3>
+                <span className="text-[11px] font-extrabold text-rose-100">Học tập chăm chỉ mỗi ngày</span>
+              </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
+                🔥
+              </div>
+            </div>
+          </div>
+
+          {/* KHU VỰC HUY HIỆU ĐÃ MỞ KHÓA & LỊCH SỬ TÍCH ĐIỂM CỦA EM */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 🎖️ HUY HIỆU THÀNH TÍCH */}
+            <div className="bg-white p-5 rounded-3xl border-2 border-amber-200 shadow-md space-y-3">
+              <h4 className="font-black text-xs text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                <Trophy className="w-4 h-4 text-amber-500" /> 🎖️ HUY HIỆU THÀNH TÍCH CỦA EM
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {studentBadges.map((b, idx) => {
+                  const isUnlocked = myTotalPoints >= b.minPoints;
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-3 rounded-2xl border text-center space-y-1 transition-all ${
+                        isUnlocked
+                          ? 'bg-amber-50 border-amber-300 text-amber-950 shadow-xs font-black'
+                          : 'bg-slate-50 border-slate-200 text-slate-400 opacity-60 grayscale font-bold'
+                      }`}
+                    >
+                      <div className="text-2xl">{b.icon}</div>
+                      <h5 className="font-black text-[11px] leading-tight">{b.title}</h5>
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-white border border-amber-200 block w-max mx-auto">
+                        {isUnlocked ? '✓ Đã mở' : `Cần ${b.minPoints}đ`}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 📜 LỊCH SỬ TÍCH ĐIỂM CỦA EM (CHỈ XEM) */}
+            <div className="bg-white p-5 rounded-3xl border-2 border-amber-200 shadow-md space-y-3">
+              <h4 className="font-black text-xs text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-400" /> 📜 LỊCH SỬ TÍCH ĐIỂM CỦA EM
+              </h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {myPointLogs.length === 0 ? (
+                  <p className="text-xs font-bold text-slate-500 italic text-center py-6">Em chưa có nhật ký tích điểm nào. Hãy hăng hái phát biểu và làm bài tập nhé!</p>
+                ) : (
+                  myPointLogs.map((log, lIdx) => (
+                    <div key={log.id || lIdx} className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/50 text-xs flex items-center justify-between gap-2 shadow-xs">
+                      <div>
+                        <span className="font-extrabold text-slate-900">{log.icon || '⭐'} {log.reason}</span>
+                        <p className="text-[10px] font-bold text-slate-500">
+                          {log.created_at ? new Date(log.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
+                        </p>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-xl text-xs font-black shadow-xs ${log.points_change >= 0 ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+                        {log.points_change >= 0 ? `+${log.points_change}` : log.points_change} điểm
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
 
           {/* HUY HIỆU LỚP ĐANG HỌC */}
           <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md flex items-center justify-between">
