@@ -854,11 +854,11 @@ export const TeacherDashboard: React.FC = () => {
                   onChange={(e) => setTargetGroup(e.target.value)}
                   className="w-full p-2.5 bg-amber-100 border border-amber-400 rounded-xl text-xs font-black text-amber-950 shadow-sm"
                 >
-                  <option value="all">👥 Cả Lớp (Mặc định - 33 em)</option>
-                  <option value="group_1">🥇 Nhóm 1 (Nhóm Cần Phụ Đạo)</option>
-                  <option value="group_2">🥈 Nhóm 2 (Nhóm Ôn Luyện)</option>
-                  <option value="group_3">🥉 Nhóm 3 (Nhóm Khá Giỏi)</option>
-                  <option value="group_4">⭐ Nhóm 4 (Nhóm Siêu Trí Tuệ)</option>
+                  <option value="all">👥 Cả Lớp</option>
+                  <option value="group_1">🥇 Nhóm 1</option>
+                  <option value="group_2">🥈 Nhóm 2</option>
+                  <option value="group_3">🥉 Nhóm 3</option>
+                  <option value="group_4">⭐ Nhóm 4</option>
                 </select>
               </div>
 
