@@ -323,25 +323,33 @@ export const StudentDashboard: React.FC = () => {
           </div>
 
           {/* BANNER THÔNG BÁO BÀI TẬP TUẦN MỚI GIAO */}
-          {assignments.length > 0 && (
+          {uncompletedCount > 0 && (
             <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-5 rounded-3xl shadow-xl border-4 border-amber-300 flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
                   🔔
                 </div>
                 <div>
-                  <h4 className="font-black text-base text-yellow-200">THÔNG BÁO THẦY/CÔ VỪA GIAO BÀI TẬP TUẦN MỚI!</h4>
+                  <h4 className="font-black text-base text-yellow-200 flex items-center gap-2">
+                    🔔 Bài tập mới! ({uncompletedCount} bài tập chưa làm)
+                  </h4>
                   <p className="text-xs font-bold text-white/90">
-                    Lớp em vừa nhận được bài tập tuần mới: <strong className="text-yellow-300 font-extrabold underline">{assignments[0].title}</strong> ({assignments[0].questions?.length || 1} câu hỏi - Hạn đếm ngược: {assignments[0].time_limit_minutes || 15} phút).
+                    <strong>Toán – {assignments.find(a => !submissions.some(s => s.assignment_id === a.id))?.title || 'Bài tập tuần'}</strong>
+                    <br />
+                    <span>Giáo viên vừa giao bài tập mới cho em. ⏱️ Thời gian: {assignments.find(a => !submissions.some(s => s.assignment_id === a.id))?.time_limit_minutes || 15} phút</span>
                   </p>
                 </div>
               </div>
 
               <button
-                onClick={() => { setActiveMenu('assignments'); setActiveAssignment(null); }}
-                className="px-5 py-3 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black text-xs rounded-2xl shadow-lg uppercase tracking-wider whitespace-nowrap transform active:scale-95 transition-all flex items-center gap-1.5"
+                onClick={() => {
+                  const targetAssign = assignments.find(a => !submissions.some(s => s.assignment_id === a.id));
+                  setActiveMenu('assignments');
+                  if (targetAssign) handleStartAssignment(targetAssign);
+                }}
+                className="px-6 py-3 bg-yellow-400 hover:bg-yellow-500 text-amber-950 font-black text-xs rounded-2xl shadow-lg uppercase tracking-wider whitespace-nowrap transform active:scale-95 transition-all flex items-center gap-1.5"
               >
-                📝 Mở Bài Tập Tuần Làm Ngay →
+                [LÀM BÀI] →
               </button>
             </div>
           )}
@@ -433,33 +441,42 @@ export const StudentDashboard: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {assignments.map(a => {
                 const sub = submissions.find(s => s.assignment_id === a.id);
+                const isOverdue = !sub && a.due_date && new Date() > new Date(a.due_date);
+
                 return (
                   <div key={a.id} className="p-5 rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50/60 to-orange-50/30 space-y-3 flex flex-col justify-between shadow-sm hover:border-amber-400 transition-all">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between gap-2">
                         <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">
-                          {a.type === 'weekly_test' ? '📝 Bài Tập Tuần' : '🎯 Bài Kiểm Tra Trắc Nghiệm'}
+                          📝 Bài Tập Tuần
                         </span>
 
                         {sub ? (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-900 border border-emerald-300">
-                            ✓ Đã Nộp ({sub.score}/100 Điểm)
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
+                            🟢 Đã Hoàn Thành ({sub.score}/100 Điểm)
+                          </span>
+                        ) : isOverdue ? (
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
+                            🔴 Quá Hạn
                           </span>
                         ) : (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                            ⏱️ Chưa Làm
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 animate-pulse">
+                            🆕 Chưa Làm
                           </span>
                         )}
                       </div>
 
                       <h4 className="font-extrabold text-base text-slate-900">{a.title}</h4>
                       
-                      <div className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
                         <span className="flex items-center gap-1 text-amber-800">
-                          <Clock className="w-3.5 h-3.5" /> Thời gian: {a.time_limit_minutes || 15} phút
+                          <Clock className="w-3.5 h-3.5" /> Hạn thời gian: {a.time_limit_minutes || 15} phút
                         </span>
                         <span className="flex items-center gap-1 text-purple-800">
                           <HelpCircle className="w-3.5 h-3.5" /> {a.questions?.length || 0} câu hỏi
+                        </span>
+                        <span className="text-slate-500">
+                          📅 Ngày giao: {a.created_at ? new Date(a.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
                         </span>
                       </div>
                     </div>
@@ -467,15 +484,15 @@ export const StudentDashboard: React.FC = () => {
                     <div className="pt-2">
                       {sub ? (
                         <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900">
-                          <span>Điểm số: <strong className="text-sm font-black text-emerald-700">{sub.score} / 100</strong></span>
-                          <span>Trạng thái: Đã chấm</span>
+                          <span>Kết quả: <strong className="text-sm font-black text-emerald-700">{sub.score} / 100 Điểm</strong></span>
+                          <span className="text-[10px] bg-emerald-200 px-2.5 py-1 rounded-lg">✓ Đã nộp bài</span>
                         </div>
                       ) : (
                         <button
                           onClick={() => handleStartAssignment(a)}
-                          className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl shadow-md text-xs uppercase tracking-wider transition-all transform active:scale-95 flex items-center justify-center gap-2"
+                          className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl shadow-md text-xs uppercase tracking-wider transition-all transform active:scale-95 flex items-center justify-center gap-2"
                         >
-                          <Play className="w-4 h-4 fill-white" /> BẮT ĐẦU LÀM BÀI NGAY
+                          <Play className="w-4 h-4 fill-white" /> [LÀM BÀI] NGAY
                         </button>
                       )}
                     </div>

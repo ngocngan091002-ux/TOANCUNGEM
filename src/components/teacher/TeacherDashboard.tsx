@@ -1140,7 +1140,8 @@ export const TeacherDashboard: React.FC = () => {
                       <th className="p-3">Tên Bài Tập Tuần</th>
                       <th className="p-3">Ngày Giao</th>
                       <th className="p-3 text-center">Số Câu Hỏi</th>
-                      <th className="p-3 text-center">Thời Gian Đếm Ngược</th>
+                      <th className="p-3 text-center">Hạn Thời Gian</th>
+                      <th className="p-3 text-center">Tiến Độ Làm Bài</th>
                       <th className="p-3 text-center">Trạng Thái</th>
                       <th className="p-3 text-right rounded-r-xl">Hành Động</th>
                     </tr>
@@ -1154,7 +1155,7 @@ export const TeacherDashboard: React.FC = () => {
                           {a.created_at ? new Date(a.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(a.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : 'Vừa xong'}
                         </td>
                         <td className="p-3 text-center">
-                          <span className="px-2.5 py-1 bg-purple-100 text-purple-900 rounded-xl border border-purple-300">
+                          <span className="px-2.5 py-1 bg-purple-100 text-purple-900 rounded-xl border border-purple-300 font-extrabold">
                             {a.questions?.length || 0} câu
                           </span>
                         </td>
@@ -1164,8 +1165,8 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="p-3 text-center">
-                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-900 rounded-xl border border-emerald-300">
-                            ✓ Đã giao cho lớp
+                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-950 rounded-xl border border-emerald-400 font-extrabold">
+                            ✓ Đã giao cho {students.length || 33} học sinh
                           </span>
                         </td>
                         <td className="p-3 text-right">
