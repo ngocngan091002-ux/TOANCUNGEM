@@ -826,7 +826,8 @@ export const TeacherDashboard: React.FC = () => {
       setAssignments([created, ...assignments]);
       setAssignTitle('');
       setDraftQuestions([]);
-      alert(`🎉 Đã chốt & giao bài tập tuần "${finalTitle}" gồm ${questionsToSave.length} câu hỏi cho ${targetGroupLabel} của lớp ${selectedClass.name}!`);
+      const targetText = targetGroup === 'all' ? `Cả ${selectedClass.name}` : `${targetGroupLabel} (${selectedClass.name})`;
+      alert(`🎉 Đã chốt & giao thành công bài tập tuần "${finalTitle}" gồm ${questionsToSave.length} câu hỏi cho ${targetText}!`);
     } catch (err: any) {
       alert('Lỗi tạo bài tập: ' + err.message);
     }
