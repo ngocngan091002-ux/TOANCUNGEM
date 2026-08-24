@@ -1919,12 +1919,26 @@ export const TeacherDashboard: React.FC = () => {
                 <option value="image">Hình ảnh Toán học</option>
               </select>
 
-              <input
-                type="file"
-                required
-                onChange={(e) => e.target.files && setMatFile(e.target.files[0])}
-                className="w-full text-xs font-bold"
-              />
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 block">Chọn tệp bài giảng từ máy tính:</label>
+                <label className="w-full p-3.5 bg-amber-100 hover:bg-amber-200 text-amber-950 font-black rounded-2xl border-2 border-dashed border-amber-400 text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-xs active:scale-95">
+                  <Upload className="w-4 h-4 text-amber-700 flex-shrink-0 animate-bounce" />
+                  <span className="truncate">
+                    {matFile ? `📁 ${matFile.name}` : '📂 BẤM VÀO ĐÂY ĐỂ CHỌN FILE TỆP'}
+                  </span>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => e.target.files && setMatFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                </label>
+                {matFile && (
+                  <p className="text-[10px] font-bold text-emerald-700 text-center">
+                    ✓ Đã chọn: {matFile.name} ({(matFile.size / (1024 * 1024)).toFixed(2)} MB)
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"
