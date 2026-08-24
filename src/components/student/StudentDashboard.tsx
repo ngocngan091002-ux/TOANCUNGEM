@@ -154,9 +154,15 @@ export const StudentDashboard: React.FC = () => {
       const lb = await getClassLeaderboard(classId);
       setLeaderboard(lb);
 
+      const globalSaved = localStorage.getItem('toan_cung_em_global_point_logs');
+      let globalPointLogs: PointLogRecord[] = [];
+      if (globalSaved) {
+        try { globalPointLogs = JSON.parse(globalSaved); } catch (e) {}
+      }
+
       const pLogs = await getStudentPointLogs(user!.id);
       const mergedMap = new Map<string, PointLogRecord>();
-      [...pLogs, ...localPointLogs.filter((p: any) => p.student_id === user?.id)].forEach(item => {
+      [...pLogs, ...localPointLogs, ...globalPointLogs].filter((p: any) => p.student_id === user?.id).forEach(item => {
         if (item.id) mergedMap.set(item.id, item);
       });
       const finalLogs = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());

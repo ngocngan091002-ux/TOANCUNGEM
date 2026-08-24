@@ -1065,8 +1065,9 @@ export async function addStudentPointLog(payload: {
   type: 'reward' | 'penalty';
   created_by?: string;
 }): Promise<PointLogRecord> {
+  const defaultClassId = payload.class_id || '38546e64-1664-4fed-b1ca-82fbe5e2d194';
   const insertPayload = {
-    class_id: payload.class_id,
+    class_id: defaultClassId,
     student_id: payload.student_id,
     points_change: payload.points_change,
     stars_change: payload.stars_change || (payload.type === 'reward' ? Math.max(1, payload.points_change) : -1),
@@ -1111,7 +1112,7 @@ export async function getClassPointLogs(classId?: string): Promise<PointLogRecor
   try {
     let query = supabaseAdmin.from('student_points_log').select('*, student:profiles(full_name, student_code)').order('created_at', { ascending: false });
     if (classId) {
-      query = query.eq('class_id', classId);
+      query = query.or(`class_id.eq.${classId},class_id.is.null`);
     }
     const { data, error } = await query;
     if (!error && data) {

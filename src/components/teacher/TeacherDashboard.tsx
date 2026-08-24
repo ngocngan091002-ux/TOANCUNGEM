@@ -404,8 +404,9 @@ export const TeacherDashboard: React.FC = () => {
   // ⭐ HÀM CỘNG / TRỪ ĐIỂM HỌC SINH VÀ LƯU VĨNH VIỄN (LOCALSTORAGE + SUPABASE DB)
   const handleAwardPoints = async (st: UserProfile, reasonObj: { title: string; points: number; icon: string; type: 'reward' | 'penalty' }) => {
     try {
+      const targetClassId = selectedClass?.id || '38546e64-1664-4fed-b1ca-82fbe5e2d194';
       const newLog = await addStudentPointLog({
-        class_id: selectedClass?.id,
+        class_id: targetClassId,
         student_id: st.id,
         student_name: st.full_name,
         points_change: reasonObj.points,
@@ -419,9 +420,15 @@ export const TeacherDashboard: React.FC = () => {
       const updatedLogs = [newLog, ...pointLogs];
       setPointLogs(updatedLogs);
 
-      if (selectedClass?.id) {
-        localStorage.setItem(`toan_cung_em_point_logs_${selectedClass.id}`, JSON.stringify(updatedLogs));
+      // Lưu 2 tầng LocalStorage (Class key + Global key) để không bao giờ bị mất điểm
+      localStorage.setItem(`toan_cung_em_point_logs_${targetClassId}`, JSON.stringify(updatedLogs));
+
+      const globalSaved = localStorage.getItem('toan_cung_em_global_point_logs');
+      let globalLogs: PointLogRecord[] = [];
+      if (globalSaved) {
+        try { globalLogs = JSON.parse(globalSaved); } catch (e) {}
       }
+      localStorage.setItem('toan_cung_em_global_point_logs', JSON.stringify([newLog, ...globalLogs]));
 
       const currentStars = conductStars[st.id] || 0;
       const updatedStars = Math.max(0, currentStars + (reasonObj.type === 'reward' ? Math.max(1, reasonObj.points) : -1));
