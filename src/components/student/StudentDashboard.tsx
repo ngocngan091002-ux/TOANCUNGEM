@@ -256,10 +256,10 @@ export const StudentDashboard: React.FC = () => {
 
   const uncompletedCount = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id)).length;
 
-  // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY VÀ HUY HIỆU CÁ NHÂN CỦA HỌC SINH
+  // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY THỰC TẾ (KHÔNG ĐIỂM ẢO)
   const myPointsFromLogs = myPointLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
-  const myTotalPoints = Math.max(0, 100 + myPointsFromLogs);
-  const myStars = 10 + myPointLogs.filter(l => l.type === 'reward').length;
+  const myTotalPoints = Math.max(0, myPointsFromLogs);
+  const myStars = myPointLogs.filter(l => l.type === 'reward').length;
 
   const myRankInClass = leaderboard.length > 0
     ? (leaderboard.findIndex(item => item.student_id === user?.id || item.email === user?.email) + 1 || 1)

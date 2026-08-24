@@ -322,7 +322,7 @@ export const TeacherDashboard: React.FC = () => {
       const initStars: Record<string, number> = {};
       stList.forEach(s => {
         initAtt[s.id] = 'present';
-        initStars[s.id] = 10;
+        initStars[s.id] = 0;
       });
       setAttendanceRecords(initAtt);
       setConductStars(initStars);
@@ -377,7 +377,7 @@ export const TeacherDashboard: React.FC = () => {
 
       setPointLogs(prev => [newLog, ...prev]);
 
-      const currentStars = conductStars[st.id] || 10;
+      const currentStars = conductStars[st.id] || 0;
       const updatedStars = Math.max(0, currentStars + (reasonObj.type === 'reward' ? Math.max(1, reasonObj.points) : -1));
       setConductStars(prev => ({ ...prev, [st.id]: updatedStars }));
 
@@ -409,7 +409,7 @@ export const TeacherDashboard: React.FC = () => {
     setCustomReasons(prev => prev.filter(r => r.id !== id));
   };
 
-  // TÍNH TỔNG ĐIỂM & ĐẾM LỊCH SỬ CHO TỪNG HỌC SINH
+  // TÍNH TỔNG ĐIỂM THỰC TẾ TRÊN DATABASE (KHÔNG ĐIỂM ẢO)
   const getStudentStats = (studentId: string) => {
     const studentLogs = pointLogs.filter(l => l.student_id === studentId);
     
@@ -427,12 +427,11 @@ export const TeacherDashboard: React.FC = () => {
     });
 
     const totalPointsChange = filteredLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
-    const basePoints = 100 + totalPointsChange;
-    const totalStars = (conductStars[studentId] || 10) + filteredLogs.filter(l => l.type === 'reward').length;
+    const totalStars = (conductStars[studentId] || 0) + filteredLogs.filter(l => l.type === 'reward').length;
 
     return {
-      totalPoints: Math.max(0, basePoints),
-      stars: totalStars,
+      totalPoints: Math.max(0, totalPointsChange),
+      stars: Math.max(0, totalStars),
       rewardCount: filteredLogs.filter(l => l.type === 'reward').length,
       penaltyCount: filteredLogs.filter(l => l.type === 'penalty').length
     };
