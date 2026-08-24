@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile, UserRole, ActiveView } from '../types';
-import { supabase, supabaseAdmin, getCurrentProfile } from '../services/supabase';
+import { supabase, supabaseAdmin, getCurrentProfile, getProfileByIdOrEmail } from '../services/supabase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -28,37 +28,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
-      let profile = await getCurrentProfile(sessionUser.id);
+      const email = sessionUser.email ? sessionUser.email.toLowerCase() : '';
+      let profile = await getProfileByIdOrEmail(sessionUser.id, email);
       const userMetaName = sessionUser.user_metadata?.full_name || sessionUser.user_metadata?.name;
 
-      // Nếu chưa có profile trong bảng profiles, tự động tạo profile từ User Meta Data
+      // Nếu chưa có profile trong bảng profiles, tự động tạo profile từ User Meta Data bằng supabaseAdmin (bypassing RLS)
       if (!profile) {
         const savedRole = (localStorage.getItem('auth_selected_role') as UserRole) || 'student';
-        const isSuperAdmin = sessionUser.email?.toLowerCase() === 'ngocngan091002@gmail.com';
+        const isSuperAdmin = email === 'ngocngan091002@gmail.com';
         
         const fallbackProfile: UserProfile = {
           id: sessionUser.id,
-          email: sessionUser.email || '',
-          full_name: userMetaName || sessionUser.email?.split('@')[0] || 'Học sinh',
+          email: email,
+          full_name: userMetaName || email.split('@')[0] || 'Người dùng Google',
           role: isSuperAdmin ? 'admin' : savedRole,
-          status: isSuperAdmin ? 'approved' : (savedRole === 'teacher' ? 'pending' : 'approved'),
+          status: 'approved',
           avatar_url: sessionUser.user_metadata?.avatar_url || sessionUser.user_metadata?.picture || ''
         };
 
         try {
-          await supabase.from('profiles').upsert(fallbackProfile);
+          await supabaseAdmin.from('profiles').upsert([fallbackProfile]);
         } catch (e) {
           console.warn('Upsert fallback profile warning:', e);
         }
 
         profile = fallbackProfile;
-      } else if (userMetaName && profile.full_name === profile.email.split('@')[0]) {
-        // Cập nhật lại full_name nếu profile cũ lỡ bị lưu tên email
-        profile.full_name = userMetaName;
-        try {
-          await supabase.from('profiles').update({ full_name: userMetaName }).eq('id', profile.id);
-        } catch (e) {
-          console.warn('Update full_name error:', e);
+      } else {
+        // Đồng bộ lại ID profile cho trùng với sessionUser.id
+        if (profile.id !== sessionUser.id) {
+          try {
+            await supabaseAdmin.from('profiles').update({ id: sessionUser.id }).eq('email', email);
+            profile.id = sessionUser.id;
+          } catch (e) {
+            console.warn('Sync profile ID error:', e);
+          }
         }
       }
 

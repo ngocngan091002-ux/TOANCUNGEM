@@ -36,6 +36,33 @@ export async function getCurrentProfile(userId: string): Promise<UserProfile | n
   }
 }
 
+export async function getProfileByIdOrEmail(userId: string, email?: string): Promise<UserProfile | null> {
+  try {
+    const { data: byId } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (byId) return byId as UserProfile;
+
+    if (email) {
+      const cleanEmail = email.trim().toLowerCase();
+      const { data: byEmail } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .eq('email', cleanEmail)
+        .single();
+
+      if (byEmail) return byEmail as UserProfile;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function checkEmailExists(email: string): Promise<boolean> {
   try {
     const { data, error } = await supabaseAdmin

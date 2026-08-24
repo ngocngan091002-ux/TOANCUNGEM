@@ -83,19 +83,9 @@ export const AuthPage: React.FC = () => {
       setLoading(true);
       await loginWithGoogle(selectedRole);
     } catch (err: any) {
-      setErrorMsg('Google Login chưa bật Client ID trên Supabase Dashboard. Thầy/Cô có thể bấm nút "Đăng Nhập Thử Google Demo" bên dưới hoặc dùng Email & Mật khẩu ạ!');
+      setErrorMsg('Lỗi đăng nhập Google: ' + (err.message || 'Vui lòng thử lại hoặc đăng nhập bằng Email & Mật khẩu!'));
       setLoading(false);
     }
-  };
-
-  const handleQuickGoogleDemo = () => {
-    setSelectedRole('teacher');
-    setIsSignUp(false);
-    setEmail('google_teacher_demo@gmail.com');
-    setPassword('12345678');
-    setFullName('Giáo Viên Google User');
-    setErrorMsg('');
-    setSuccessMsg('🎉 Đã sẵn sàng Tài khoản Google Demo! Thầy/Cô bấm nút cam "Vào Hệ Thống Học Tập" bên dưới để vào ngay nhé.');
   };
 
   const handleQuickFillAdmin = () => {
@@ -248,7 +238,7 @@ export const AuthPage: React.FC = () => {
         </div>
 
         {/* AUTH-02: NÚT ĐĂNG NHẬP NHANH BẰNG GOOGLE */}
-        <div className="space-y-1.5">
+        <div>
           <button
             type="button"
             onClick={handleGoogleAuth}
@@ -262,14 +252,6 @@ export const AuthPage: React.FC = () => {
               <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
             </svg>
             Đăng nhập nhanh bằng Google (1-Click)
-          </button>
-
-          <button
-            type="button"
-            onClick={handleQuickGoogleDemo}
-            className="w-full text-[11px] font-extrabold text-blue-800 bg-blue-50 hover:bg-blue-100 py-1.5 rounded-xl border border-blue-200 text-center"
-          >
-            👉 Hoặc Nhấp để Đăng Nhập Thử Google Demo (Dành cho Giáo viên)
           </button>
         </div>
 
