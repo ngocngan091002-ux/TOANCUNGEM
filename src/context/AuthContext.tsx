@@ -65,6 +65,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      // Tự động kiểm tra nếu full_name bị dán mã học sinh (VD: HS2026_02 hoặc hs2026_02), tra cứu Họ tên thực tế trong DB
+      if (profile && (profile.full_name.toUpperCase().startsWith('HS2026_') || profile.full_name.toUpperCase().startsWith('HS20'))) {
+        const { data: realProf } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .or(`student_code.ilike.${profile.full_name},email.eq.${email}`)
+          .not('full_name', 'ilike', 'HS20%')
+          .maybeSingle();
+
+        if (realProf && realProf.full_name) {
+          profile.full_name = realProf.full_name;
+          try {
+            await supabaseAdmin.from('profiles').update({ full_name: realProf.full_name }).eq('id', profile.id);
+          } catch (e) {
+            console.warn('Update real student name error:', e);
+          }
+        }
+      }
+
       handleProfileLoaded(profile);
     };
 
@@ -141,10 +160,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const loginWithEmail = async (email: string, pass: string, selectedRole: UserRole): Promise<{ success: boolean; error?: string }> => {
+  const loginWithEmail = async (emailInput: string, pass: string, selectedRole: UserRole): Promise<{ success: boolean; error?: string }> => {
     try {
-      const cleanEmail = email.trim().toLowerCase();
+      const rawInput = emailInput.trim();
+      let cleanEmail = rawInput.toLowerCase();
       const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
+
+      // 0. Nếu người dùng nhập Mã Học Sinh (VD: HS2026_02 hoặc hs2026_02), tự động tra cứu Email & Họ Tên thực tế từ DB profiles
+      let matchedStudentProfile: UserProfile | null = null;
+      const { data: byCode } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .ilike('student_code', rawInput)
+        .maybeSingle();
+
+      if (byCode) {
+        matchedStudentProfile = byCode as UserProfile;
+        if (byCode.email) cleanEmail = byCode.email.toLowerCase();
+      }
 
       // 1. Thử Đăng nhập trực tiếp với Supabase Auth
       let { data, error } = await supabase.auth.signInWithPassword({
@@ -154,16 +187,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // 2. Nếu Auth báo sai tài khoản/mật khẩu, kiểm tra trong DB profiles xem có phải học sinh do Admin thêm không
       if (error) {
-        const { data: dbProfile } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+        let dbProfile = matchedStudentProfile;
+        if (!dbProfile) {
+          const { data: pData } = await supabaseAdmin
+            .from('profiles')
+            .select('*')
+            .eq('email', cleanEmail)
+            .maybeSingle();
+          dbProfile = pData as UserProfile;
+        }
 
         if (dbProfile) {
           const defaultPassword = dbProfile.parent_pin || pass || '123456';
           try {
-            // Tự động tạo/đồng bộ Auth User cho học sinh này với mật khẩu mặc định
+            // Tự động tạo/đồng bộ Auth User cho học sinh này với mật khẩu mặc định và Họ Tên thực tế
             const { data: newAuth } = await supabaseAdmin.auth.admin.createUser({
               email: cleanEmail,
               password: defaultPassword,
@@ -176,14 +213,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
 
             if (newAuth?.user) {
-              await supabaseAdmin.from('profiles').update({ id: newAuth.user.id }).eq('email', cleanEmail);
+              await supabaseAdmin.from('profiles').update({ id: newAuth.user.id, full_name: dbProfile.full_name }).eq('email', cleanEmail);
             } else {
-              // Cập nhật lại mật khẩu nếu tài khoản Auth đã có sẵn
+              // Cập nhật lại mật khẩu & Họ Tên thực tế nếu tài khoản Auth đã có sẵn
               const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
               const existingAuth = usersData?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
               if (existingAuth) {
-                await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password: defaultPassword });
-                await supabaseAdmin.from('profiles').update({ id: existingAuth.id }).eq('email', cleanEmail);
+                await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { 
+                  password: defaultPassword,
+                  user_metadata: { full_name: dbProfile.full_name }
+                });
+                await supabaseAdmin.from('profiles').update({ id: existingAuth.id, full_name: dbProfile.full_name }).eq('email', cleanEmail);
               }
             }
 

@@ -318,11 +318,17 @@ export const StudentDashboard: React.FC = () => {
           <div className="bg-gradient-to-r from-amber-400 via-orange-400 to-amber-500 text-amber-950 p-6 rounded-3xl shadow-xl border-4 border-amber-200 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="space-y-2">
               <h2 className="text-2xl sm:text-3xl font-black">
-                {user?.role === 'student' ? (
-                  <>Chào mừng em, <span className="text-white underline decoration-amber-300">{user?.full_name}</span>! 🌟</>
-                ) : (
-                  <>Chào mừng em đến với Cổng Học Toán Lớp 2! 🌟</>
-                )}
+                {(() => {
+                  const isCodeName = user?.full_name && (user.full_name.toUpperCase().startsWith('HS2026_') || user.full_name.toUpperCase().startsWith('HS20'));
+                  const matchedEntry = isCodeName ? leaderboard.find(lb => lb.student_id === user?.id || (lb.full_name && !lb.full_name.toUpperCase().startsWith('HS20'))) : null;
+                  const displayName = matchedEntry?.full_name || user?.full_name || 'Học sinh';
+
+                  return user?.role === 'student' ? (
+                    <>Chào mừng em, <span className="text-white underline decoration-amber-300">{displayName}</span>! 🌟</>
+                  ) : (
+                    <>Chào mừng em đến với Cổng Học Toán Lớp 2! 🌟</>
+                  );
+                })()}
               </h2>
               <p className="text-xs font-extrabold text-amber-950 opacity-90">
                 Chúc em có một ngày học tập thật vui vẻ và gặt hái nhiều điểm thưởng!
