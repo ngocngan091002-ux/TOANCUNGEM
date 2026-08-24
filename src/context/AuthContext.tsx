@@ -146,11 +146,59 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const cleanEmail = email.trim().toLowerCase();
       const isSuperAdmin = cleanEmail === 'ngocngan091002@gmail.com';
 
-      // Tiến hành Auth Sign In trực tiếp với Supabase
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 1. Thử Đăng nhập trực tiếp với Supabase Auth
+      let { data, error } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: pass
       });
+
+      // 2. Nếu Auth báo sai tài khoản/mật khẩu, kiểm tra trong DB profiles xem có phải học sinh do Admin thêm không
+      if (error) {
+        const { data: dbProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+
+        if (dbProfile) {
+          const defaultPassword = dbProfile.parent_pin || pass || '123456';
+          try {
+            // Tự động tạo/đồng bộ Auth User cho học sinh này với mật khẩu mặc định
+            const { data: newAuth } = await supabaseAdmin.auth.admin.createUser({
+              email: cleanEmail,
+              password: defaultPassword,
+              email_confirm: true,
+              user_metadata: {
+                full_name: dbProfile.full_name,
+                role: dbProfile.role || selectedRole,
+                status: 'approved'
+              }
+            });
+
+            if (newAuth?.user) {
+              await supabaseAdmin.from('profiles').update({ id: newAuth.user.id }).eq('email', cleanEmail);
+            } else {
+              // Cập nhật lại mật khẩu nếu tài khoản Auth đã có sẵn
+              const { data: usersData } = await supabaseAdmin.auth.admin.listUsers();
+              const existingAuth = usersData?.users?.find(u => u.email?.toLowerCase() === cleanEmail);
+              if (existingAuth) {
+                await supabaseAdmin.auth.admin.updateUserById(existingAuth.id, { password: defaultPassword });
+                await supabaseAdmin.from('profiles').update({ id: existingAuth.id }).eq('email', cleanEmail);
+              }
+            }
+
+            // Đăng nhập lại ngay lập tức!
+            const retry = await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password: defaultPassword
+            });
+            data = retry.data;
+            error = retry.error;
+          } catch (autoErr) {
+            console.warn('Auto auth provisioning error:', autoErr);
+          }
+        }
+      }
 
       if (error) {
         if (error.message.includes('Email not confirmed')) {
@@ -161,7 +209,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         return { 
           success: false, 
-          error: 'Mật khẩu không chính xác hoặc tài khoản chưa đăng ký. Nếu chưa có tài khoản, Thầy/Cô nhấp vào "Chưa có tài khoản? Bấm để Đăng Ký Mới" bên dưới nhé!' 
+          error: 'Mật khẩu không chính xác hoặc tài khoản chưa đăng ký. Vui lòng kiểm tra lại Email & Mật khẩu!' 
         };
       }
 
