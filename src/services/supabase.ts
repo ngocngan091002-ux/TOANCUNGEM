@@ -442,14 +442,36 @@ export async function createMaterial(mat: Omit<Material, 'id' | 'created_at'>): 
 }
 
 export async function getLearningMaterials(classId: string): Promise<LearningMaterial[]> {
-  const { data, error } = await supabaseAdmin
-    .from('learning_materials')
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('learning_materials')
+      .select('*')
+      .eq('class_id', classId)
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) return data;
+  } catch (err) {
+    console.warn('getLearningMaterials primary table warning, fallback to materials:', err);
+  }
+
+  // Fallback sang bảng materials trên Supabase DB
+  const { data: matData, error: matErr } = await supabaseAdmin
+    .from('materials')
     .select('*')
-    .eq('class_id', classId)
+    .or(`class_id.eq.${classId},is_public.eq.true`)
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
-  return data || [];
+  if (matErr) throw matErr;
+  return (matData || []).map((m: any) => ({
+    id: m.id,
+    class_id: m.class_id,
+    teacher_id: m.teacher_id || m.author_id,
+    title: m.title,
+    description: m.description,
+    file_url: m.file_url,
+    file_type: m.type || m.file_type || 'document',
+    created_at: m.created_at
+  }));
 }
 
 export async function addLearningMaterial(material: Omit<LearningMaterial, 'id' | 'created_at'>): Promise<LearningMaterial> {
@@ -457,14 +479,49 @@ export async function addLearningMaterial(material: Omit<LearningMaterial, 'id' 
   const payload: any = { ...material };
   if (!isUuid(payload.teacher_id)) delete payload.teacher_id;
 
-  const { data, error } = await supabaseAdmin
-    .from('learning_materials')
-    .insert([payload])
+  // 1. Thử chèn vào bảng learning_materials
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('learning_materials')
+      .insert([payload])
+      .select()
+      .single();
+
+    if (!error && data) return data;
+  } catch (err) {
+    console.warn('addLearningMaterial primary table insert warning, trying materials fallback...');
+  }
+
+  // 2. Fallback chèn vào bảng materials trên Supabase
+  const matPayload: any = {
+    title: material.title,
+    description: material.description || '',
+    type: (material as any).file_type || (material as any).type || 'document',
+    file_url: material.file_url,
+    class_id: material.class_id
+  };
+
+  if (isUuid(material.teacher_id)) {
+    matPayload.teacher_id = material.teacher_id;
+  }
+
+  const { data: fbData, error: fbErr } = await supabaseAdmin
+    .from('materials')
+    .insert([matPayload])
     .select()
     .single();
 
-  if (error) throw error;
-  return data;
+  if (fbErr) throw fbErr;
+  return {
+    id: fbData.id,
+    class_id: fbData.class_id,
+    teacher_id: fbData.teacher_id || fbData.author_id,
+    title: fbData.title,
+    description: fbData.description,
+    file_url: fbData.file_url,
+    file_type: fbData.type,
+    created_at: fbData.created_at
+  };
 }
 
 export async function getGames(classId: string): Promise<GameItem[]> {
