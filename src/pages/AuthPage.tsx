@@ -83,7 +83,8 @@ export const AuthPage: React.FC = () => {
       setLoading(true);
       await loginWithGoogle(selectedRole);
     } catch (err: any) {
-      setErrorMsg('Lỗi đăng nhập Google: ' + (err.message || 'Vui lòng thử lại hoặc đăng nhập bằng Email & Mật khẩu!'));
+      console.error('Google Login error:', err);
+      setErrorMsg('Đăng nhập chưa thành công. Vui lòng thử lại!');
       setLoading(false);
     }
   };

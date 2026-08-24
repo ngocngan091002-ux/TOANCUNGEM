@@ -125,56 +125,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const loginWithGoogle = async (selectedRole: UserRole) => {
     localStorage.setItem('auth_selected_role', selectedRole);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin,
+        queryParams: {
+          prompt: 'select_account' // Ưu tiên hiển thị danh sách tài khoản Google đã đăng nhập trên thiết bị
         }
-      });
-      if (error) throw error;
-    } catch (oauthErr: any) {
-      console.warn('Supabase OAuth Google not configured on Dashboard, activating 1-Click Google Auth Fallback:', oauthErr.message);
-
-      // 1-Click Instant Google Auth Fallback
-      let googleUser: UserProfile;
-      if (selectedRole === 'admin') {
-        googleUser = {
-          id: '8c75764d-1664-4fed-b1ca-82fbe5e2d194',
-          email: 'ngocngan091002@gmail.com',
-          full_name: 'Quản Trị Viên Ngọc Ngân (Google)',
-          role: 'admin',
-          status: 'approved',
-          avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin'
-        };
-      } else if (selectedRole === 'teacher') {
-        googleUser = {
-          id: '72f7f406-e5cf-42a0-8707-7bc271773f1b',
-          email: 'co_ngoc@gmail.com',
-          full_name: 'Cô Ngọc (Giáo Viên Google)',
-          role: 'teacher',
-          status: 'approved',
-          avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=teacher'
-        };
-      } else {
-        googleUser = {
-          id: '5f286e46-bc1d-43ee-94a6-597d7dc7d6e7',
-          email: 'phuoctran180506@gmail.com',
-          full_name: 'Huỳnh Phương Bảo Anh (Học Sinh Google)',
-          role: 'student',
-          status: 'approved',
-          avatar_url: 'https://api.dicebear.com/7.x/bottts/svg?seed=student'
-        };
       }
+    });
 
-      try {
-        await supabaseAdmin.from('profiles').upsert([googleUser]);
-      } catch (e) {
-        console.warn('Google fallback profile upsert warning:', e);
-      }
-
-      setUser(googleUser);
-      handleProfileLoaded(googleUser);
+    if (error) {
+      console.error('Google OAuth signInWithOAuth error:', error);
+      throw error;
     }
   };
 
