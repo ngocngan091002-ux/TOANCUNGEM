@@ -747,6 +747,79 @@ export const StudentDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* 5. KHO HỌC LIỆU & BÀI GIẢNG DÀNH CHO HỌC SINH */}
+      {activeMenu === 'materials' && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-amber-600" />
+              📖 KHO HỌC LIỆU & BÀI GIẢNG DÀNH CHO EM ({materials.length})
+            </h3>
+            <button
+              onClick={() => loadClassContent(selectedClassId)}
+              className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold rounded-xl text-xs flex items-center gap-1"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> Tải lại học liệu
+            </button>
+          </div>
+
+          {materials.length === 0 ? (
+            <div className="bg-amber-50/60 p-8 rounded-2xl text-center space-y-2 border border-amber-200">
+              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
+                <BookOpen className="w-6 h-6" />
+              </div>
+              <h4 className="font-black text-sm text-slate-700">Chưa có học liệu nào được đăng trong lớp!</h4>
+              <p className="text-xs font-bold text-slate-500">Khi Giáo viên đăng slide bài giảng, video hay tài liệu ôn tập, các em có thể vào đây học nhé.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {materials.map(m => (
+                <div key={m.id} className="p-4 rounded-3xl border-2 border-amber-200 bg-amber-50/40 space-y-3 flex flex-col justify-between hover:shadow-md transition-all">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="px-2.5 py-1 bg-amber-500 text-white text-[10px] font-black rounded-xl uppercase tracking-wider">
+                        {m.file_type || 'Tài liệu'}
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        {m.created_at ? new Date(m.created_at).toLocaleDateString('vi-VN') : 'Mới đăng'}
+                      </span>
+                    </div>
+
+                    <h4 className="font-black text-sm text-slate-900 line-clamp-2">{m.title}</h4>
+                    {m.description && <p className="text-xs font-bold text-slate-600 line-clamp-2">{m.description}</p>}
+                  </div>
+
+                  <div className="pt-2 border-t border-amber-200/60">
+                    {m.file_type === 'video' || (m.file_url && m.file_url.includes('.mp4')) ? (
+                      <div className="space-y-2">
+                        <video controls src={m.file_url} className="w-full h-36 rounded-2xl border border-amber-300 object-cover bg-black" />
+                        <a
+                          href={m.file_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-2xl text-xs text-center block shadow"
+                        >
+                          ▶️ Xem Video Toàn Màn Hình
+                        </a>
+                      </div>
+                    ) : (
+                      <a
+                        href={m.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-2xl text-xs text-center block shadow flex items-center justify-center gap-1.5"
+                      >
+                        <BookOpen className="w-4 h-4" /> [MỞ XEM BÀI GIẢNG / TỆP]
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 6. AI MATH CHAT ASSISTANT */}
       {activeMenu === 'ai' && (
         <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">

@@ -1908,13 +1908,53 @@ export const TeacherDashboard: React.FC = () => {
           <div className="md:col-span-2 bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
             <h3 className="text-base font-black text-slate-800">DANH SÁCH HỌC LIỆU TRONG LỚP ({materials.length})</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {materials.map(m => (
-                <div key={m.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-2">
-                  <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-black rounded-md uppercase">{m.file_type}</span>
-                  <h4 className="font-extrabold text-sm text-slate-900">{m.title}</h4>
-                  <a href={m.file_url} target="_blank" rel="noreferrer" className="text-xs font-bold text-amber-700 underline block">Mở xem tệp</a>
-                </div>
-              ))}
+              {materials.length === 0 ? (
+                <p className="col-span-2 text-xs font-bold text-slate-500 italic text-center py-8">Chưa có học liệu nào trong lớp học này. Thầy/Cô hãy chọn tệp bên trái để đăng!</p>
+              ) : (
+                materials.map(m => (
+                  <div key={m.id} className="p-4 rounded-2xl border border-amber-200 bg-amber-50/40 space-y-3 flex flex-col justify-between">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="px-2 py-0.5 bg-amber-200 text-amber-900 text-[10px] font-black rounded-md uppercase">{m.file_type || 'Tệp'}</span>
+                        <button
+                          onClick={async () => {
+                            if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa học liệu "${m.title}"?`)) return;
+                            try {
+                              await supabaseAdmin.from('materials').delete().eq('id', m.id);
+                              await supabaseAdmin.from('learning_materials').delete().eq('id', m.id);
+                              setMaterials(materials.filter(item => item.id !== m.id));
+                              alert('🎉 Đã xóa học liệu thành công!');
+                            } catch (e: any) {
+                              alert('Lỗi xóa học liệu: ' + e.message);
+                            }
+                          }}
+                          className="p-1 text-rose-600 hover:bg-rose-100 rounded-lg transition-all"
+                          title="Xóa học liệu"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <h4 className="font-extrabold text-sm text-slate-900">{m.title}</h4>
+                      {m.description && <p className="text-xs font-bold text-slate-600 line-clamp-2">{m.description}</p>}
+                    </div>
+
+                    <div className="pt-2 border-t border-amber-200/60 space-y-2">
+                      {m.file_type === 'video' || (m.file_url && m.file_url.includes('.mp4')) ? (
+                        <video controls src={m.file_url} className="w-full h-32 rounded-xl border border-amber-300 object-cover bg-black" />
+                      ) : null}
+
+                      <a
+                        href={m.file_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-xl text-xs text-center shadow block transition-all"
+                      >
+                        📖 [MỞ XEM TỆP BÀI GIẢNG]
+                      </a>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
