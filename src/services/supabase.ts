@@ -886,6 +886,31 @@ export async function getClassSubmissionsForTeacher(assignmentId: string): Promi
   return data || [];
 }
 
+export async function getAssignmentSubmissionCounts(): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('assignment_submissions')
+      .select('assignment_id, student_id');
+
+    if (!error && data) {
+      const counts: Record<string, Set<string>> = {};
+      data.forEach((s: any) => {
+        if (!counts[s.assignment_id]) counts[s.assignment_id] = new Set();
+        counts[s.assignment_id].add(s.student_id);
+      });
+
+      const result: Record<string, number> = {};
+      Object.keys(counts).forEach(aid => {
+        result[aid] = counts[aid].size;
+      });
+      return result;
+    }
+  } catch (err) {
+    console.warn('getAssignmentSubmissionCounts exception:', err);
+  }
+  return {};
+}
+
 export async function updateTeacherGrading(
   submissionId: string,
   score: number,

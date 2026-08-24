@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -83,6 +83,8 @@ export const TeacherDashboard: React.FC = () => {
   const [questionDifficulty, setQuestionDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium'); // QUIZ-10: Độ khó
   const [selectedQuestionType, setSelectedQuestionType] = useState<'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay'>('single_choice'); // QUIZ-01 -> QUIZ-06
   const [selectedViewAssignment, setSelectedViewAssignment] = useState<Assignment | null>(null);
+  const [viewAssignmentSubmissions, setViewAssignmentSubmissions] = useState<any[]>([]);
+  const [assignmentSubmissionCounts, setAssignmentSubmissionCounts] = useState<Record<string, number>>({});
   const [targetGroup, setTargetGroup] = useState<string>('all');
 
   // ⭐ TÍCH ĐIỂM & THI ĐUA HỌC SINH STATES
@@ -284,6 +286,9 @@ export const TeacherDashboard: React.FC = () => {
           setAssignments(a);
         }
       });
+      getAssignmentSubmissionCounts().then(counts => {
+        setAssignmentSubmissionCounts(counts);
+      });
     }
   }, [activeTab, selectedClass]);
 
@@ -341,6 +346,9 @@ export const TeacherDashboard: React.FC = () => {
 
       const pLogs = await getClassPointLogs(classId);
       setPointLogs(pLogs);
+
+      const subCounts = await getAssignmentSubmissionCounts();
+      setAssignmentSubmissionCounts(subCounts);
     } catch (err) {
       console.error('Error loading class data:', err);
     }
@@ -357,6 +365,16 @@ export const TeacherDashboard: React.FC = () => {
       setShowClassModal(false);
     } catch (err: any) {
       alert('Lỗi tạo lớp: ' + err.message);
+    }
+  };
+
+  const handleOpenViewAssignmentModal = async (a: Assignment) => {
+    setSelectedViewAssignment(a);
+    try {
+      const subs = await getClassSubmissionsForTeacher(a.id);
+      setViewAssignmentSubmissions(subs);
+    } catch (e) {
+      setViewAssignmentSubmissions([]);
     }
   };
 
@@ -1317,14 +1335,27 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </td>
                         <td className="p-3 text-center">
-                          <span className="px-2.5 py-1 bg-emerald-100 text-emerald-950 rounded-xl border border-emerald-400 font-extrabold">
-                            ✓ Đã giao cho {students.length || 33} học sinh
-                          </span>
+                          {(() => {
+                            const doneCount = assignmentSubmissionCounts[a.id] || 0;
+                            const totalStudentsCount = students.length || 33;
+                            const isAllDone = doneCount > 0 && doneCount >= totalStudentsCount;
+                            return (
+                              <span className={`px-2.5 py-1 rounded-xl text-xs font-black border flex items-center justify-center gap-1 mx-auto w-max ${
+                                isAllDone
+                                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400'
+                                  : doneCount > 0
+                                  ? 'bg-blue-100 text-blue-950 border-blue-400'
+                                  : 'bg-amber-100 text-amber-950 border-amber-300'
+                              }`}>
+                                📝 Đã làm: {doneCount} / {totalStudentsCount} học sinh
+                              </span>
+                            );
+                          })()}
                         </td>
                         <td className="p-3 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
-                              onClick={() => setSelectedViewAssignment(a)}
+                              onClick={() => handleOpenViewAssignmentModal(a)}
                               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold rounded-xl text-xs flex items-center gap-1 shadow"
                             >
                               <Eye className="w-3.5 h-3.5" /> Xem bài đã giao
@@ -2387,7 +2418,54 @@ export const TeacherDashboard: React.FC = () => {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              <div className="flex items-center justify-between border-b pb-2">
+              {/* BANNER THỐNG KÊ TIẾN ĐỘ NỘP BÀI CẢ LỚP */}
+              <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-300 flex items-center justify-between shadow-xs">
+                <div>
+                  <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📊 TIẾN ĐỘ NỘP BÀI CẢ LỚP:</h4>
+                  <p className="text-sm font-black text-slate-900 mt-0.5">
+                    Đã làm: <span className="text-emerald-700 font-extrabold text-base">{assignmentSubmissionCounts[selectedViewAssignment.id] || viewAssignmentSubmissions.length} / {students.length || 33}</span> Học sinh
+                  </p>
+                </div>
+                <div className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-xl shadow">
+                  {Math.round(((assignmentSubmissionCounts[selectedViewAssignment.id] || viewAssignmentSubmissions.length) / (students.length || 33)) * 100)}% Hoàn thành
+                </div>
+              </div>
+
+              {/* DANH SÁCH HỌC SINH ĐÃ NỘP BÀI VS CHƯA NỘP BÀI */}
+              <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-2">
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                  📋 CHI TIẾT TRẠNG THÁI HỌC SINH LÀM BÀI:
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                  {students.map(st => {
+                    const stSub = viewAssignmentSubmissions.find(s => s.student_id === st.id || s.student?.id === st.id);
+                    return (
+                      <div
+                        key={st.id}
+                        className={`p-2 rounded-xl border flex items-center justify-between text-xs font-bold ${
+                          stSub
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                            : 'bg-slate-50 border-slate-200 text-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span>{stSub ? '🟢' : '⚪'}</span>
+                          <span className="font-black text-slate-900 truncate max-w-[130px]">{st.full_name}</span>
+                        </div>
+                        {stSub ? (
+                          <span className="font-black text-emerald-700 bg-emerald-200/60 px-2 py-0.5 rounded-md text-[11px]">
+                            ✓ {stSub.score > 10 ? Math.round((stSub.score / 100) * 10 * 10) / 10 : stSub.score} / 10 Điểm
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-extrabold text-slate-400">Chưa làm</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between border-b pb-2 pt-2">
                 <h4 className="font-black text-sm text-slate-800">
                   DANH SÁCH CÂU HỎI TRONG ĐỀ BÀI ({selectedViewAssignment.questions?.length || 0} CÂU HỎI):
                 </h4>
