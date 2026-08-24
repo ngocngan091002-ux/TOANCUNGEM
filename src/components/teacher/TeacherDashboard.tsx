@@ -764,6 +764,14 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
+  const getTargetGroupLabel = (groupKey: string) => {
+    if (groupKey === 'group_1') return 'Nhóm 1';
+    if (groupKey === 'group_2') return 'Nhóm 2';
+    if (groupKey === 'group_3') return 'Nhóm 3';
+    if (groupKey === 'group_4') return 'Nhóm 4';
+    return 'Cả Lớp';
+  };
+
   // CHỐT TẠO BÀI TẬP VÀ GIAO CHO LỚP (QUIZ-08 & QUIZ-09)
   const handleSaveAssignment = async () => {
     if (!selectedClass) {
@@ -782,8 +790,10 @@ export const TeacherDashboard: React.FC = () => {
       return;
     }
 
-    // Tự động đặt tên bài kiểm tra nếu Giáo viên để trống
-    const finalTitle = assignTitle.trim() || `Kiểm Tra Toán Lớp 2 (${new Date().toLocaleDateString('vi-VN')})`;
+    // Tự động đặt tên bài kiểm tra theo nhóm nếu Giáo viên chọn giao theo nhóm
+    const targetGroupLabel = getTargetGroupLabel(targetGroup);
+    const targetSuffix = targetGroup !== 'all' ? ` (${targetGroupLabel})` : '';
+    const finalTitle = assignTitle.trim() ? (assignTitle.trim() + targetSuffix) : `Kiểm Tra Toán Lớp 2${targetSuffix} (${new Date().toLocaleDateString('vi-VN')})`;
 
     try {
       const questionsToSave = selectedDrafts.map(q => ({
@@ -816,7 +826,7 @@ export const TeacherDashboard: React.FC = () => {
       setAssignments([created, ...assignments]);
       setAssignTitle('');
       setDraftQuestions([]);
-      alert(`🎉 Đã giao thành công Đề Bài "${finalTitle}" gồm ${questionsToSave.length} câu hỏi (Hạn đếm ngược: ${timeLimitMinutes} phút) cho lớp ${selectedClass.name}!`);
+      alert(`🎉 Đã chốt & giao bài tập tuần "${finalTitle}" gồm ${questionsToSave.length} câu hỏi cho ${targetGroupLabel} của lớp ${selectedClass.name}!`);
     } catch (err: any) {
       alert('Lỗi tạo bài tập: ' + err.message);
     }
@@ -1279,9 +1289,9 @@ export const TeacherDashboard: React.FC = () => {
 
                 <button
                   onClick={handleSaveAssignment}
-                  className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-black py-3 rounded-2xl shadow-lg text-xs uppercase tracking-wider"
+                  className="w-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700 hover:from-purple-700 hover:to-indigo-800 text-white font-black py-3.5 rounded-2xl shadow-lg text-xs uppercase tracking-wider transition-all transform active:scale-98"
                 >
-                  🚀 Chốt & Giao Bài Tập Tuần Cho Lớp ({draftQuestions.filter(q => q.selected !== false).length} Câu Hỏi Được Chọn - Hạn đếm ngược: {timeLimitMinutes} phút)
+                  🚀 CHỐT & GIAO BÀI TẬP TUẦN CHO {getTargetGroupLabel(targetGroup).toUpperCase()} ({draftQuestions.filter(q => q.selected !== false).length} CÂU HỎI ĐƯỢC CHỌN - HẠN ĐẾM NGƯỢC: {timeLimitMinutes} PHÚT)
                 </button>
               </div>
             )}
