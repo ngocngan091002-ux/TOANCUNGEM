@@ -126,6 +126,27 @@ export const TeacherDashboard: React.FC = () => {
     });
   };
 
+  // HÀM TỰ ĐỘNG CHIA NHÓM VÀ LƯU VĨNH VIỄN
+  const handleAutoGroupStudents = (numGroups: number) => {
+    if (!selectedClass || students.length === 0) return;
+    const newGroups: Record<string, string> = {};
+    students.forEach((st, idx) => {
+      const gNum = (idx % numGroups) + 1;
+      newGroups[st.id] = `Nhóm ${gNum}`;
+    });
+    setStudentGroups(newGroups);
+    localStorage.setItem('toan_cung_em_student_groups_' + selectedClass.id, JSON.stringify(newGroups));
+    alert(`🎉 Đã chia ${students.length} học sinh thành ${numGroups} Nhóm và ĐÃ LƯU GHI NHỚ VĨNH VIỄN!`);
+  };
+
+  // HÀM ĐỔI NHÓM THỦ CÔNG VÀ LƯU VĨNH VIỄN
+  const handleUpdateStudentGroup = (studentId: string, groupName: string) => {
+    if (!selectedClass) return;
+    const updated = { ...studentGroups, [studentId]: groupName };
+    setStudentGroups(updated);
+    localStorage.setItem('toan_cung_em_student_groups_' + selectedClass.id, JSON.stringify(updated));
+  };
+
   // UPLOAD ẢNH CHO TỪNG ĐÁP ÁN
   const handleOptionImageUpload = async (qIndex: number, optId: string, file: File) => {
     try {
@@ -260,6 +281,18 @@ export const TeacherDashboard: React.FC = () => {
       const stList = members.map(m => m.student).filter(Boolean) as UserProfile[];
       setStudents(stList);
 
+      // GHI NHỚ & TẢI LẠI PHÂN CHIA NHÓM HỌC SINH TỪ STORAGE
+      const savedGroupsStr = localStorage.getItem('toan_cung_em_student_groups_' + classId);
+      if (savedGroupsStr) {
+        try {
+          setStudentGroups(JSON.parse(savedGroupsStr));
+        } catch (e) {
+          setStudentGroups({});
+        }
+      } else {
+        setStudentGroups({});
+      }
+
       const initAtt: Record<string, any> = {};
       const initStars: Record<string, number> = {};
       stList.forEach(s => {
@@ -326,18 +359,6 @@ export const TeacherDashboard: React.FC = () => {
     setCoTeachers([...coTeachers, coTeacherEmail.trim()]);
     setCoTeacherEmail('');
     alert(`🎉 Đã phân công Đồng Giáo Viên (${coTeacherEmail}) cùng quản lý lớp!`);
-  };
-
-  // CLAS-04: TỰ ĐỘNG CHIA NHÓM HỌC SINH
-  const handleAutoGroupStudents = (groupCount: number) => {
-    if (students.length === 0) return;
-    const newGroups: Record<string, string> = {};
-    students.forEach((st, idx) => {
-      const groupNum = (idx % groupCount) + 1;
-      newGroups[st.id] = `Nhóm ${groupNum}`;
-    });
-    setStudentGroups(newGroups);
-    alert(`🎉 Đã tự động chia ${students.length} học sinh thành ${groupCount} Nhóm!`);
   };
 
   // CLAS-06: CỘNG TRỪ SAO NỀ NẾP
@@ -1397,7 +1418,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* CLAS-04: CHIA NHÓM HỌC SINH */}
+      {/* CLAS-04: CHIA NHÓM HỌC SINH VÀ LƯU GHI NHỚ VĨNH VIỄN */}
       {activeTab === 'groups' && (
         <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-200 pb-3">
@@ -1405,19 +1426,19 @@ export const TeacherDashboard: React.FC = () => {
               <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
                 <Users className="w-5 h-5 text-amber-600" /> CHIA NHÓM HỌC SINH LÀM BÀI TẬP NHÓM
               </h3>
-              <p className="text-xs font-bold text-slate-500">Tự động hoặc thủ công phân chia học sinh thành các Group nhỏ</p>
+              <p className="text-xs font-bold text-slate-500">Tự động hoặc thủ công phân chia học sinh thành các Group nhỏ (Tự động ghi nhớ vĩnh viễn)</p>
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleAutoGroupStudents(2)}
-                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs"
+                className="bg-amber-500 hover:bg-amber-600 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs transition-all active:scale-95"
               >
                 Tự động Chia 2 Nhóm
               </button>
               <button
                 onClick={() => handleAutoGroupStudents(4)}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs"
+                className="bg-purple-600 hover:bg-purple-700 text-white font-extrabold px-3.5 py-2 rounded-2xl shadow text-xs transition-all active:scale-95"
               >
                 Tự động Chia 4 Nhóm
               </button>
@@ -1436,8 +1457,8 @@ export const TeacherDashboard: React.FC = () => {
 
                 <select
                   value={studentGroups[st.id] || 'Chưa xếp nhóm'}
-                  onChange={(e) => setStudentGroups({ ...studentGroups, [st.id]: e.target.value })}
-                  className="p-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold"
+                  onChange={(e) => handleUpdateStudentGroup(st.id, e.target.value)}
+                  className="p-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold focus:outline-none focus:border-amber-500"
                 >
                   <option value="Chưa xếp nhóm">Chưa xếp nhóm</option>
                   <option value="Nhóm 1">Nhóm 1</option>
