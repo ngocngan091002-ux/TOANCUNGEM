@@ -174,7 +174,7 @@ export const AuthPage: React.FC = () => {
             className="w-full py-2.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-950 font-black rounded-2xl border-2 border-emerald-300 text-xs flex items-center justify-center gap-2 shadow-sm transition-all"
           >
             <Eye className="w-4 h-4 text-emerald-700" />
-            👨‍👩‍👧 Phụ Huynh Tra Cứu Tiến Độ Học (Không Cần Account)
+            👨‍👩‍👧 Phụ Huynh Tra Cứu Tiến Độ Học
           </button>
         </div>
 
