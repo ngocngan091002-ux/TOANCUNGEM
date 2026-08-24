@@ -92,18 +92,28 @@ export const TeacherDashboard: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<'today' | 'week' | 'month' | 'all'>('all');
   const [showReasonModal, setShowReasonModal] = useState<boolean>(false);
 
-  // Danh sách lý do tích điểm
-  const [customReasons, setCustomReasons] = useState<CustomPointReason[]>([
-    { id: 'r1', title: 'Phát biểu hay', points: 1, icon: '⭐', type: 'reward' },
-    { id: 'r2', title: 'Hoàn thành bài tập', points: 2, icon: '📚', type: 'reward' },
-    { id: 'r3', title: 'Hoàn thành nhiệm vụ', points: 3, icon: '🎯', type: 'reward' },
-    { id: 'r4', title: 'Có cách giải sáng tạo', points: 3, icon: '💡', type: 'reward' },
-    { id: 'r5', title: 'Giúp đỡ bạn', points: 2, icon: '🤝', type: 'reward' },
-    { id: 'r6', title: 'Thành tích nổi bật', points: 5, icon: '🏆', type: 'reward' },
-    { id: 'p1', title: 'Chưa hoàn thành nhiệm vụ', points: -1, icon: '⚠️', type: 'penalty' },
-    { id: 'p2', title: 'Quên đồ dùng học tập', points: -1, icon: '⚠️', type: 'penalty' },
-    { id: 'p3', title: 'Chưa thực hiện nội quy', points: -2, icon: '⚠️', type: 'penalty' }
-  ]);
+  // Danh sách lý do tích điểm (Lưu vĩnh viễn LocalStorage)
+  const [customReasons, setCustomReasons] = useState<CustomPointReason[]>(() => {
+    const saved = localStorage.getItem('toan_cung_em_custom_reasons');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      { id: 'r1', title: 'Phát biểu hay', points: 1, icon: '⭐', type: 'reward' },
+      { id: 'r2', title: 'Hoàn thành bài tập', points: 2, icon: '📚', type: 'reward' },
+      { id: 'r3', title: 'Hoàn thành nhiệm vụ', points: 3, icon: '🎯', type: 'reward' },
+      { id: 'r4', title: 'Có cách giải sáng tạo', points: 3, icon: '💡', type: 'reward' },
+      { id: 'r5', title: 'Giúp đỡ bạn', points: 2, icon: '🤝', type: 'reward' },
+      { id: 'r6', title: 'Thành tích nổi bật', points: 5, icon: '🏆', type: 'reward' },
+      { id: 'p1', title: 'Chưa hoàn thành nhiệm vụ', points: -1, icon: '⚠️', type: 'penalty' },
+      { id: 'p2', title: 'Quên đồ dùng học tập', points: -1, icon: '⚠️', type: 'penalty' },
+      { id: 'p3', title: 'Chưa thực hiện nội quy', points: -2, icon: '⚠️', type: 'penalty' }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('toan_cung_em_custom_reasons', JSON.stringify(customReasons));
+  }, [customReasons]);
 
   // Form tạo lý do tích điểm mới
   const [newReasonTitle, setNewReasonTitle] = useState<string>('');
@@ -344,8 +354,21 @@ export const TeacherDashboard: React.FC = () => {
       const a = await getAssignments(classId, true);
       setAssignments(a);
 
+      const localKey = `toan_cung_em_point_logs_${classId}`;
+      const savedLogsStr = localStorage.getItem(localKey);
+      let localLogs: PointLogRecord[] = [];
+      if (savedLogsStr) {
+        try { localLogs = JSON.parse(savedLogsStr); setPointLogs(localLogs); } catch (e) {}
+      }
+
       const pLogs = await getClassPointLogs(classId);
-      setPointLogs(pLogs);
+      const mergedMap = new Map<string, PointLogRecord>();
+      [...pLogs, ...localLogs].forEach(item => {
+        if (item.id) mergedMap.set(item.id, item);
+      });
+      const finalLogs = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setPointLogs(finalLogs);
+      localStorage.setItem(localKey, JSON.stringify(finalLogs));
 
       const subCounts = await getAssignmentSubmissionCounts();
       setAssignmentSubmissionCounts(subCounts);
@@ -378,7 +401,7 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  // ⭐ HÀM CỘNG / TRỪ ĐIỂM HỌC SINH VÀ LƯU SUPABASE DB VĨNH VIỄN
+  // ⭐ HÀM CỘNG / TRỪ ĐIỂM HỌC SINH VÀ LƯU VĨNH VIỄN (LOCALSTORAGE + SUPABASE DB)
   const handleAwardPoints = async (st: UserProfile, reasonObj: { title: string; points: number; icon: string; type: 'reward' | 'penalty' }) => {
     try {
       const newLog = await addStudentPointLog({
@@ -393,7 +416,12 @@ export const TeacherDashboard: React.FC = () => {
         created_by: user?.id
       });
 
-      setPointLogs(prev => [newLog, ...prev]);
+      const updatedLogs = [newLog, ...pointLogs];
+      setPointLogs(updatedLogs);
+
+      if (selectedClass?.id) {
+        localStorage.setItem(`toan_cung_em_point_logs_${selectedClass.id}`, JSON.stringify(updatedLogs));
+      }
 
       const currentStars = conductStars[st.id] || 0;
       const updatedStars = Math.max(0, currentStars + (reasonObj.type === 'reward' ? Math.max(1, reasonObj.points) : -1));

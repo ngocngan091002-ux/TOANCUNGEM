@@ -90,6 +90,18 @@ export const StudentDashboard: React.FC = () => {
 
   const loadClassContent = async (classId: string) => {
     try {
+      // 0. Nạp trước từ LocalStorage để điểm hiển thị tức thì 0 giây
+      const localKey = `toan_cung_em_point_logs_${classId}`;
+      const savedLogsStr = localStorage.getItem(localKey);
+      let localPointLogs: PointLogRecord[] = [];
+      if (savedLogsStr) {
+        try {
+          localPointLogs = JSON.parse(savedLogsStr);
+          const studentLocalLogs = localPointLogs.filter((p: any) => p.student_id === user?.id);
+          setMyPointLogs(studentLocalLogs);
+        } catch (e) {}
+      }
+
       const t = await getDailyTasks(classId, user!.id);
       setTasks(t);
 
@@ -109,7 +121,12 @@ export const StudentDashboard: React.FC = () => {
       setLeaderboard(lb);
 
       const pLogs = await getStudentPointLogs(user!.id);
-      setMyPointLogs(pLogs);
+      const mergedMap = new Map<string, PointLogRecord>();
+      [...pLogs, ...localPointLogs.filter((p: any) => p.student_id === user?.id)].forEach(item => {
+        if (item.id) mergedMap.set(item.id, item);
+      });
+      const finalLogs = Array.from(mergedMap.values()).sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+      setMyPointLogs(finalLogs);
     } catch (err) {
       console.error('Error loading class content:', err);
     }
