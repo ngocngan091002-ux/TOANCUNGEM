@@ -823,7 +823,11 @@ export async function submitAssignment(
   studentId: string,
   responses: { question_id: string; selected_options: string[]; time_spent_seconds: number; is_correct: boolean }[]
 ): Promise<AssignmentSubmission> {
-  const totalScore = responses.reduce((sum, r) => sum + (r.is_correct ? 10 : 0), 0);
+  const totalQuestions = responses.length || 1;
+  const correctCount = responses.filter(r => r.is_correct).length;
+  // Tính điểm trên thang điểm 10 chuẩn, sai câu nào trừ điểm câu đó (10 / tổng số câu * số câu đúng)
+  const rawScore = (correctCount / totalQuestions) * 10;
+  const totalScore = Math.round(rawScore * 10) / 10;
   const totalTime = responses.reduce((sum, r) => sum + r.time_spent_seconds, 0);
 
   // Tạo submission

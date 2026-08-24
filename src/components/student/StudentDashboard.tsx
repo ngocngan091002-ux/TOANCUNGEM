@@ -569,7 +569,7 @@ export const StudentDashboard: React.FC = () => {
 
                         {sub ? (
                           <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
-                            🟢 Đã Hoàn Thành ({sub.score}/100 Điểm)
+                            🟢 Đã Hoàn Thành ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
                           </span>
                         ) : isOverdue ? (
                           <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
@@ -600,7 +600,7 @@ export const StudentDashboard: React.FC = () => {
                     <div className="pt-2">
                       {sub ? (
                         <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900">
-                          <span>Kết quả: <strong className="text-sm font-black text-emerald-700">{sub.score} / 100 Điểm</strong></span>
+                          <span>Kết quả: <strong className="text-sm font-black text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score} / 10 Điểm</strong></span>
                           <span className="text-[10px] bg-emerald-200 px-2.5 py-1 rounded-lg">✓ Đã nộp bài</span>
                         </div>
                       ) : (
@@ -888,8 +888,10 @@ export const StudentDashboard: React.FC = () => {
                   return (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between text-xs font-black text-purple-900">
-                        <span>CÂU HỎI {currentQuestionIndex + 1}:</span>
-                        <span>(10 Điểm)</span>
+                        <span>CÂU HỎI {currentQuestionIndex + 1} / {activeAssignment.questions.length}:</span>
+                        <span className="px-2 py-0.5 bg-purple-100 text-purple-900 rounded-md font-black">
+                          (+{Math.round((10 / activeAssignment.questions.length) * 10) / 10} Điểm / câu)
+                        </span>
                       </div>
 
                       <h4 className="text-base font-black text-slate-900 bg-amber-50 p-4 rounded-2xl border border-amber-200">
