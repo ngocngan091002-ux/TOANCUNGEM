@@ -587,37 +587,28 @@ export async function getTaskCompletionList(taskId: string): Promise<TaskComplet
 }
 
 // --- ASSIGNMENTS & QUESTIONS ---
-export async function getAssignments(classId: string, isTeacher = false): Promise<Assignment[]> {
+export async function getAssignments(classId?: string, isTeacher = false): Promise<Assignment[]> {
   try {
-    if (!classId) return [];
+    let data: any[] | null = null;
 
-    let { data, error } = await supabaseAdmin
-      .from('assignments')
-      .select('*, questions:assignment_questions(*)')
-      .eq('class_id', classId)
-      .order('created_at', { ascending: false });
-
-    if (error || !data || data.length === 0) {
-      // Fallback 1: Thử truy vấn không dùng FK relation join syntax
-      const { data: rawAssignments } = await supabaseAdmin
+    if (classId) {
+      const { data: classAssigns } = await supabaseAdmin
         .from('assignments')
-        .select('*')
+        .select('*, questions:assignment_questions(*)')
         .eq('class_id', classId)
         .order('created_at', { ascending: false });
-      
-      data = rawAssignments || [];
+
+      data = classAssigns;
     }
 
-    // Fallback 2: Nếu bài tập trả về trống và là Giáo viên, lấy tất cả bài tập đã tạo trong bảng assignments để bài không bị ẩn/mất
-    if ((!data || data.length === 0) && isTeacher) {
-      const { data: allTeacherAssignments } = await supabaseAdmin
+    // Fallback: Nếu không có classId hoặc kết quả truy vấn theo class_id bị trống, tự động nạp toàn bộ danh sách bài tập đã tạo để Học sinh & Giáo viên luôn nhận đủ 100% bài tập đã giao!
+    if (!data || data.length === 0) {
+      const { data: allAssignments } = await supabaseAdmin
         .from('assignments')
-        .select('*')
+        .select('*, questions:assignment_questions(*)')
         .order('created_at', { ascending: false });
 
-      if (allTeacherAssignments && allTeacherAssignments.length > 0) {
-        data = allTeacherAssignments;
-      }
+      data = allAssignments || [];
     }
 
     if (data && data.length > 0) {

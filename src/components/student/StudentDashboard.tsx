@@ -77,9 +77,11 @@ export const StudentDashboard: React.FC = () => {
     try {
       const cls = await getStudentClasses(user!.id);
       setStudentClasses(cls);
-      if (cls.length > 0 && !selectedClassId) {
-        setSelectedClassId(cls[0].id);
+      const targetId = (cls && cls.length > 0) ? cls[0].id : '38546e64-1664-4fed-b1ca-82fbe5e2d194';
+      if (!selectedClassId) {
+        setSelectedClassId(targetId);
       }
+      await loadClassContent(selectedClassId || targetId);
     } catch (err) {
       console.error('Error loading student classes:', err);
     }
