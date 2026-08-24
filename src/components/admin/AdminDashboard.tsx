@@ -385,7 +385,7 @@ export const AdminDashboard: React.FC = () => {
               NẠP DANH SÁCH HỌC SINH EXCEL / CSV DÀNH CHO ADMIN
             </h3>
             <p className="text-xs font-bold text-amber-700 mt-1">
-              Quản trị viên có thể nhập 1-Click file Excel danh sách học sinh vào bất kỳ Lớp Học nào trong hệ thống!
+              Quản trị viên có thể nhập file Excel danh sách học sinh vào bất kỳ Lớp Học nào trong hệ thống!
             </p>
           </div>
 
