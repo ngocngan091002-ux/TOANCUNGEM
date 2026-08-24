@@ -230,6 +230,16 @@ export const TeacherDashboard: React.FC = () => {
     }
   }, [selectedClass]);
 
+  useEffect(() => {
+    if (selectedClass && activeTab === 'assignments') {
+      getAssignments(selectedClass.id, true).then(a => {
+        if (a && a.length > 0) {
+          setAssignments(a);
+        }
+      });
+    }
+  }, [activeTab, selectedClass]);
+
   const loadTeacherClasses = async () => {
     try {
       const cls = await getTeacherClasses(user?.id || '');

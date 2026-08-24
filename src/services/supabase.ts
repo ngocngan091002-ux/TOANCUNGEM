@@ -589,13 +589,16 @@ export async function getTaskCompletionList(taskId: string): Promise<TaskComplet
 // --- ASSIGNMENTS & QUESTIONS ---
 export async function getAssignments(classId: string, isTeacher = false): Promise<Assignment[]> {
   try {
+    if (!classId) return [];
+
     let { data, error } = await supabaseAdmin
       .from('assignments')
-      .select('*, questions:assignment_questions(*), material:materials(*)')
+      .select('*, questions:assignment_questions(*)')
       .eq('class_id', classId)
       .order('created_at', { ascending: false });
 
     if (error || !data || data.length === 0) {
+      // Fallback 1: Thử truy vấn không dùng FK relation join syntax
       const { data: rawAssignments } = await supabaseAdmin
         .from('assignments')
         .select('*')
@@ -605,12 +608,25 @@ export async function getAssignments(classId: string, isTeacher = false): Promis
       data = rawAssignments || [];
     }
 
+    // Fallback 2: Nếu bài tập trả về trống và là Giáo viên, lấy tất cả bài tập đã tạo trong bảng assignments để bài không bị ẩn/mất
+    if ((!data || data.length === 0) && isTeacher) {
+      const { data: allTeacherAssignments } = await supabaseAdmin
+        .from('assignments')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (allTeacherAssignments && allTeacherAssignments.length > 0) {
+        data = allTeacherAssignments;
+      }
+    }
+
     if (data && data.length > 0) {
       const assignmentIds = data.map((a: any) => a.id);
       const { data: allQuestions } = await supabaseAdmin
         .from('assignment_questions')
         .select('*')
-        .in('assignment_id', assignmentIds);
+        .in('assignment_id', assignmentIds)
+        .order('order_index', { ascending: true });
 
       if (allQuestions && allQuestions.length > 0) {
         data = data.map((a: any) => {
