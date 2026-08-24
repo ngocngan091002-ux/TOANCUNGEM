@@ -82,6 +82,7 @@ export const TeacherDashboard: React.FC = () => {
   const [questionDifficulty, setQuestionDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium'); // QUIZ-10: Độ khó
   const [selectedQuestionType, setSelectedQuestionType] = useState<'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay'>('single_choice'); // QUIZ-01 -> QUIZ-06
   const [selectedViewAssignment, setSelectedViewAssignment] = useState<Assignment | null>(null);
+  const [targetGroup, setTargetGroup] = useState<string>('all');
 
   const handleDeleteAssignment = async (assignId: string, title: string) => {
     if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa bài tập tuần "${title}"?`)) return;
@@ -833,8 +834,8 @@ export const TeacherDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* CẤU HÌNH CÂU HỎI & CẤU HÌNH THỜI GIAN ĐẾM NGƯỢC */}
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 bg-purple-50/60 p-4 rounded-2xl border border-purple-200">
+            {/* CẤU HÌNH CÂU HỎI, ĐỐI TƯỢNG NHẬN BÀI & THỜI GIAN ĐẾM NGƯỢC */}
+            <div className="grid grid-cols-1 sm:grid-cols-6 gap-3 bg-purple-50/60 p-4 rounded-2xl border border-purple-200">
               <div>
                 <label className="text-[11px] font-bold text-purple-950 block mb-1">Tên Bài Tập Tuần:</label>
                 <input
@@ -844,6 +845,21 @@ export const TeacherDashboard: React.FC = () => {
                   onChange={(e) => setAssignTitle(e.target.value)}
                   className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold"
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-purple-950 block mb-1">Đối Tượng Giao Bài:</label>
+                <select
+                  value={targetGroup}
+                  onChange={(e) => setTargetGroup(e.target.value)}
+                  className="w-full p-2.5 bg-amber-100 border border-amber-400 rounded-xl text-xs font-black text-amber-950 shadow-sm"
+                >
+                  <option value="all">👥 Cả Lớp (Mặc định - 33 em)</option>
+                  <option value="group_1">🥇 Nhóm 1 (Nhóm Cần Phụ Đạo)</option>
+                  <option value="group_2">🥈 Nhóm 2 (Nhóm Ôn Luyện)</option>
+                  <option value="group_3">🥉 Nhóm 3 (Nhóm Khá Giỏi)</option>
+                  <option value="group_4">⭐ Nhóm 4 (Nhóm Siêu Trí Tuệ)</option>
+                </select>
               </div>
 
               <div>
