@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason, TaskCompletion } from '../../types';
 import { 
   getTeacherClasses, createClass, getClassMembers, 
@@ -21,6 +21,7 @@ import {
 
 export const TeacherDashboard: React.FC = () => {
   const { user } = useAuth();
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
   const [selectedClass, setSelectedClass] = useState<ClassItem | null>(null);
@@ -1539,37 +1540,47 @@ export const TeacherDashboard: React.FC = () => {
 
             <form onSubmit={handleBatchCreateTasks} className="space-y-4">
               <div className="p-3.5 rounded-2xl bg-amber-100/70 border-2 border-amber-300 space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-amber-700" />
-                    CHỌN NGÀY GIAO CHO CẢ LỚP:
-                  </label>
-                  <span className="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-xs">
-                    📅 {(() => {
-                      if (!batchDueDate) return '25/08/2026';
-                      const parts = batchDueDate.split('-');
-                      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
-                    })()}
-                  </span>
-                </div>
+                <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-amber-700" />
+                  CHỌN NGÀY GIAO CHO CẢ LỚP:
+                </label>
 
-                <div className="relative">
+                <div 
+                  onClick={() => {
+                    try {
+                      dateInputRef.current?.showPicker();
+                    } catch (e) {
+                      dateInputRef.current?.focus();
+                      dateInputRef.current?.click();
+                    }
+                  }}
+                  className="w-full p-3 bg-white hover:bg-amber-50 border-2 border-amber-300 hover:border-amber-500 rounded-2xl text-sm font-black text-slate-900 flex items-center justify-between shadow-xs transition-all cursor-pointer select-none active:scale-[0.99]"
+                  title="Bấm vào đây để chọn Ngày / Tháng / Năm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">📅</span>
+                    <span className="text-amber-950 font-black tracking-wide text-base">
+                      {(() => {
+                        if (!batchDueDate) return '25/08/2026';
+                        const parts = batchDueDate.split('-');
+                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
+                      })()}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 px-3 py-1.5 rounded-xl border border-amber-300 text-xs font-black shadow-xs">
+                    <span>Bấm Chọn Ngày 🗓️</span>
+                  </div>
+
                   <input
+                    ref={dateInputRef}
                     type="date"
                     required
                     value={batchDueDate}
                     onChange={(e) => setBatchDueDate(e.target.value)}
-                    onClick={(e) => {
-                      try {
-                        (e.target as any).showPicker?.();
-                      } catch (err) {}
-                    }}
-                    className="w-full p-3 bg-white border-2 border-amber-300 hover:border-amber-500 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-amber-500 cursor-pointer shadow-xs"
+                    className="sr-only pointer-events-none"
                   />
                 </div>
-                <p className="text-[10px] font-extrabold text-amber-900 italic text-right">
-                  Bấm trực tiếp vào ô để chọn ngày trên lịch 🗓️
-                </p>
               </div>
 
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
