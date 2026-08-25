@@ -664,7 +664,11 @@ export async function markTaskCompleted(taskId: string, studentId: string): Prom
     try {
       const { error } = await supabaseAdmin
         .from('task_completions')
-        .upsert([{ task_id: taskId, student_id: validStudentId }], { onConflict: 'task_id,student_id' });
+        .upsert([{ 
+          task_id: taskId, 
+          student_id: validStudentId,
+          completed_at: new Date().toISOString()
+        }], { onConflict: 'task_id,student_id' });
 
       if (error && !error.message.includes('unique constraint')) {
         console.warn('markTaskCompleted upsert warning:', error.message);
@@ -675,14 +679,65 @@ export async function markTaskCompleted(taskId: string, studentId: string): Prom
   }
 }
 
-export async function getTaskCompletionList(taskId: string): Promise<TaskCompletion[]> {
-  const { data, error } = await supabaseAdmin
+export async function getTaskCompletionList(taskId: string): Promise<any[]> {
+  const { data: completions, error } = await supabaseAdmin
     .from('task_completions')
     .select('*, student:profiles(*)')
-    .eq('task_id', taskId);
+    .eq('task_id', taskId)
+    .order('completed_at', { ascending: false });
+
+  if (error) {
+    console.warn('getTaskCompletionList error:', error.message);
+  }
+
+  const { data: taskData } = await supabaseAdmin.from('daily_tasks').select('*').eq('id', taskId).maybeSingle();
+  let submissionsMap: Record<string, any> = {};
+  let assignmentQuestions: any[] = [];
+
+  if (taskData) {
+    const { data: matchedAssignments } = await supabaseAdmin
+      .from('assignments')
+      .select('id, title, questions:assignment_questions(*)')
+      .eq('class_id', taskData.class_id);
+
+    const matchedAssign = matchedAssignments?.find(a => 
+      a.title.toLowerCase().trim() === taskData.title.toLowerCase().trim() ||
+      taskData.title.toLowerCase().includes(a.title.toLowerCase()) ||
+      a.title.toLowerCase().includes(taskData.title.toLowerCase())
+    );
+
+    if (matchedAssign) {
+      assignmentQuestions = matchedAssign.questions || [];
+      const { data: subs } = await supabaseAdmin
+        .from('assignment_submissions')
+        .select('*, student:profiles(*), responses:question_responses(*)')
+        .eq('assignment_id', matchedAssign.id);
+
+      if (subs) {
+        subs.forEach(s => {
+          submissionsMap[s.student_id] = s;
+        });
+      }
+    }
+  }
+
+  return (completions || []).map(c => {
+    const sub = submissionsMap[c.student_id];
+    return {
+      ...c,
+      submission: sub || null,
+      assignment_questions: assignmentQuestions
+    };
+  });
+}
+
+export async function updateTeacherRemark(submissionId: string, remark: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('assignment_submissions')
+    .update({ teacher_remark: remark })
+    .eq('id', submissionId);
 
   if (error) throw error;
-  return data || [];
 }
 
 // --- ASSIGNMENTS & QUESTIONS ---

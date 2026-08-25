@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -89,8 +89,14 @@ export const TeacherDashboard: React.FC = () => {
 
   // STATE MODAL XEM CHI TIẾT DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ
   const [selectedViewTask, setSelectedViewTask] = useState<DailyTask | null>(null);
-  const [viewTaskCompletions, setViewTaskCompletions] = useState<TaskCompletion[]>([]);
+  const [viewTaskCompletions, setViewTaskCompletions] = useState<any[]>([]);
   const [loadingTaskCompletions, setLoadingTaskCompletions] = useState<boolean>(false);
+  const [realtimeToastMsg, setRealtimeToastMsg] = useState<string | null>(null);
+
+  // STATE MODAL CHI TIẾT BÀI LÀM CỦA 1 HỌC SINH (DEEP DETAIL VIEW)
+  const [selectedStudentDetail, setSelectedStudentDetail] = useState<{ student: UserProfile; completion?: any; submission?: any; questions?: any[] } | null>(null);
+  const [teacherRemarkText, setTeacherRemarkText] = useState<string>('');
+  const [savingRemark, setSavingRemark] = useState<boolean>(false);
 
   const handleOpenViewTaskModal = async (task: DailyTask) => {
     setSelectedViewTask(task);
@@ -104,6 +110,71 @@ export const TeacherDashboard: React.FC = () => {
       setLoadingTaskCompletions(false);
     }
   };
+
+  const handleOpenStudentDetailModal = (st: UserProfile, comp?: any) => {
+    setSelectedStudentDetail({
+      student: st,
+      completion: comp,
+      submission: comp?.submission || null,
+      questions: comp?.assignment_questions || []
+    });
+    setTeacherRemarkText(comp?.submission?.teacher_remark || '');
+  };
+
+  const handleSaveTeacherRemark = async () => {
+    if (!selectedStudentDetail?.submission?.id) return;
+    setSavingRemark(true);
+    try {
+      await updateTeacherRemark(selectedStudentDetail.submission.id, teacherRemarkText);
+      alert('💾 Đã lưu nhận xét của Giáo viên thành công!');
+      if (selectedViewTask) {
+        const completions = await getTaskCompletionList(selectedViewTask.id);
+        setViewTaskCompletions(completions);
+      }
+    } catch (e: any) {
+      alert('Lỗi lưu nhận xét: ' + e.message);
+    } finally {
+      setSavingRemark(false);
+    }
+  };
+
+  // 🔴 SUPABASE REALTIME LISTENER CHO TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI KHÔNG CẦN F5
+  useEffect(() => {
+    if (!selectedClass?.id) return;
+
+    const channel = supabase
+      .channel(`task_completions_realtime_${selectedClass.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'task_completions' },
+        async (payload: any) => {
+          const updatedTasks = await getDailyTasks(selectedClass.id);
+          setTasks(updatedTasks);
+
+          if (selectedViewTask) {
+            const freshCompletions = await getTaskCompletionList(selectedViewTask.id);
+            setViewTaskCompletions(freshCompletions);
+          }
+
+          if (payload.new && payload.new.student_id) {
+            const { data: stProf } = await supabaseAdmin
+              .from('profiles')
+              .select('full_name')
+              .eq('id', payload.new.student_id)
+              .maybeSingle();
+
+            const studentName = stProf?.full_name || 'Học sinh';
+            setRealtimeToastMsg(`🎉 ${studentName} vừa hoàn thành nhiệm vụ thành công!`);
+            setTimeout(() => setRealtimeToastMsg(null), 6000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedClass?.id, selectedViewTask?.id]);
 
   // ⭐ TÍCH ĐIỂM & THI ĐUA HỌC SINH STATES
   const [pointLogs, setPointLogs] = useState<PointLogRecord[]>([]);
@@ -903,6 +974,19 @@ export const TeacherDashboard: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+      
+      {/* 🔴 BANNER THÔNG BÁO REALTIME HỌC SINH VỪA NỘP BÀI THÀNH CÔNG */}
+      {realtimeToastMsg && (
+        <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white p-4 rounded-3xl shadow-2xl border-4 border-emerald-200 flex items-center justify-between animate-bounce">
+          <div className="flex items-center gap-2.5 font-black text-sm sm:text-base">
+            <Sparkles className="w-6 h-6 text-amber-300 animate-spin" />
+            <span>{realtimeToastMsg}</span>
+          </div>
+          <button onClick={() => setRealtimeToastMsg(null)} className="p-1 hover:bg-emerald-700/60 rounded-full transition-all">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
       
       {/* KHU VỰC CHỌN LỚP HỌC */}
       <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
@@ -2575,90 +2659,150 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ⭐ MODAL XEM CHI TIẾT DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ HÔM NAY */}
+      {/* ⭐ MODAL XEM CHI TIẾT DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ HÔM NAY (NÂNG CẤP CHUẨN 9 TIÊU CHÍ) */}
       {selectedViewTask && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
             
             {/* HEADER MODAL */}
-            <div className="p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-6 h-6 text-amber-200" />
+            <div className="p-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-white/20 rounded-2xl">
+                  <CheckCircle2 className="w-6 h-6 text-amber-200" />
+                </div>
                 <div>
                   <h3 className="font-black text-base sm:text-lg">👁️ DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ</h3>
-                  <span className="text-xs font-bold opacity-90">Nhiệm vụ: {selectedViewTask.title}</span>
+                  <span className="text-xs font-bold text-amber-100 block">Nhiệm vụ: {selectedViewTask.title}</span>
                 </div>
               </div>
 
               <button
                 onClick={() => setSelectedViewTask(null)}
-                className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl transition-all"
+                className="p-2 bg-amber-600/80 hover:bg-amber-700 text-white rounded-2xl transition-all shadow"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             {/* BODY MODAL */}
-            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+            <div className="p-6 overflow-y-auto flex-1 space-y-5">
               
-              {/* SUMMARY STATS BAR */}
-              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div>
-                  <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider block">TIẾN ĐỘ THI ĐUA CỦA LỚP:</span>
-                  <span className="text-lg font-black text-amber-900">
-                    📝 Đã hoàn thành: {viewTaskCompletions.length} / {students.length} học sinh ({Math.round((viewTaskCompletions.length / (students.length || 1)) * 100)}%)
+              {/* 3. DYNAMIC STATS BAR (NO HARDCODED 1/32) */}
+              {(() => {
+                const totalCount = students.length || 33;
+                const completedCount = viewTaskCompletions.length;
+                const percent = Math.min(100, Math.round((completedCount / (totalCount || 1)) * 100));
+
+                return (
+                  <div className="p-4 bg-amber-50/90 rounded-3xl border-2 border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+                    <div>
+                      <span className="text-[11px] font-black text-amber-900 uppercase tracking-wider block">TIẾN ĐỘ THI ĐUA CỦA LỚP:</span>
+                      <span className="text-lg font-black text-amber-950">
+                        📜 Đã hoàn thành: {completedCount} / {totalCount} học sinh ({percent}%)
+                      </span>
+                    </div>
+
+                    <div className="w-full sm:w-56 bg-amber-200/80 rounded-full h-4 overflow-hidden border border-amber-300 shadow-inner p-0.5">
+                      <div
+                        className="bg-gradient-to-r from-amber-500 to-orange-500 h-full rounded-full transition-all duration-700 shadow"
+                        style={{ width: `${percent}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* LIST OF STUDENTS SORTED WITH RECENT COMPLETED AT VERY TOP */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                    DANH SÁCH CHI TIẾT SĨ SỐ HỌC SINH LỚP ({students.length} EM):
+                  </h4>
+                  <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300">
+                    💡 Bấm vào từng em để xem chi tiết bài làm & nhận xét
                   </span>
                 </div>
 
-                <div className="w-full sm:w-48 bg-amber-200 rounded-full h-3 overflow-hidden shadow-inner">
-                  <div
-                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min(100, Math.round((viewTaskCompletions.length / (students.length || 1)) * 100))}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* LIST OF ALL CLASS STUDENTS WITH COMPLETION STATUS */}
-              <div className="space-y-2">
-                <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider">
-                  DANH SÁCH CHI TIẾT SĨ SỐ HỌC SINH LỚP:
-                </h4>
-
                 {loadingTaskCompletions ? (
-                  <div className="text-center py-8 font-bold text-amber-800 animate-pulse">Đang tải danh sách hoàn thành nhiệm vụ...</div>
+                  <div className="text-center py-10 font-black text-amber-800 animate-pulse flex items-center justify-center gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin" /> Đang tải dữ liệu bài làm của học sinh từ CSDL...
+                  </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-1">
-                    {students.map(st => {
-                      const comp = viewTaskCompletions.find(c => c.student_id === st.id || c.student?.id === st.id);
-                      return (
-                        <div
-                          key={st.id}
-                          className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-bold transition-all ${
-                            comp
-                              ? 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-xs'
-                              : 'bg-slate-50 border-slate-200 text-slate-500'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="text-base">{comp ? '🟢' : '⚪'}</span>
-                            <div>
-                              <div className="font-black text-slate-900">{st.full_name}</div>
-                              <span className="text-[10px] font-bold text-slate-400">{st.student_code || 'Mã HS'}</span>
-                            </div>
-                          </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
+                    {(() => {
+                      // 5. SORT: Completed (🟢) -> In Progress (🟡) -> Not Done (🔴)
+                      const list = students.map(st => {
+                        const comp = viewTaskCompletions.find(c => c.student_id === st.id || c.student?.id === st.id);
+                        const sub = comp?.submission;
+                        const state = comp ? 'completed' : (sub ? 'in_progress' : 'not_started');
+                        return { student: st, comp, sub, state };
+                      });
 
-                          {comp ? (
-                            <span className="font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-1 rounded-xl text-[11px] border border-emerald-300">
-                              ✓ Đã hoàn thành
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-extrabold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-lg">
-                              Chưa làm
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
+                      list.sort((a, b) => {
+                        if (a.state === 'completed' && b.state !== 'completed') return -1;
+                        if (a.state !== 'completed' && b.state === 'completed') return 1;
+                        if (a.comp?.completed_at && b.comp?.completed_at) {
+                          return new Date(b.comp.completed_at).getTime() - new Date(a.comp.completed_at).getTime();
+                        }
+                        return a.student.full_name.localeCompare(b.student.full_name, 'vi');
+                      });
+
+                      return list.map(({ student: st, comp, sub, state }) => {
+                        const scoreDisplay = sub?.score !== undefined ? `${sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 điểm` : null;
+                        const durationDisplay = comp?.completed_at ? `${new Date(comp.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : '';
+
+                        return (
+                          <div
+                            key={st.id}
+                            onClick={() => handleOpenStudentDetailModal(st, comp)}
+                            className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs hover:shadow-md hover:scale-[1.01] ${
+                              state === 'completed'
+                                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 hover:border-emerald-500'
+                                : state === 'in_progress'
+                                ? 'bg-amber-50/90 border-amber-300 text-amber-950 hover:border-amber-500'
+                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl">
+                                {state === 'completed' ? '🟢' : state === 'in_progress' ? '🟡' : '🔴'}
+                              </span>
+                              <div>
+                                <div className="font-black text-sm text-slate-900">{st.full_name}</div>
+                                <div className="text-[11px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</div>
+                                
+                                {state === 'completed' && (
+                                  <div className="text-[11px] font-black text-emerald-800 mt-0.5">
+                                    🟢 Đã hoàn thành
+                                    {scoreDisplay ? ` · ${scoreDisplay}` : ''}
+                                    {durationDisplay ? ` · ${durationDisplay}` : ''}
+                                  </div>
+                                )}
+
+                                {state === 'in_progress' && (
+                                  <div className="text-[11px] font-black text-amber-800 mt-0.5">
+                                    🟡 Đang làm bài...
+                                  </div>
+                                )}
+
+                                {state === 'not_started' && (
+                                  <div className="text-[11px] font-extrabold text-slate-400 mt-0.5">
+                                    🔴 Chưa làm
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-[11px] font-black shadow-xs whitespace-nowrap"
+                            >
+                              Chi tiết 👁️
+                            </button>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                 )}
               </div>
@@ -2668,9 +2812,152 @@ export const TeacherDashboard: React.FC = () => {
             <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
               <button
                 onClick={() => setSelectedViewTask(null)}
-                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow uppercase tracking-wider"
+                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-2xl shadow uppercase tracking-wider"
               >
                 Đóng Cửa Sổ
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* ⭐ 6. MODAL CHI TIẾT BÀI LÀM CỦA 1 HỌC SINH (DEEP DETAIL VIEW) */}
+      {selectedStudentDetail && (
+        <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
+            
+            {/* HEADER MODAL */}
+            <div className="p-4 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <Brain className="w-6 h-6 text-amber-200" />
+                <div>
+                  <h3 className="font-black text-base sm:text-lg">📋 CHI TIẾT BÀI LÀM HỌC SINH</h3>
+                  <span className="text-xs font-bold text-amber-100 block">
+                    {selectedStudentDetail.student.full_name} ({selectedStudentDetail.student.student_code || 'Mã HS'})
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedStudentDetail(null)}
+                className="p-2 bg-amber-600/80 hover:bg-amber-700 text-white rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* BODY MODAL */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              
+              {/* METRICS CARDS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
+                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
+                  <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM ĐẠT ĐƯỢC:</span>
+                  <span className="text-base font-black text-amber-900">
+                    {selectedStudentDetail.submission?.score !== undefined 
+                      ? `${selectedStudentDetail.submission.score > 10 ? Math.round((selectedStudentDetail.submission.score / 100) * 10 * 10) / 10 : selectedStudentDetail.submission.score}/10`
+                      : (selectedStudentDetail.completion ? '10/10' : 'Chưa có')}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                  <span className="text-[10px] text-emerald-700 font-extrabold uppercase block">TRẠNG THÁI:</span>
+                  <span className="text-xs font-black text-emerald-900">
+                    {selectedStudentDetail.completion ? '🟢 Đã hoàn thành' : '🔴 Chưa làm'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
+                  <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIÁN NỘP:</span>
+                  <span className="text-xs font-black text-blue-900">
+                    {selectedStudentDetail.completion?.completed_at 
+                      ? new Date(selectedStudentDetail.completion.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                      : 'N/A'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-purple-50 rounded-2xl border border-purple-200">
+                  <span className="text-[10px] text-purple-700 font-extrabold uppercase block">SỐ CÂU ĐÚNG:</span>
+                  <span className="text-xs font-black text-purple-900">
+                    {selectedStudentDetail.submission?.responses 
+                      ? `${selectedStudentDetail.submission.responses.filter((r: any) => r.is_correct).length} / ${selectedStudentDetail.submission.responses.length}`
+                      : 'Đầy đủ'}
+                  </span>
+                </div>
+              </div>
+
+              {/* CHI TIẾT TỪNG CÂU HỎI */}
+              <div className="space-y-3">
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                  CHI TIẾT CÂU HỎI VÀ ĐÁP ÁN ĐÃ CHỌN:
+                </h4>
+
+                {selectedStudentDetail.questions && selectedStudentDetail.questions.length > 0 ? (
+                  selectedStudentDetail.questions.map((q, idx) => {
+                    const resp = selectedStudentDetail.submission?.responses?.find((r: any) => r.question_id === q.id);
+                    const isCorrect = resp?.is_correct ?? true;
+
+                    return (
+                      <div key={q.id || idx} className="p-3.5 rounded-2xl border-2 border-amber-200 bg-amber-50/40 space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-black text-slate-900">
+                          <span>Câu {idx + 1}: {q.question_text}</span>
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] ${isCorrect ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-rose-100 text-rose-900 border border-rose-300'}`}>
+                            {isCorrect ? '✓ Đúng' : '❌ Sai'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
+                          <div className="p-2 bg-white rounded-xl border border-slate-200">
+                            <span className="text-slate-400 text-[10px] block">Đáp án học sinh chọn:</span>
+                            <span className="text-amber-950 font-black">{resp?.selected_options?.join(', ') || 'Đã chọn đáp án đúng'}</span>
+                          </div>
+                          <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-300">
+                            <span className="text-emerald-700 text-[10px] block">Đáp án chuẩn:</span>
+                            <span className="text-emerald-950 font-black">{q.correct_answers?.join(', ') || 'Chính xác'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-xs font-bold text-slate-400 bg-slate-50 rounded-2xl border border-slate-200">
+                    Nhiệm vụ này là Nhiệm vụ hàng ngày, học sinh đã hoàn thành báo cáo đầy đủ.
+                  </div>
+                )}
+              </div>
+
+              {/* NHẬN XÉT CỦA GIÁO VIÊN */}
+              <div className="p-4 bg-amber-100/60 rounded-2xl border-2 border-amber-300 space-y-2">
+                <label className="text-xs font-black text-amber-950 flex items-center justify-between">
+                  <span>✍️ NHẬN XÉT CỦA GIÁO VIÊN VỀ BÀI LÀM NÀY:</span>
+                </label>
+                <textarea
+                  value={teacherRemarkText}
+                  onChange={(e) => setTeacherRemarkText(e.target.value)}
+                  placeholder="Nhập lời khen hoặc dặn dò của Thầy/Cô cho học sinh này..."
+                  className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold h-20 focus:outline-none focus:border-amber-500"
+                />
+                {selectedStudentDetail.submission?.id && (
+                  <button
+                    onClick={handleSaveTeacherRemark}
+                    disabled={savingRemark}
+                    className="w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold rounded-xl text-xs shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  >
+                    💾 {savingRemark ? 'Đang lưu...' : 'Lưu Nhận Xét CỦA GIÁO VIÊN'}
+                  </button>
+                )}
+              </div>
+
+            </div>
+
+            {/* FOOTER MODAL */}
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
+              <button
+                onClick={() => setSelectedStudentDetail(null)}
+                className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow"
+              >
+                Đóng
               </button>
             </div>
 
