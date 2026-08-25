@@ -987,7 +987,6 @@ export const TeacherDashboard: React.FC = () => {
           { id: 'assignments', label: '📝 Bài Tập Tuần' },
           { id: 'attendance', label: '⭐ Tích Điểm & Thi Đua' },
           { id: 'groups', label: '👥 Chia Nhóm Lớp' },
-          { id: 'class_settings', label: '⚙️ Cấu Hình Lớp & TKB' },
           { id: 'materials', label: '📖 Upload Học Liệu' },
           { id: 'games', label: '🎮 Tạo Trò Chơi' },
           { id: 'ai', label: '🧠 AI Hỗ Trợ Giáo Viên' },
@@ -1928,57 +1927,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* CLAS-07, CLAS-08, CLAS-09, CLAS-10: CẤU HÌNH LỚP */}
-      {activeTab === 'class_settings' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-              <UserPlus className="w-5 h-5 text-blue-600" /> PHÂN CÔNG ĐỒNG GIÁO VIÊN (CO-TEACHER)
-            </h3>
-            <form onSubmit={handleAddCoTeacher} className="space-y-3">
-              <input
-                type="email"
-                required
-                placeholder="Nhập Email Giáo viên muốn mời cùng quản lý lớp..."
-                value={coTeacherEmail}
-                onChange={(e) => setCoTeacherEmail(e.target.value)}
-                className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs font-bold"
-              />
-              <button
-                type="submit"
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2.5 rounded-2xl shadow text-xs flex items-center justify-center gap-1"
-              >
-                <UserPlus className="w-4 h-4" /> Mời Đồng Giáo Viên Cùng Chấm Bài
-              </button>
-            </form>
-          </div>
 
-          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-            <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-amber-600" /> THỜI KHÓA BIỂU & TRẠNG THÁI LỚP
-            </h3>
-            
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-700 block">Lịch Học Cố Định Trong Tuần:</label>
-              <textarea
-                value={classSchedule}
-                onChange={(e) => setClassSchedule(e.target.value)}
-                className="w-full p-2.5 bg-amber-50 border border-amber-300 rounded-2xl text-xs font-bold h-24"
-              />
-            </div>
-
-            <div className="pt-2 flex items-center gap-3">
-              <button
-                onClick={handleToggleArchiveClass}
-                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold py-2.5 rounded-2xl text-xs flex items-center justify-center gap-1 border border-slate-300"
-              >
-                <Archive className="w-4 h-4 text-slate-600" />
-                {selectedClass?.is_archived ? 'Khôi Phục Lớp Học' : 'Lưu Trữ Lớp Học (Archive)'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 3. UPLOAD HỌC LIỆU */}
       {activeTab === 'materials' && (
