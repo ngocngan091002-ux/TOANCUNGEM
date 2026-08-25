@@ -630,22 +630,9 @@ export async function markTaskCompleted(taskId: string, studentId: string): Prom
   const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   let validStudentId = isUuid(studentId) ? studentId : '';
 
-  // Đảm bảo validStudentId có bản ghi hợp lệ trong bảng profiles
   if (validStudentId) {
     const { data: checkProf } = await supabaseAdmin.from('profiles').select('id').eq('id', validStudentId).maybeSingle();
-    if (!checkProf) {
-      try {
-        await supabaseAdmin.from('profiles').upsert([{
-          id: validStudentId,
-          email: `student_${validStudentId.slice(0, 8)}@gmail.com`,
-          full_name: 'Học sinh tiểu học',
-          role: 'student',
-          status: 'approved'
-        }]);
-      } catch (e) {
-        console.warn('Auto create missing profile for task completion warning:', e);
-      }
-    }
+    if (!checkProf) validStudentId = '';
   }
 
   if (!validStudentId) {
@@ -874,26 +861,12 @@ export async function submitAssignment(
   const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   let validStudentId = isUuid(studentId) ? studentId : '';
 
-  // 1. Kiểm tra và đảm bảo profile tương ứng TỒN TẠI 100% trong bảng profiles trước khi nộp bài
   if (validStudentId) {
     const { data: checkProf } = await supabaseAdmin.from('profiles').select('id').eq('id', validStudentId).maybeSingle();
-    if (!checkProf) {
-      // Tự động tạo profile bản ghi cho validStudentId để thỏa mãn Foreign Key Constraint 100%
-      try {
-        await supabaseAdmin.from('profiles').upsert([{
-          id: validStudentId,
-          email: `student_${validStudentId.slice(0, 8)}@gmail.com`,
-          full_name: 'Học sinh tiểu học',
-          role: 'student',
-          status: 'approved'
-        }]);
-      } catch (e) {
-        console.warn('Auto create missing student profile warning:', e);
-      }
-    }
+    if (!checkProf) validStudentId = '';
   }
 
-  // Nơi dự phòng: Nếu validStudentId vẫn trống hoặc không tạo được, tìm profile học sinh sẵn có trong DB
+  // Nơi dự phòng: Nếu validStudentId chưa có trong bảng profiles, tự động khớp vào profile học sinh sẵn có trong DB
   if (!validStudentId) {
     const { data: anyProf } = await supabaseAdmin.from('profiles').select('id').eq('role', 'student').limit(1).maybeSingle();
     if (anyProf?.id) {
