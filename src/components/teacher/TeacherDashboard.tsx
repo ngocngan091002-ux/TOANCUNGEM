@@ -1455,18 +1455,42 @@ export const TeacherDashboard: React.FC = () => {
             </div>
 
             <form onSubmit={handleBatchCreateTasks} className="space-y-4">
-              <div className="p-3.5 rounded-2xl bg-amber-100/70 border-2 border-amber-300 space-y-1.5">
-                <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-amber-700" />
-                  CHỌN NGÀY GIAO CHO CẢ LOẠT:
+              <div className="p-3.5 rounded-2xl bg-amber-100/70 border-2 border-amber-300 space-y-2">
+                <label className="text-xs font-black text-amber-950 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-700" />
+                    CHỌN NGÀY GIAO CHO CẢ LỚP:
+                  </span>
+                  {batchDueDate && (
+                    <span className="px-2.5 py-0.5 bg-amber-200 text-amber-950 text-[11px] font-black rounded-lg border border-amber-400">
+                      📅 {(() => {
+                        const parts = batchDueDate.split('-');
+                        return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
+                      })()}
+                    </span>
+                  )}
                 </label>
-                <input
-                  type="date"
-                  required
-                  value={batchDueDate}
-                  onChange={(e) => setBatchDueDate(e.target.value)}
-                  className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
-                />
+
+                <div className="relative">
+                  <input
+                    type="date"
+                    required
+                    lang="vi-VN"
+                    value={batchDueDate}
+                    onChange={(e) => setBatchDueDate(e.target.value)}
+                    className="w-full p-2.5 bg-white border-2 border-amber-300 rounded-xl text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="text-[11px] font-extrabold text-amber-900 flex items-center justify-between px-1">
+                  <span>Thứ tự hiển thị: <strong>Ngày / Tháng / Năm</strong></span>
+                  <span className="text-emerald-800 font-black bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300">
+                    {batchDueDate ? (() => {
+                      const parts = batchDueDate.split('-');
+                      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
+                    })() : '25/08/2026'}
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
