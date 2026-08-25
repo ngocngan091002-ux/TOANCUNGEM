@@ -648,18 +648,42 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
   return data;
 }
 
-export async function markTaskCompleted(taskId: string, studentId: string): Promise<void> {
+export async function markTaskCompleted(
+  taskId: string, 
+  studentId: string,
+  email?: string,
+  studentCode?: string
+): Promise<void> {
   const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-  let validStudentId = isUuid(studentId) ? studentId : '';
+  let validStudentId = '';
 
-  if (validStudentId) {
-    const { data: checkProf } = await supabaseAdmin.from('profiles').select('id').eq('id', validStudentId).maybeSingle();
-    if (!checkProf) validStudentId = '';
+  if (isUuid(studentId)) {
+    const { data: checkProf } = await supabaseAdmin.from('profiles').select('id, role').eq('id', studentId).maybeSingle();
+    if (checkProf && checkProf.role === 'student') {
+      validStudentId = checkProf.id;
+    }
   }
 
-  if (!validStudentId) {
-    const { data: anyProf } = await supabaseAdmin.from('profiles').select('id').eq('role', 'student').limit(1).maybeSingle();
-    if (anyProf?.id) validStudentId = anyProf.id;
+  if (!validStudentId && email && email.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data: byEmail } = await supabaseAdmin.from('profiles').select('id, role').eq('email', cleanEmail).maybeSingle();
+    if (byEmail && byEmail.role === 'student') {
+      validStudentId = byEmail.id;
+      if (isUuid(studentId) && byEmail.id !== studentId) {
+        try {
+          await supabaseAdmin.from('profiles').update({ id: studentId }).eq('id', byEmail.id);
+          validStudentId = studentId;
+        } catch (e) {}
+      }
+    }
+  }
+
+  if (!validStudentId && studentCode && studentCode.trim()) {
+    const cleanCode = studentCode.trim().toUpperCase();
+    const { data: byCode } = await supabaseAdmin.from('profiles').select('id, role').eq('student_code', cleanCode).maybeSingle();
+    if (byCode && byCode.role === 'student') {
+      validStudentId = byCode.id;
+    }
   }
 
   if (validStudentId) {
@@ -926,31 +950,45 @@ export async function getClassProgressSummary(classId: string): Promise<StudentP
 export async function submitAssignment(
   assignmentId: string,
   studentId: string,
-  responses: { question_id: string; selected_options: string[]; time_spent_seconds: number; is_correct: boolean }[]
+  responses: { question_id: string; selected_options: string[]; time_spent_seconds: number; is_correct: boolean }[],
+  email?: string,
+  studentCode?: string
 ): Promise<AssignmentSubmission> {
   const totalQuestions = responses.length || 1;
   const correctCount = responses.filter(r => r.is_correct).length;
-  // Tính điểm trên thang điểm 10 chuẩn, sai câu nào trừ điểm câu đó (10 / tổng số câu * số câu đúng)
   const rawScore = (correctCount / totalQuestions) * 10;
   const totalScore = Math.round(rawScore * 10) / 10;
   const totalTime = responses.reduce((sum, r) => sum + r.time_spent_seconds, 0);
 
   const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
-  let validStudentId = isUuid(studentId) ? studentId : '';
+  let validStudentId = '';
 
-  if (validStudentId) {
-    const { data: checkProf } = await supabaseAdmin.from('profiles').select('id').eq('id', validStudentId).maybeSingle();
-    if (!checkProf) validStudentId = '';
+  if (isUuid(studentId)) {
+    const { data: checkProf } = await supabaseAdmin.from('profiles').select('id, role').eq('id', studentId).maybeSingle();
+    if (checkProf && checkProf.role === 'student') {
+      validStudentId = checkProf.id;
+    }
   }
 
-  // Nơi dự phòng: Nếu validStudentId chưa có trong bảng profiles, tự động khớp vào profile học sinh sẵn có trong DB
-  if (!validStudentId) {
-    const { data: anyProf } = await supabaseAdmin.from('profiles').select('id').eq('role', 'student').limit(1).maybeSingle();
-    if (anyProf?.id) {
-      validStudentId = anyProf.id;
-    } else {
-      const { data: firstProf } = await supabaseAdmin.from('profiles').select('id').limit(1).single();
-      if (firstProf?.id) validStudentId = firstProf.id;
+  if (!validStudentId && email && email.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    const { data: byEmail } = await supabaseAdmin.from('profiles').select('id, role').eq('email', cleanEmail).maybeSingle();
+    if (byEmail && byEmail.role === 'student') {
+      validStudentId = byEmail.id;
+      if (isUuid(studentId) && byEmail.id !== studentId) {
+        try {
+          await supabaseAdmin.from('profiles').update({ id: studentId }).eq('id', byEmail.id);
+          validStudentId = studentId;
+        } catch (e) {}
+      }
+    }
+  }
+
+  if (!validStudentId && studentCode && studentCode.trim()) {
+    const cleanCode = studentCode.trim().toUpperCase();
+    const { data: byCode } = await supabaseAdmin.from('profiles').select('id, role').eq('student_code', cleanCode).maybeSingle();
+    if (byCode && byCode.role === 'student') {
+      validStudentId = byCode.id;
     }
   }
 

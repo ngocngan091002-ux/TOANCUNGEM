@@ -222,7 +222,7 @@ export const StudentDashboard: React.FC = () => {
 
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
       confetti({ particleCount: 80, spread: 60 });
-      await markTaskCompleted(taskId, user!.id);
+      await markTaskCompleted(taskId, user!.id, user?.email, user?.student_code);
     } catch (err: any) {
       console.warn('handleCompleteTask exception handled:', err);
     }
@@ -266,7 +266,7 @@ export const StudentDashboard: React.FC = () => {
         };
       });
 
-      await submitAssignment(activeAssignment.id, user!.id, responses);
+      await submitAssignment(activeAssignment.id, user!.id, responses, user?.email, user?.student_code);
 
       confetti({ particleCount: 100, spread: 80 });
       alert('🎉 Chúc mừng em đã hoàn thành bài tập! Điểm số và thời gian làm bài đã được ghi nhận.');
