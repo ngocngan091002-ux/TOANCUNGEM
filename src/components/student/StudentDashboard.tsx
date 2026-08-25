@@ -407,9 +407,9 @@ export const StudentDashboard: React.FC = () => {
             <div className="space-y-2">
               <h2 className="text-2xl sm:text-3xl font-black">
                 {(() => {
-                  const isCodeName = user?.full_name && (user.full_name.toUpperCase().startsWith('HS2026_') || user.full_name.toUpperCase().startsWith('HS20'));
-                  const matchedEntry = isCodeName ? leaderboard.find(lb => lb.student_id === user?.id || (lb.full_name && !lb.full_name.toUpperCase().startsWith('HS20'))) : null;
-                  const displayName = matchedEntry?.full_name || user?.full_name || 'Học sinh';
+                  const isCodeOrShort = !user?.full_name || user.full_name.toUpperCase().startsWith('HS2026_') || user.full_name.toUpperCase().startsWith('HS20') || user.full_name.split(' ').length < 2;
+                  const matchedEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.email === user?.email || (lb.full_name && lb.full_name.split(' ').length >= 2 && !lb.full_name.toUpperCase().startsWith('HS20')));
+                  const displayName = (isCodeOrShort && matchedEntry?.full_name) ? matchedEntry.full_name : (user?.full_name || 'Học sinh');
 
                   return user?.role === 'student' ? (
                     <>Chào mừng em, <span className="text-white underline decoration-amber-300">{displayName}</span>! 🌟</>

@@ -39,24 +39,34 @@ export async function getCurrentProfile(userId: string): Promise<UserProfile | n
 
 export async function getProfileByIdOrEmail(userId: string, email?: string): Promise<UserProfile | null> {
   try {
-    const { data: byId } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (byId) return byId as UserProfile;
-
+    // 1. Ưu tiên tra cứu theo Email hoặc Mã Học Sinh để lấy Họ và Tên thực tế đầy đủ nhất trong DB
     if (email) {
       const cleanEmail = email.trim().toLowerCase();
       const { data: byEmail } = await supabaseAdmin
         .from('profiles')
         .select('*')
-        .eq('email', cleanEmail)
-        .single();
+        .or(`email.eq.${cleanEmail},student_code.ilike.${cleanEmail}`)
+        .maybeSingle();
 
-      if (byEmail) return byEmail as UserProfile;
+      if (byEmail && byEmail.full_name) {
+        if (byEmail.id !== userId) {
+          try {
+            await supabaseAdmin.from('profiles').update({ id: userId }).eq('email', cleanEmail);
+            byEmail.id = userId;
+          } catch (e) {}
+        }
+        return byEmail as UserProfile;
+      }
     }
+
+    // 2. Tìm theo ID
+    const { data: byId } = await supabaseAdmin
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (byId) return byId as UserProfile;
 
     return null;
   } catch {

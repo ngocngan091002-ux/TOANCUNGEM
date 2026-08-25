@@ -65,22 +65,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Tự động kiểm tra nếu full_name bị dán mã học sinh (VD: HS2026_02 hoặc hs2026_02), tra cứu Họ tên thực tế trong DB
-      if (profile && (profile.full_name.toUpperCase().startsWith('HS2026_') || profile.full_name.toUpperCase().startsWith('HS20'))) {
-        const { data: realProf } = await supabaseAdmin
+      // 3. Luôn kiểm tra CSDL để nạp đúng Họ và Tên chuẩn 100% của học sinh (VD: Trần Dương Thanh Ngọc, Nguyễn Lâm Lan Anh)
+      if (email && profile) {
+        const { data: dbReal } = await supabaseAdmin
           .from('profiles')
-          .select('full_name')
-          .or(`student_code.ilike.${profile.full_name},email.eq.${email}`)
-          .not('full_name', 'ilike', 'HS20%')
+          .select('full_name, student_code')
+          .or(`email.eq.${email},student_code.ilike.${email}`)
           .maybeSingle();
 
-        if (realProf && realProf.full_name) {
-          profile.full_name = realProf.full_name;
-          try {
-            await supabaseAdmin.from('profiles').update({ full_name: realProf.full_name }).eq('id', profile.id);
-          } catch (e) {
-            console.warn('Update real student name error:', e);
-          }
+        if (dbReal && dbReal.full_name) {
+          profile.full_name = dbReal.full_name;
+          if (dbReal.student_code) profile.student_code = dbReal.student_code;
         }
       }
 
