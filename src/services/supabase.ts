@@ -577,24 +577,26 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
     .select('task_id, student_id')
     .in('task_id', taskIds);
 
+  const { data: studentProfiles } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .eq('role', 'student');
+  const validStudentSet = new Set((studentProfiles || []).map(p => p.id));
+
   const { count: totalStudentsCount } = await supabaseAdmin
     .from('class_members')
     .select('*', { count: 'exact', head: true })
     .eq('class_id', classId);
 
-  const { count: totalProfilesCount } = await supabaseAdmin
-    .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .eq('role', 'student');
-
   const finalTotalStudents = (totalStudentsCount && totalStudentsCount > 0)
     ? totalStudentsCount
-    : (totalProfilesCount || 33);
+    : ((studentProfiles && studentProfiles.length > 0) ? studentProfiles.length : 32);
 
   return tasks.map(t => {
-    const taskCompletions = completions?.filter(c => c.task_id === t.id) || [];
-    const uniqueStudentIds = new Set(taskCompletions.map(c => c.student_id));
-    const isCompleted = studentId ? taskCompletions.some(c => c.student_id === studentId) : false;
+    const rawCompletions = completions?.filter(c => c.task_id === t.id) || [];
+    const validCompletions = rawCompletions.filter(c => validStudentSet.has(c.student_id));
+    const uniqueStudentIds = new Set(validCompletions.map(c => c.student_id));
+    const isCompleted = studentId ? validCompletions.some(c => c.student_id === studentId) : false;
 
     return {
       ...t,

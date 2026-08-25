@@ -2687,10 +2687,18 @@ export const TeacherDashboard: React.FC = () => {
             {/* BODY MODAL */}
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
               
-              {/* 3. DYNAMIC STATS BAR (NO HARDCODED 1/32) */}
+              {/* 3. DYNAMIC STATS BAR (COMPUTED EXCLUSIVELY FROM CLASS STUDENTS) */}
               {(() => {
-                const totalCount = students.length || 33;
-                const completedCount = viewTaskCompletions.length;
+                const totalCount = students.length || 32;
+                const validCompletedList = viewTaskCompletions.filter(c =>
+                  students.some(st =>
+                    st.id === c.student_id ||
+                    st.id === c.student?.id ||
+                    (st.email && st.email === c.student?.email) ||
+                    (st.student_code && st.student_code === c.student?.student_code)
+                  )
+                );
+                const completedCount = validCompletedList.length;
                 const percent = Math.min(100, Math.round((completedCount / (totalCount || 1)) * 100));
 
                 return (
@@ -2732,7 +2740,12 @@ export const TeacherDashboard: React.FC = () => {
                     {(() => {
                       // 5. SORT: Completed (🟢) -> In Progress (🟡) -> Not Done (🔴)
                       const list = students.map(st => {
-                        const comp = viewTaskCompletions.find(c => c.student_id === st.id || c.student?.id === st.id);
+                        const comp = viewTaskCompletions.find(c =>
+                          c.student_id === st.id ||
+                          c.student?.id === st.id ||
+                          (c.student?.email && c.student?.email === st.email) ||
+                          (c.student?.student_code && c.student?.student_code === st.student_code)
+                        );
                         const sub = comp?.submission;
                         const state = comp ? 'completed' : (sub ? 'in_progress' : 'not_started');
                         return { student: st, comp, sub, state };
