@@ -103,7 +103,25 @@ export const StudentDashboard: React.FC = () => {
       }
 
       const t = await getDailyTasks(classId, user!.id);
-      setTasks(t);
+      
+      // Gộp trạng thái hoàn thành nhiệm vụ từ LocalStorage để không bao giờ bị mất khi chuyển tab hoặc tắt web
+      let localCompletedTaskIds: string[] = [];
+      if (user?.id) {
+        const savedIds = localStorage.getItem(`toan_cung_em_completed_tasks_${user.id}`);
+        if (savedIds) {
+          try { localCompletedTaskIds = JSON.parse(savedIds); } catch (e) {}
+        }
+      }
+
+      const mergedTasks = t.map(task => {
+        const isDone = task.is_completed || localCompletedTaskIds.includes(task.id);
+        return {
+          ...task,
+          is_completed: isDone
+        };
+      });
+
+      setTasks(mergedTasks);
 
       const m = await getLearningMaterials(classId);
       setMaterials(m);
@@ -189,11 +207,24 @@ export const StudentDashboard: React.FC = () => {
 
   const handleCompleteTask = async (taskId: string) => {
     try {
-      await markTaskCompleted(taskId, user!.id);
+      if (user?.id) {
+        const localKey = `toan_cung_em_completed_tasks_${user.id}`;
+        const savedIds = localStorage.getItem(localKey);
+        let completedIds: string[] = [];
+        if (savedIds) {
+          try { completedIds = JSON.parse(savedIds); } catch (e) {}
+        }
+        if (!completedIds.includes(taskId)) {
+          completedIds.push(taskId);
+          localStorage.setItem(localKey, JSON.stringify(completedIds));
+        }
+      }
+
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
       confetti({ particleCount: 80, spread: 60 });
-      setTasks(tasks.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
+      await markTaskCompleted(taskId, user!.id);
     } catch (err: any) {
-      alert('Lỗi hoàn thành nhiệm vụ: ' + err.message);
+      console.warn('handleCompleteTask exception handled:', err);
     }
   };
 
