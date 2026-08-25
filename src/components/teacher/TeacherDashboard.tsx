@@ -1539,36 +1539,37 @@ export const TeacherDashboard: React.FC = () => {
 
             <form onSubmit={handleBatchCreateTasks} className="space-y-4">
               <div className="p-3.5 rounded-2xl bg-amber-100/70 border-2 border-amber-300 space-y-2">
-                <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-amber-700" />
-                  CHỌN NGÀY GIAO CHO CẢ LỚP:
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black text-amber-950 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-amber-700" />
+                    CHỌN NGÀY GIAO CHO CẢ LỚP:
+                  </label>
+                  <span className="text-[11px] font-black text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-lg border border-emerald-300 shadow-xs">
+                    📅 {(() => {
+                      if (!batchDueDate) return '25/08/2026';
+                      const parts = batchDueDate.split('-');
+                      return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
+                    })()}
+                  </span>
+                </div>
 
-                <div className="relative cursor-pointer group">
-                  <div className="w-full p-3 bg-white border-2 border-amber-300 group-hover:border-amber-500 rounded-xl text-sm font-black text-slate-900 flex items-center justify-between shadow-xs transition-colors pointer-events-none">
-                    <div className="flex items-center gap-2">
-                      <span className="text-base">📅</span>
-                      <span className="text-amber-950 font-black tracking-wide text-sm">
-                        {(() => {
-                          if (!batchDueDate) return '25/08/2026';
-                          const parts = batchDueDate.split('-');
-                          return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : batchDueDate;
-                        })()}
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-extrabold text-amber-800 bg-amber-100 px-2.5 py-0.5 rounded-lg border border-amber-300">
-                      Ngày / Tháng / Năm 🗓️
-                    </span>
-                  </div>
-
+                <div className="relative">
                   <input
                     type="date"
                     required
                     value={batchDueDate}
                     onChange={(e) => setBatchDueDate(e.target.value)}
-                    className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                    onClick={(e) => {
+                      try {
+                        (e.target as any).showPicker?.();
+                      } catch (err) {}
+                    }}
+                    className="w-full p-3 bg-white border-2 border-amber-300 hover:border-amber-500 rounded-xl text-sm font-black text-slate-900 focus:outline-none focus:border-amber-500 cursor-pointer shadow-xs"
                   />
                 </div>
+                <p className="text-[10px] font-extrabold text-amber-900 italic text-right">
+                  Bấm trực tiếp vào ô để chọn ngày trên lịch 🗓️
+                </p>
               </div>
 
               <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
