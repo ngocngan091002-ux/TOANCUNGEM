@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason } from '../../types';
+import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason, TaskCompletion } from '../../types';
 import { 
   getTeacherClasses, createClass, getClassMembers, 
   getDailyTasks, createDailyTask, 
@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -86,6 +86,24 @@ export const TeacherDashboard: React.FC = () => {
   const [viewAssignmentSubmissions, setViewAssignmentSubmissions] = useState<any[]>([]);
   const [assignmentSubmissionCounts, setAssignmentSubmissionCounts] = useState<Record<string, number>>({});
   const [targetGroup, setTargetGroup] = useState<string>('all');
+
+  // STATE MODAL XEM CHI TIẾT DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ
+  const [selectedViewTask, setSelectedViewTask] = useState<DailyTask | null>(null);
+  const [viewTaskCompletions, setViewTaskCompletions] = useState<TaskCompletion[]>([]);
+  const [loadingTaskCompletions, setLoadingTaskCompletions] = useState<boolean>(false);
+
+  const handleOpenViewTaskModal = async (task: DailyTask) => {
+    setSelectedViewTask(task);
+    setLoadingTaskCompletions(true);
+    try {
+      const completions = await getTaskCompletionList(task.id);
+      setViewTaskCompletions(completions);
+    } catch (e) {
+      setViewTaskCompletions([]);
+    } finally {
+      setLoadingTaskCompletions(false);
+    }
+  };
 
   // ⭐ TÍCH ĐIỂM & THI ĐUA HỌC SINH STATES
   const [pointLogs, setPointLogs] = useState<PointLogRecord[]>([]);
@@ -1505,10 +1523,15 @@ export const TeacherDashboard: React.FC = () => {
                     </p>
                   </div>
                   
-                  <div className="bg-amber-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow flex items-center gap-1">
-                    <CheckCircle2 className="w-4 h-4 text-amber-200" />
-                    Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenViewTaskModal(t)}
+                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-white px-3.5 py-2 rounded-2xl text-xs font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer border-2 border-amber-300"
+                    title="Nhấp vào để xem chi tiết danh sách học sinh đã hoàn thành"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-amber-100" />
+                    📝 Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh (Chi tiết 👁️)
+                  </button>
                 </div>
               ))}
             </div>
@@ -2580,6 +2603,109 @@ export const TeacherDashboard: React.FC = () => {
                 Đóng Cửa Sổ
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ⭐ MODAL XEM CHI TIẾT DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ HÔM NAY */}
+      {selectedViewTask && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-3xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden">
+            
+            {/* HEADER MODAL */}
+            <div className="p-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-6 h-6 text-amber-200" />
+                <div>
+                  <h3 className="font-black text-base sm:text-lg">👁️ DANH SÁCH HỌC SINH HOÀN THÀNH NHIỆM VỤ</h3>
+                  <span className="text-xs font-bold opacity-90">Nhiệm vụ: {selectedViewTask.title}</span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedViewTask(null)}
+                className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl transition-all"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* BODY MODAL */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              
+              {/* SUMMARY STATS BAR */}
+              <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div>
+                  <span className="text-xs font-extrabold text-amber-950 uppercase tracking-wider block">TIẾN ĐỘ THI ĐUA CỦA LỚP:</span>
+                  <span className="text-lg font-black text-amber-900">
+                    📝 Đã hoàn thành: {viewTaskCompletions.length} / {students.length} học sinh ({Math.round((viewTaskCompletions.length / (students.length || 1)) * 100)}%)
+                  </span>
+                </div>
+
+                <div className="w-full sm:w-48 bg-amber-200 rounded-full h-3 overflow-hidden shadow-inner">
+                  <div
+                    className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${Math.min(100, Math.round((viewTaskCompletions.length / (students.length || 1)) * 100))}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* LIST OF ALL CLASS STUDENTS WITH COMPLETION STATUS */}
+              <div className="space-y-2">
+                <h4 className="font-black text-xs text-slate-700 uppercase tracking-wider">
+                  DANH SÁCH CHI TIẾT SĨ SỐ HỌC SINH LỚP:
+                </h4>
+
+                {loadingTaskCompletions ? (
+                  <div className="text-center py-8 font-bold text-amber-800 animate-pulse">Đang tải danh sách hoàn thành nhiệm vụ...</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-80 overflow-y-auto pr-1">
+                    {students.map(st => {
+                      const comp = viewTaskCompletions.find(c => c.student_id === st.id || c.student?.id === st.id);
+                      return (
+                        <div
+                          key={st.id}
+                          className={`p-3 rounded-2xl border flex items-center justify-between text-xs font-bold transition-all ${
+                            comp
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-950 shadow-xs'
+                              : 'bg-slate-50 border-slate-200 text-slate-500'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">{comp ? '🟢' : '⚪'}</span>
+                            <div>
+                              <div className="font-black text-slate-900">{st.full_name}</div>
+                              <span className="text-[10px] font-bold text-slate-400">{st.student_code || 'Mã HS'}</span>
+                            </div>
+                          </div>
+
+                          {comp ? (
+                            <span className="font-black text-emerald-800 bg-emerald-200/80 px-2.5 py-1 rounded-xl text-[11px] border border-emerald-300">
+                              ✓ Đã hoàn thành
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-extrabold text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-lg">
+                              Chưa làm
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* FOOTER MODAL */}
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
+              <button
+                onClick={() => setSelectedViewTask(null)}
+                className="px-6 py-2.5 bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs rounded-xl shadow uppercase tracking-wider"
+              >
+                Đóng Cửa Sổ
+              </button>
+            </div>
+
           </div>
         </div>
       )}
