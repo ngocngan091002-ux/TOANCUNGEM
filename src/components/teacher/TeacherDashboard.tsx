@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason, TaskCompletion } from '../../types';
 import { 
   getTeacherClasses, createClass, getClassMembers, 
-  getDailyTasks, createDailyTask, 
+  getDailyTasks, createDailyTask, deleteDailyTask, 
   getLearningMaterials, addLearningMaterial, getGames, addGame, 
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
@@ -219,6 +219,17 @@ export const TeacherDashboard: React.FC = () => {
       alert('🎉 Đã xóa bài tập tuần!');
     } catch (err: any) {
       alert('Lỗi xóa bài tập: ' + err.message);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string, title: string) => {
+    if (!window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa nhiệm vụ "${title}" này không?`)) return;
+    try {
+      await deleteDailyTask(taskId);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+      alert(`🎉 Đã xóa thành công nhiệm vụ "${title}"!`);
+    } catch (err: any) {
+      alert('Lỗi xóa nhiệm vụ: ' + (err.message || 'Không thể xóa'));
     }
   };
 
@@ -1637,15 +1648,26 @@ export const TeacherDashboard: React.FC = () => {
                     </p>
                   </div>
                   
-                  <button
-                    type="button"
-                    onClick={() => handleOpenViewTaskModal(t)}
-                    className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-white px-3.5 py-2 rounded-2xl text-xs font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer border-2 border-amber-300"
-                    title="Nhấp vào để xem chi tiết danh sách học sinh đã hoàn thành"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-amber-100" />
-                    📝 Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh (Chi tiết 👁️)
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenViewTaskModal(t)}
+                      className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 active:scale-95 text-white px-3.5 py-2 rounded-2xl text-xs font-black shadow-md flex items-center gap-1.5 transition-all cursor-pointer border-2 border-amber-300"
+                      title="Nhấp vào để xem chi tiết danh sách học sinh đã hoàn thành"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-amber-100" />
+                      📝 Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh (Chi tiết 👁️)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTask(t.id, t.title)}
+                      className="p-2.5 bg-rose-100 hover:bg-rose-600 text-rose-700 hover:text-white rounded-2xl transition-all shadow-xs border border-rose-300 cursor-pointer active:scale-95 flex items-center justify-center"
+                      title="Xóa nhiệm vụ này khỏi danh sách đã giao"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

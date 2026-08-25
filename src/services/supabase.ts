@@ -648,6 +648,15 @@ export async function createDailyTask(task: Omit<DailyTask, 'id' | 'created_at'>
   return data;
 }
 
+export async function deleteDailyTask(taskId: string): Promise<void> {
+  await supabaseAdmin.from('task_completions').delete().eq('task_id', taskId);
+  const { error } = await supabaseAdmin.from('daily_tasks').delete().eq('id', taskId);
+  if (error) {
+    console.warn('deleteDailyTask error:', error.message);
+    throw error;
+  }
+}
+
 export async function markTaskCompleted(
   taskId: string, 
   studentId: string,
