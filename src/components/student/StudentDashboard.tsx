@@ -14,7 +14,7 @@ import {
   BookOpen, Gamepad2, Award, CheckCircle2, 
   Clock, Trophy, Sparkles, Send, Play, 
   FileText, Video, Image as ImageIcon, Star, HelpCircle, UserCheck, ShieldCheck, 
-  Home, RefreshCw, Flame, Users, Heart, ThumbsUp, X, RotateCcw
+  Home, RefreshCw, Flame, Users, Heart, ThumbsUp, X, RotateCcw, Eye
 } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
@@ -41,6 +41,7 @@ export const StudentDashboard: React.FC = () => {
   const [questionStartTime, setQuestionStartTime] = useState<number>(Date.now());
   const [questionTimers, setQuestionTimers] = useState<Record<string, number>>({});
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [selectedSubmissionDetail, setSelectedSubmissionDetail] = useState<{ assignment: Assignment; submission: any } | null>(null);
 
   // GAME MODAL & GAMIFICATION (GAME-01 -> GAME-10)
   const [activePlayGame, setActivePlayGame] = useState<GameItem | null>(null);
@@ -703,9 +704,15 @@ export const StudentDashboard: React.FC = () => {
                         </span>
 
                         {sub ? (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
-                            🟢 Đã Hoàn Thành ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
-                          </span>
+                          (sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed') ? (
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
+                              🟢 Cô Đã Duyệt ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1">
+                              🟠 Đã Nộp – Chờ Duyệt
+                            </span>
+                          )
                         ) : isOverdue ? (
                           <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
                             🔴 Quá Hạn
@@ -734,10 +741,43 @@ export const StudentDashboard: React.FC = () => {
 
                     <div className="pt-2">
                       {sub ? (
-                        <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center justify-between text-xs font-bold text-emerald-900">
-                          <span>Kết quả: <strong className="text-sm font-black text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score} / 10 Điểm</strong></span>
-                          <span className="text-[10px] bg-emerald-200 px-2.5 py-1 rounded-lg">✓ Đã nộp bài</span>
-                        </div>
+                        (sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed') ? (
+                          <div className="p-3 bg-emerald-50 rounded-2xl border-2 border-emerald-300 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-emerald-900">
+                                🎯 Điểm chính thức: <strong className="text-base text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score} / 10</strong>
+                              </span>
+                              <span className="text-[10px] bg-emerald-200 text-emerald-950 font-black px-2 py-0.5 rounded-lg">
+                                ✓ Đã chốt
+                              </span>
+                            </div>
+
+                            {sub.teacher_remark && (
+                              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
+                                <span className="text-emerald-800 font-black block text-[10px]">✍️ Lời nhắn từ Thầy/Cô:</span>
+                                "{sub.teacher_remark}"
+                              </div>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedSubmissionDetail({ assignment: a, submission: sub })}
+                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all mt-1"
+                            >
+                              <Eye className="w-4 h-4" /> [ 👁️ XEM BÀI LÀM & ĐÁP ÁN ĐÚNG ]
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-amber-950">🟠 Đã nộp bài thành công</span>
+                              <span className="text-[10px] bg-amber-200 text-amber-950 font-bold px-2 py-0.5 rounded-lg">⏳ Chờ duyệt</span>
+                            </div>
+                            <p className="text-[11px] font-bold text-amber-800">
+                              Điểm số & chi tiết đáp án sẽ hiển thị ngay khi Giáo viên duyệt bài nhé!
+                            </p>
+                          </div>
+                        )
                       ) : (
                         <button
                           onClick={() => handleStartAssignment(a)}
@@ -1091,6 +1131,116 @@ export const StudentDashboard: React.FC = () => {
                   {isSubmitting ? 'Đang nộp bài...' : '🎯 NỘP BÀI THI'}
                 </button>
               )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CHI TIẾT BÀI LÀM VÀ ĐÁP ÁN DÀNH CHO HỌC SINH */}
+      {selectedSubmissionDetail && (
+        <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
+            
+            {/* HEADER MODAL */}
+            <div className="p-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <CheckCircle2 className="w-6 h-6 text-emerald-200" />
+                <div>
+                  <h3 className="font-black text-base sm:text-lg">📋 CHI TIẾT KẾT QUẢ BÀI LÀM CỦA EM</h3>
+                  <span className="text-xs font-bold text-emerald-100 block">
+                    Đề bài: {selectedSubmissionDetail.assignment.title}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedSubmissionDetail(null)}
+                className="p-2 bg-emerald-700/80 hover:bg-emerald-800 text-white rounded-2xl transition-all cursor-pointer"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* BODY MODAL */}
+            <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              
+              {/* SCORE & REMARK CARD */}
+              <div className="p-4 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border-2 border-emerald-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-emerald-900 uppercase">🎯 ĐIỂM CHÍNH THỨC CỦA EM:</span>
+                  <span className="text-xl font-black text-emerald-700 bg-emerald-200/80 px-4 py-1 rounded-xl shadow-xs">
+                    {selectedSubmissionDetail.submission.score > 10 
+                      ? Math.round((selectedSubmissionDetail.submission.score / 100) * 10 * 10) / 10 
+                      : selectedSubmissionDetail.submission.score} / 10 Điểm
+                  </span>
+                </div>
+
+                {selectedSubmissionDetail.submission.teacher_remark ? (
+                  <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
+                    <span className="text-emerald-800 font-black block mb-1">✍️ Lời nhắn / Nhận xét của Thầy/Cô:</span>
+                    "{selectedSubmissionDetail.submission.teacher_remark}"
+                  </div>
+                ) : (
+                  <div className="p-3 bg-white/80 rounded-xl border border-emerald-200 text-xs font-bold text-slate-500 italic">
+                    Thầy/Cô đã duyệt bài làm và khen ngợi sự nỗ lực của em!
+                  </div>
+                )}
+              </div>
+
+              {/* CHI TIẾT CÂU HỎI VÀ ĐÁP ÁN */}
+              <div className="space-y-3">
+                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                  📖 BÀI LÀM CHI TIẾT VÀ ĐÁP ÁN ĐÚNG:
+                </h4>
+
+                {selectedSubmissionDetail.assignment.questions && selectedSubmissionDetail.assignment.questions.length > 0 ? (
+                  selectedSubmissionDetail.assignment.questions.map((q, idx) => {
+                    const resp = selectedSubmissionDetail.submission.responses?.find((r: any) => r.question_id === q.id);
+                    const isCorrect = resp?.is_correct ?? true;
+                    const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
+
+                    return (
+                      <div key={q.id || idx} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/30 space-y-2 text-xs">
+                        <div className="flex items-center justify-between font-black text-slate-900">
+                          <span>Câu {idx + 1}: {cleanQText}</span>
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black ${isCorrect ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'}`}>
+                            {isCorrect ? '🟢 ĐÚNG' : '🔴 SAI'}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-[11px] font-bold pt-1">
+                          <div className={`p-2.5 rounded-xl border ${isCorrect ? 'bg-white border-slate-200' : 'bg-rose-50 border-rose-300'}`}>
+                            <span className="text-slate-400 text-[10px] block">Em đã chọn:</span>
+                            <span className={`font-black ${isCorrect ? 'text-emerald-950' : 'text-rose-900'}`}>
+                              {resp?.selected_options?.join(', ') || 'Đã chọn'}
+                            </span>
+                          </div>
+                          <div className="p-2.5 bg-emerald-100/70 rounded-xl border border-emerald-300">
+                            <span className="text-emerald-800 text-[10px] block">Đáp án đúng:</span>
+                            <span className="text-emerald-950 font-black">
+                              {q.correct_answers?.join(', ') || 'Chính xác'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="text-center py-4 text-xs font-bold text-slate-400">Đề bài không lưu câu hỏi chi tiết.</div>
+                )}
+              </div>
+
+            </div>
+
+            {/* FOOTER MODAL */}
+            <div className="p-4 bg-slate-50 border-t flex items-center justify-end">
+              <button
+                onClick={() => setSelectedSubmissionDetail(null)}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-2xl shadow uppercase tracking-wider cursor-pointer"
+              >
+                Đóng Cửa Sổ
+              </button>
             </div>
 
           </div>
