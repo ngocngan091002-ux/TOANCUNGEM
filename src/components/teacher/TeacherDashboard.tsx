@@ -2963,7 +2963,7 @@ export const TeacherDashboard: React.FC = () => {
                 </div>
 
                 <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
-                  <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIÁN NỘP:</span>
+                  <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIAN NỘP:</span>
                   <span className="text-xs font-black text-blue-900">
                     {selectedStudentDetail.completion?.completed_at 
                       ? new Date(selectedStudentDetail.completion.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
