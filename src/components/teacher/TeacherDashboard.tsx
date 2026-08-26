@@ -113,13 +113,12 @@ export const TeacherDashboard: React.FC = () => {
     }
   };
 
-  const handleOpenStudentDetailModal = (st: UserProfile, comp?: any) => {
-    const sub = comp?.submission || null;
+  const handleOpenStudentDetailModalFromAssignment = (st: UserProfile, sub?: any) => {
     setSelectedStudentDetail({
       student: st,
-      completion: comp,
+      completion: null,
       submission: sub,
-      questions: comp?.assignment_questions || []
+      questions: selectedViewAssignment?.questions || []
     });
     setTeacherRemarkText(sub?.teacher_remark || '');
     setOverrideScoreText(sub?.score !== undefined ? String(sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score) : '10');
@@ -2647,29 +2646,46 @@ export const TeacherDashboard: React.FC = () => {
 
               {/* DANH SÁCH HỌC SINH ĐÃ NỘP BÀI VS CHƯA NỘP BÀI */}
               <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-2">
-                <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
-                  📋 CHI TIẾT TRẠNG THÁI HỌC SINH LÀM BÀI:
-                </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
+                    📋 CHI TIẾT BÀI NỘP HỌC SINH (BẤM VÀO ĐỂ DUYỆT & CHỐT ĐIỂM):
+                  </h4>
+                  <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300">
+                    💡 Bấm vào em đã nộp để xem từng câu Đúng/Sai & chốt điểm
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                   {students.map(st => {
                     const stSub = viewAssignmentSubmissions.find(s => s.student_id === st.id || s.student?.id === st.id);
                     return (
                       <div
                         key={st.id}
-                        className={`p-2 rounded-xl border flex items-center justify-between text-xs font-bold ${
+                        onClick={() => stSub && handleOpenStudentDetailModalFromAssignment(st, stSub)}
+                        className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between text-xs font-bold ${
                           stSub
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 cursor-pointer hover:border-emerald-500 hover:shadow-md'
                             : 'bg-slate-50 border-slate-200 text-slate-500'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <span>{stSub ? '🟢' : '⚪'}</span>
-                          <span className="font-black text-slate-900 truncate max-w-[130px]">{st.full_name}</span>
+                        <div className="flex items-center gap-2.5">
+                          <span className="text-lg">{stSub ? '🟢' : '⚪'}</span>
+                          <div>
+                            <span className="font-black text-slate-900 block truncate max-w-[130px]">{st.full_name}</span>
+                            <span className="text-[10px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</span>
+                          </div>
                         </div>
                         {stSub ? (
-                          <span className="font-black text-emerald-700 bg-emerald-200/60 px-2 py-0.5 rounded-md text-[11px]">
-                            ✓ {stSub.score > 10 ? Math.round((stSub.score / 100) * 10 * 10) / 10 : stSub.score} / 10 Điểm
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-black text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-lg text-[11px]">
+                              {stSub.score > 10 ? Math.round((stSub.score / 100) * 10 * 10) / 10 : stSub.score}/10 Điểm
+                            </span>
+                            <button
+                              type="button"
+                              className="px-2 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-[10px] font-black shadow-xs whitespace-nowrap"
+                            >
+                              Chấm bài 👁️
+                            </button>
+                          </div>
                         ) : (
                           <span className="text-[10px] font-extrabold text-slate-400">Chưa làm</span>
                         )}
