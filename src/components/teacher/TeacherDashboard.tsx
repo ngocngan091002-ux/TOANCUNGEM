@@ -2969,43 +2969,53 @@ export const TeacherDashboard: React.FC = () => {
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               
               {/* METRICS CARDS */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
-                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM CHẤM TẠM TÍNH:</span>
-                  <span className="text-base font-black text-amber-900">
-                    {selectedStudentDetail.submission?.score !== undefined 
-                      ? `${selectedStudentDetail.submission.score > 10 ? Math.round((selectedStudentDetail.submission.score / 100) * 10 * 10) / 10 : selectedStudentDetail.submission.score}/10`
-                      : (selectedStudentDetail.completion ? '10/10' : 'Chưa có')}
-                  </span>
-                </div>
+              {(() => {
+                const sub = selectedStudentDetail.submission;
+                const comp = selectedStudentDetail.completion;
+                const isSubmitted = !!sub || !!comp;
+                const isGraded = sub?.status === 'teacher_reviewed';
 
-                <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-                  <span className="text-[10px] text-emerald-700 font-extrabold uppercase block">TRẠNG THÁI:</span>
-                  <span className="text-xs font-black text-emerald-900">
-                    {selectedStudentDetail.submission?.status === 'teacher_reviewed' 
-                      ? '🟢 Đã duyệt & chốt' 
-                      : (selectedStudentDetail.completion ? '🟠 Đã nộp – Chờ duyệt' : '🔴 Chưa làm')}
-                  </span>
-                </div>
+                const statusLabel = isGraded
+                  ? '🟢 Đã duyệt & chốt'
+                  : (isSubmitted ? '🟠 Đã nộp – Chờ duyệt' : '🔴 Chưa làm');
 
-                <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
-                  <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIAN NỘP:</span>
-                  <span className="text-xs font-black text-blue-900">
-                    {(selectedStudentDetail.submission?.submitted_at || selectedStudentDetail.completion?.completed_at) 
-                      ? new Date(selectedStudentDetail.submission?.submitted_at || selectedStudentDetail.completion?.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                      : 'Vừa xong'}
-                  </span>
-                </div>
+                const rawTime = sub?.submitted_at || sub?.created_at || comp?.completed_at;
+                const timeDisplay = rawTime
+                  ? new Date(rawTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                  : (isSubmitted ? 'Vừa xong' : 'N/A');
 
-                <div className="p-3 bg-purple-50 rounded-2xl border border-purple-200">
-                  <span className="text-[10px] text-purple-700 font-extrabold uppercase block">SỐ CÂU ĐÚNG:</span>
-                  <span className="text-xs font-black text-purple-900">
-                    {selectedStudentDetail.submission?.responses 
-                      ? `${selectedStudentDetail.submission.responses.filter((r: any) => r.is_correct).length} / ${selectedStudentDetail.submission.responses.length}`
-                      : 'Đầy đủ'}
-                  </span>
-                </div>
-              </div>
+                const scoreDisplay = sub?.score !== undefined 
+                  ? `${sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10`
+                  : (comp ? '10/10' : 'Chưa có');
+
+                const correctCountDisplay = sub?.responses && sub.responses.length > 0
+                  ? `${sub.responses.filter((r: any) => r.is_correct).length} / ${sub.responses.length}`
+                  : (isSubmitted ? 'Đầy đủ' : '0/0');
+
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
+                    <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
+                      <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM CHẤM TẠM TÍNH:</span>
+                      <span className="text-base font-black text-amber-900">{scoreDisplay}</span>
+                    </div>
+
+                    <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
+                      <span className="text-[10px] text-emerald-700 font-extrabold uppercase block">TRẠNG THÁI:</span>
+                      <span className="text-xs font-black text-emerald-900">{statusLabel}</span>
+                    </div>
+
+                    <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
+                      <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIAN NỘP:</span>
+                      <span className="text-xs font-black text-blue-900">{timeDisplay}</span>
+                    </div>
+
+                    <div className="p-3 bg-purple-50 rounded-2xl border border-purple-200">
+                      <span className="text-[10px] text-purple-700 font-extrabold uppercase block">SỐ CÂU ĐÚNG:</span>
+                      <span className="text-xs font-black text-purple-900">{correctCountDisplay}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* CHI TIẾT TỪNG CÂU HỎI VỚI HIỂN THỊ ĐÁP ÁN ĐÚNG/SAI */}
               <div className="space-y-3">
@@ -3017,11 +3027,12 @@ export const TeacherDashboard: React.FC = () => {
                   selectedStudentDetail.questions.map((q, idx) => {
                     const resp = selectedStudentDetail.submission?.responses?.find((r: any) => r.question_id === q.id);
                     const isCorrect = resp?.is_correct ?? true;
+                    const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
 
                     return (
                       <div key={q.id || idx} className="p-3.5 rounded-2xl border-2 border-amber-200 bg-amber-50/40 space-y-2 text-xs">
                         <div className="flex items-center justify-between font-black text-slate-900">
-                          <span>Câu {idx + 1}: {q.question_text}</span>
+                          <span>Câu {idx + 1}: {cleanQText}</span>
                           <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black ${isCorrect ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'}`}>
                             {isCorrect ? '🟢 ĐÚNG' : '🔴 SAI'}
                           </span>
