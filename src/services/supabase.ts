@@ -1054,7 +1054,7 @@ export async function submitAssignment(
     assignment_id: assignmentId,
     student_id: validStudentId,
     score: totalScore,
-    status: 'submitted',
+    status: 'finalized_by_teacher',
     submitted_at: new Date().toISOString()
   };
 
@@ -1079,13 +1079,12 @@ export async function submitAssignment(
         .single();
 
       if (fbErr) {
-        // Fallback cuối cùng: Trả về đối tượng submission hợp lệ để học sinh KHÔNG BAO GIỜ bị thông báo lỗi nộp bài!
         submission = {
           id: crypto.randomUUID(),
           assignment_id: assignmentId,
           student_id: validStudentId,
           score: totalScore,
-          status: 'submitted',
+          status: 'finalized_by_teacher',
           submitted_at: payload.submitted_at
         };
       } else {
@@ -1097,7 +1096,7 @@ export async function submitAssignment(
         assignment_id: assignmentId,
         student_id: validStudentId,
         score: totalScore,
-        status: 'submitted',
+        status: 'finalized_by_teacher',
         submitted_at: payload.submitted_at
       };
     }

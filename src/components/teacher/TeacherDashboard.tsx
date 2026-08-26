@@ -152,7 +152,7 @@ export const TeacherDashboard: React.FC = () => {
         await approveSubmission(selectedStudentDetail.submission.id, scoreNum, teacherRemarkText);
       }
 
-      alert('✅ DUYỆT VÀ CHỐT ĐIỂM THÀNH CÔNG! Kết quả đã được công bố cho học sinh.');
+      alert('💾 ĐÃ LƯU NHẬN XẾT & CẬP NHẬT ĐIỂM SỐ THÀNH CÔNG!');
       setSelectedStudentDetail(null);
 
       if (selectedViewAssignment) {
@@ -2979,9 +2979,7 @@ export const TeacherDashboard: React.FC = () => {
                 const isSubmitted = !!sub || !!comp;
                 const isGraded = sub?.status === 'teacher_reviewed' || sub?.status === 'finalized_by_teacher';
 
-                const statusLabel = isGraded
-                  ? '🟢 Đã duyệt & chốt'
-                  : (isSubmitted ? '🟠 Đã nộp – Chờ duyệt' : '🔴 Chưa làm');
+                const statusLabel = isSubmitted ? '🟢 Đã hoàn thành' : '🔴 Chưa làm';
 
                 const rawTime = sub?.submitted_at || sub?.created_at || comp?.completed_at;
                 const timeDisplay = rawTime
@@ -2999,14 +2997,14 @@ export const TeacherDashboard: React.FC = () => {
                 return (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
                     <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
-                      <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM CHẤM TẠM TÍNH:</span>
+                      <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM TỔNG CỘNG:</span>
                       <span className="text-base font-black text-amber-900">{scoreDisplay}</span>
                     </div>
 
                     <div className={`p-3 rounded-2xl border ${
-                      isGraded 
+                      isSubmitted 
                         ? 'bg-emerald-50 border-emerald-300 text-emerald-950' 
-                        : (isSubmitted ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-500')
+                        : 'bg-slate-50 border-slate-200 text-slate-500'
                     }`}>
                       <span className="text-[10px] font-extrabold uppercase block opacity-80">TRẠNG THÁI:</span>
                       <span className="text-xs font-black">{statusLabel}</span>
@@ -3101,7 +3099,7 @@ export const TeacherDashboard: React.FC = () => {
                   className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border-2 border-emerald-300"
                 >
                   <CheckCircle2 className="w-5 h-5 text-amber-300" />
-                  {savingRemark ? 'Đang duyệt & chốt điểm...' : '✅ DUYỆT VÀ CHỐT ĐIỂM (CÔNG BỐ KẾT QUẢ CHO HỌC SINH)'}
+                  {savingRemark ? 'Đang lưu nhận xét...' : '💾 LƯU NHẬN XẾT & CẬP NHẬT ĐIỂM SỐ'}
                 </button>
               </div>
 
