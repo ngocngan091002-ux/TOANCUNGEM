@@ -2617,17 +2617,33 @@ export const TeacherDashboard: React.FC = () => {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               {/* BANNER THỐNG KÊ TIẾN ĐỘ NỘP BÀI CẢ LỚP */}
-              <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-300 flex items-center justify-between shadow-xs">
-                <div>
-                  <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📊 TIẾN ĐỘ NỘP BÀI CẢ LỚP:</h4>
-                  <p className="text-sm font-black text-slate-900 mt-0.5">
-                    Đã làm: <span className="text-emerald-700 font-extrabold text-base">{assignmentSubmissionCounts[selectedViewAssignment.id] || viewAssignmentSubmissions.length} / {students.length || 33}</span> Học sinh
-                  </p>
-                </div>
-                <div className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-xl shadow">
-                  {Math.round(((assignmentSubmissionCounts[selectedViewAssignment.id] || viewAssignmentSubmissions.length) / (students.length || 33)) * 100)}% Hoàn thành
-                </div>
-              </div>
+              {(() => {
+                const validSubmissions = viewAssignmentSubmissions.filter(sub =>
+                  students.some(st =>
+                    st.id === sub.student_id ||
+                    st.id === sub.student?.id ||
+                    (st.email && st.email === sub.student?.email) ||
+                    (st.student_code && st.student_code === sub.student?.student_code)
+                  )
+                );
+                const completedCount = validSubmissions.length;
+                const totalCount = students.length || 33;
+                const percent = Math.min(100, Math.round((completedCount / (totalCount || 1)) * 100));
+
+                return (
+                  <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-300 flex items-center justify-between shadow-xs">
+                    <div>
+                      <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📊 TIẾN ĐỘ NỘP BÀI CẢ LỚP:</h4>
+                      <p className="text-sm font-black text-slate-900 mt-0.5">
+                        Đã làm: <span className="text-emerald-700 font-extrabold text-base">{completedCount} / {totalCount}</span> Học sinh
+                      </p>
+                    </div>
+                    <div className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-xl shadow">
+                      {percent}% Hoàn thành
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* DANH SÁCH HỌC SINH ĐÃ NỘP BÀI VS CHƯA NỘP BÀI */}
               <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-2">
