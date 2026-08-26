@@ -3003,9 +3003,13 @@ export const TeacherDashboard: React.FC = () => {
                       <span className="text-base font-black text-amber-900">{scoreDisplay}</span>
                     </div>
 
-                    <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
-                      <span className="text-[10px] text-emerald-700 font-extrabold uppercase block">TRẠNG THÁI:</span>
-                      <span className="text-xs font-black text-emerald-900">{statusLabel}</span>
+                    <div className={`p-3 rounded-2xl border ${
+                      isGraded 
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-950' 
+                        : (isSubmitted ? 'bg-amber-50 border-amber-300 text-amber-950' : 'bg-slate-50 border-slate-200 text-slate-500')
+                    }`}>
+                      <span className="text-[10px] font-extrabold uppercase block opacity-80">TRẠNG THÁI:</span>
+                      <span className="text-xs font-black">{statusLabel}</span>
                     </div>
 
                     <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
