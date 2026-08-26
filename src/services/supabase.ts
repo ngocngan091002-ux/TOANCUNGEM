@@ -561,7 +561,12 @@ export async function addGame(game: Omit<GameItem, 'id' | 'created_at'>): Promis
 }
 
 // --- DAILY TASKS ---
-export async function getDailyTasks(classId: string, studentId?: string): Promise<DailyTask[]> {
+export async function getDailyTasks(
+  classId: string, 
+  studentId?: string,
+  email?: string,
+  studentCode?: string
+): Promise<DailyTask[]> {
   const { data: tasks, error } = await supabaseAdmin
     .from('daily_tasks')
     .select('*')
@@ -579,9 +584,26 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
 
   const { data: studentProfiles } = await supabaseAdmin
     .from('profiles')
-    .select('id')
+    .select('id, email, student_code')
     .eq('role', 'student');
+
   const validStudentSet = new Set((studentProfiles || []).map(p => p.id));
+
+  let matchingStudentId = '';
+  if (studentId) {
+    const profById = (studentProfiles || []).find(p => p.id === studentId);
+    if (profById) matchingStudentId = profById.id;
+  }
+  if (!matchingStudentId && email && email.trim()) {
+    const cleanEmail = email.trim().toLowerCase();
+    const profByEmail = (studentProfiles || []).find(p => p.email && p.email.trim().toLowerCase() === cleanEmail);
+    if (profByEmail) matchingStudentId = profByEmail.id;
+  }
+  if (!matchingStudentId && studentCode && studentCode.trim()) {
+    const cleanCode = studentCode.trim().toUpperCase();
+    const profByCode = (studentProfiles || []).find(p => p.student_code && p.student_code.trim().toUpperCase() === cleanCode);
+    if (profByCode) matchingStudentId = profByCode.id;
+  }
 
   const { count: totalStudentsCount } = await supabaseAdmin
     .from('class_members')
@@ -590,13 +612,15 @@ export async function getDailyTasks(classId: string, studentId?: string): Promis
 
   const finalTotalStudents = (totalStudentsCount && totalStudentsCount > 0)
     ? totalStudentsCount
-    : ((studentProfiles && studentProfiles.length > 0) ? studentProfiles.length : 32);
+    : ((studentProfiles && studentProfiles.length > 0) ? studentProfiles.length : 33);
 
   return tasks.map(t => {
     const rawCompletions = completions?.filter(c => c.task_id === t.id) || [];
     const validCompletions = rawCompletions.filter(c => validStudentSet.has(c.student_id));
     const uniqueStudentIds = new Set(validCompletions.map(c => c.student_id));
-    const isCompleted = studentId ? validCompletions.some(c => c.student_id === studentId) : false;
+    const isCompleted = matchingStudentId
+      ? validCompletions.some(c => c.student_id === matchingStudentId)
+      : (studentId ? validCompletions.some(c => c.student_id === studentId) : false);
 
     return {
       ...t,
@@ -662,7 +686,7 @@ export async function markTaskCompleted(
   studentId: string,
   email?: string,
   studentCode?: string
-): Promise<void> {
+): Promise<boolean> {
   const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   let validStudentId = '';
 
@@ -678,12 +702,6 @@ export async function markTaskCompleted(
     const { data: byEmail } = await supabaseAdmin.from('profiles').select('id, role').eq('email', cleanEmail).maybeSingle();
     if (byEmail && byEmail.role === 'student') {
       validStudentId = byEmail.id;
-      if (isUuid(studentId) && byEmail.id !== studentId) {
-        try {
-          await supabaseAdmin.from('profiles').update({ id: studentId }).eq('id', byEmail.id);
-          validStudentId = studentId;
-        } catch (e) {}
-      }
     }
   }
 
@@ -695,22 +713,30 @@ export async function markTaskCompleted(
     }
   }
 
-  if (validStudentId) {
-    try {
-      const { error } = await supabaseAdmin
-        .from('task_completions')
-        .upsert([{ 
-          task_id: taskId, 
-          student_id: validStudentId,
-          completed_at: new Date().toISOString()
-        }], { onConflict: 'task_id,student_id' });
+  if (!validStudentId) {
+    console.error(`markTaskCompleted error: Unable to resolve valid student profile for (id=${studentId}, email=${email}, code=${studentCode})`);
+    return false;
+  }
 
-      if (error && !error.message.includes('unique constraint')) {
-        console.warn('markTaskCompleted upsert warning:', error.message);
-      }
-    } catch (e) {
-      console.warn('markTaskCompleted exception:', e);
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('task_completions')
+      .upsert([{ 
+        task_id: taskId, 
+        student_id: validStudentId,
+        completed_at: new Date().toISOString()
+      }], { onConflict: 'task_id,student_id' })
+      .select();
+
+    if (error) {
+      console.error('markTaskCompleted DB error:', error.message);
+      return false;
     }
+
+    return !!(data && data.length > 0);
+  } catch (e: any) {
+    console.error('markTaskCompleted exception:', e);
+    return false;
   }
 }
 

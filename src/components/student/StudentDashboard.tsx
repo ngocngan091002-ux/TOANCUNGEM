@@ -102,9 +102,8 @@ export const StudentDashboard: React.FC = () => {
         } catch (e) {}
       }
 
-      const t = await getDailyTasks(classId, user!.id);
+      const t = await getDailyTasks(classId, user!.id, user?.email, user?.student_code);
       
-      // Gộp trạng thái hoàn thành nhiệm vụ từ LocalStorage để không bao giờ bị mất khi chuyển tab hoặc tắt web
       let localCompletedTaskIds: string[] = [];
       if (user?.id) {
         const savedIds = localStorage.getItem(`toan_cung_em_completed_tasks_${user.id}`);
@@ -142,10 +141,8 @@ export const StudentDashboard: React.FC = () => {
       }
 
       const filteredAssignments = a.filter(assign => {
-        // 1. Bài tập giao cho Cả lớp hoặc không giới hạn nhóm => 100% học sinh nhận được
         if (!assign.target_group || assign.target_group === 'all') return true;
 
-        // 2. Bài tập giao đích danh cho Nhóm 1, Nhóm 2, Nhóm 3, Nhóm 4
         const targetName = assign.target_group === 'group_1' ? 'Nhóm 1' :
                            assign.target_group === 'group_2' ? 'Nhóm 2' :
                            assign.target_group === 'group_3' ? 'Nhóm 3' :
@@ -153,10 +150,8 @@ export const StudentDashboard: React.FC = () => {
 
         if (targetName && studentGroup === targetName) return true;
 
-        // 3. Phụ trợ: kiểm tra nếu tiêu đề bài tập có ghi rõ tên nhóm (VD: "(Nhóm 1)")
         if (assign.title && assign.title.includes(`(${studentGroup})`)) return true;
 
-        // 4. Nếu bài tập giao cho nhóm khác mà học sinh này không thuộc nhóm đó => Ẩn đi
         if (assign.target_group.startsWith('group_') || (assign.title && assign.title.includes('(Nhóm '))) {
           return false;
         }
@@ -207,6 +202,15 @@ export const StudentDashboard: React.FC = () => {
 
   const handleCompleteTask = async (taskId: string) => {
     try {
+      // 1. Chờ Supabase DB xác nhận lưu thành công trước (Yêu cầu 7)
+      const success = await markTaskCompleted(taskId, user!.id, user?.email, user?.student_code);
+
+      if (!success) {
+        alert('⚠️ Chưa thể lưu kết quả vào CSDL. Vui lòng thử lại.');
+        return;
+      }
+
+      // 2. Sau khi CSDL lưu thành công mới ghi vào LocalStorage & cập nhật giao diện
       if (user?.id) {
         const localKey = `toan_cung_em_completed_tasks_${user.id}`;
         const savedIds = localStorage.getItem(localKey);
@@ -222,9 +226,9 @@ export const StudentDashboard: React.FC = () => {
 
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
       confetti({ particleCount: 80, spread: 60 });
-      await markTaskCompleted(taskId, user!.id, user?.email, user?.student_code);
     } catch (err: any) {
-      console.warn('handleCompleteTask exception handled:', err);
+      console.error('handleCompleteTask error:', err);
+      alert('⚠️ Chưa thể lưu kết quả. Vui lòng thử lại.');
     }
   };
 
