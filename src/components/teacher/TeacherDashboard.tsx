@@ -369,7 +369,7 @@ export const TeacherDashboard: React.FC = () => {
   const handleAddManualQuestion = () => {
     const newIdx = draftQuestions.length + 1;
     const newQ = {
-      question_text: `Câu ${newIdx}: Cho phép tính ${newIdx * 5 + 10} + ${newIdx * 2} = ?. Đáp án đúng là bao nhiêu?`,
+      question_text: `Cho phép tính ${newIdx * 5 + 10} + ${newIdx * 2} = ?. Đáp án đúng là bao nhiêu?`,
       question_type: selectedQuestionType,
       difficulty: questionDifficulty,
       options: [
@@ -2673,12 +2673,21 @@ export const TeacherDashboard: React.FC = () => {
               </div>
 
               {selectedViewAssignment.questions && selectedViewAssignment.questions.length > 0 ? (
-                selectedViewAssignment.questions.map((q, idx) => (
-                  <div key={q.id || idx} className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/50 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-black text-amber-900">
-                      <span>CÂU {idx + 1}: {q.question_text}</span>
-                      <span className="bg-amber-200 px-2 py-0.5 rounded-lg text-[10px]">10 Điểm</span>
-                    </div>
+                selectedViewAssignment.questions.map((q, idx) => {
+                  const totalQ = selectedViewAssignment.questions!.length;
+                  const calcPoints = (q.points && q.points < 10) 
+                    ? q.points 
+                    : Math.round((10 / (totalQ || 1)) * 10) / 10;
+                  const cleanText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
+
+                  return (
+                    <div key={q.id || idx} className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/50 space-y-3">
+                      <div className="flex items-center justify-between text-xs font-black text-amber-900">
+                        <span>CÂU {idx + 1}: {cleanText}</span>
+                        <span className="bg-amber-200 px-2.5 py-1 rounded-xl text-[11px] font-black text-amber-950 border border-amber-300">
+                          {calcPoints} Điểm
+                        </span>
+                      </div>
 
                     {q.image_url && (
                       <img src={q.image_url} alt="Question diagram" className="max-h-48 w-auto rounded-xl border border-amber-300 mx-auto my-2" />
@@ -2703,7 +2712,8 @@ export const TeacherDashboard: React.FC = () => {
                       })}
                     </div>
                   </div>
-                ))
+                );
+              })
               ) : (
                 <div className="text-center py-6 text-xs font-bold text-slate-400">Đề bài không có thông tin chi tiết câu hỏi.</div>
               )}
