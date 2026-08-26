@@ -2977,7 +2977,7 @@ export const TeacherDashboard: React.FC = () => {
                 const sub = selectedStudentDetail.submission;
                 const comp = selectedStudentDetail.completion;
                 const isSubmitted = !!sub || !!comp;
-                const isGraded = sub?.status === 'teacher_reviewed';
+                const isGraded = sub?.status === 'teacher_reviewed' || sub?.status === 'finalized_by_teacher';
 
                 const statusLabel = isGraded
                   ? '🟢 Đã duyệt & chốt'

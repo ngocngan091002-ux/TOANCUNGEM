@@ -187,7 +187,7 @@ export interface StudentProgress {
   student?: UserProfile;
 }
 
-export type SubmissionStatus = 'not_started' | 'in_progress' | 'submitted' | 'teacher_reviewed';
+export type SubmissionStatus = 'not_started' | 'in_progress' | 'submitted' | 'teacher_reviewed' | 'finalized_by_teacher';
 
 export interface AssignmentSubmission {
   id: string;

@@ -808,7 +808,7 @@ export async function approveSubmission(
 ): Promise<any> {
   const payload: any = {
     score: finalScore,
-    status: 'teacher_reviewed',
+    status: 'finalized_by_teacher',
     teacher_remark: remark || ''
   };
 
