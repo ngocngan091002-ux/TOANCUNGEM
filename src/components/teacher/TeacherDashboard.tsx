@@ -149,12 +149,16 @@ export const TeacherDashboard: React.FC = () => {
       const scoreNum = parseFloat(overrideScoreText) || 10;
 
       if (selectedStudentDetail.submission?.id) {
-        await approveSubmission(selectedStudentDetail.submission.id, scoreNum, teacherRemarkText, user?.id);
+        await approveSubmission(selectedStudentDetail.submission.id, scoreNum, teacherRemarkText);
       }
 
       alert('✅ DUYỆT VÀ CHỐT ĐIỂM THÀNH CÔNG! Kết quả đã được công bố cho học sinh.');
       setSelectedStudentDetail(null);
 
+      if (selectedViewAssignment) {
+        const subs = await getClassSubmissionsForTeacher(selectedViewAssignment.id);
+        setViewAssignmentSubmissions(subs);
+      }
       if (selectedViewTask) {
         const completions = await getTaskCompletionList(selectedViewTask.id);
         setViewTaskCompletions(completions);

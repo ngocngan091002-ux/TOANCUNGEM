@@ -804,19 +804,13 @@ export async function updateTeacherRemark(submissionId: string, remark: string):
 export async function approveSubmission(
   submissionId: string, 
   finalScore: number, 
-  remark?: string, 
-  teacherId?: string
+  remark?: string
 ): Promise<any> {
   const payload: any = {
     score: finalScore,
     status: 'teacher_reviewed',
-    teacher_remark: remark || '',
-    reviewed_at: new Date().toISOString()
+    teacher_remark: remark || ''
   };
-
-  if (teacherId) {
-    payload.reviewed_by = teacherId;
-  }
 
   const { data, error } = await supabaseAdmin
     .from('assignment_submissions')
