@@ -2656,7 +2656,13 @@ export const TeacherDashboard: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
                   {students.map(st => {
-                    const stSub = viewAssignmentSubmissions.find(s => s.student_id === st.id || s.student?.id === st.id);
+                    const stSub = viewAssignmentSubmissions.find(s => 
+                      s.student_id === st.id || 
+                      s.student?.id === st.id ||
+                      (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
+                      (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
+                    );
+
                     return (
                       <div
                         key={st.id}
@@ -2681,9 +2687,13 @@ export const TeacherDashboard: React.FC = () => {
                             </span>
                             <button
                               type="button"
-                              className="px-2 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-[10px] font-black shadow-xs whitespace-nowrap"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenStudentDetailModalFromAssignment(st, stSub);
+                              }}
+                              className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-[10px] shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 border border-amber-300 whitespace-nowrap"
                             >
-                              Chấm bài 👁️
+                              👁️ Chấm bài & Chốt điểm
                             </button>
                           </div>
                         ) : (
@@ -2981,9 +2991,9 @@ export const TeacherDashboard: React.FC = () => {
                 <div className="p-3 bg-blue-50 rounded-2xl border border-blue-200">
                   <span className="text-[10px] text-blue-700 font-extrabold uppercase block">THỜI GIAN NỘP:</span>
                   <span className="text-xs font-black text-blue-900">
-                    {selectedStudentDetail.completion?.completed_at 
-                      ? new Date(selectedStudentDetail.completion.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                      : 'N/A'}
+                    {(selectedStudentDetail.submission?.submitted_at || selectedStudentDetail.completion?.completed_at) 
+                      ? new Date(selectedStudentDetail.submission?.submitted_at || selectedStudentDetail.completion?.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                      : 'Vừa xong'}
                   </span>
                 </div>
 
