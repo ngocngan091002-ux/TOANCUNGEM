@@ -187,6 +187,8 @@ export interface StudentProgress {
   student?: UserProfile;
 }
 
+export type SubmissionStatus = 'not_started' | 'in_progress' | 'submitted' | 'teacher_reviewed';
+
 export interface AssignmentSubmission {
   id: string;
   assignment_id: string;
@@ -196,7 +198,9 @@ export interface AssignmentSubmission {
   ai_suggested_score?: number;
   ai_suggested_remark?: string;
   teacher_remark?: string;
-  status: 'submitted' | 'graded_by_ai' | 'finalized_by_teacher';
+  status: SubmissionStatus;
+  reviewed_at?: string;
+  reviewed_by?: string;
   student?: UserProfile;
   assignment?: Assignment;
   responses?: QuestionResponse[];

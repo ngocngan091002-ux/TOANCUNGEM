@@ -202,7 +202,7 @@ export const StudentDashboard: React.FC = () => {
 
   const handleCompleteTask = async (taskId: string) => {
     try {
-      // 1. Chờ Supabase DB xác nhận lưu thành công trước (Yêu cầu 7)
+      // 1. Chờ Supabase DB xác nhận lưu thành công trước (Yêu cầu 7 & 14)
       const success = await markTaskCompleted(taskId, user!.id, user?.email, user?.student_code);
 
       if (!success) {
@@ -226,6 +226,8 @@ export const StudentDashboard: React.FC = () => {
 
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
       confetti({ particleCount: 80, spread: 60 });
+
+      alert('🎉 Em đã nộp bài thành công!\n\nBài làm của em đã được gửi đến giáo viên.\n⏳ Đang chờ giáo viên kiểm tra và chốt điểm.');
     } catch (err: any) {
       console.error('handleCompleteTask error:', err);
       alert('⚠️ Chưa thể lưu kết quả. Vui lòng thử lại.');
@@ -594,35 +596,70 @@ export const StudentDashboard: React.FC = () => {
 
       {/* 2. NHIỆM VỤ HÔM NAY */}
       {activeMenu === 'tasks' && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-          <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-amber-600" />
-            DANH SÁCH NHIỆM VỤ CẦN HOÀN THÀNH ({tasks.length})
-          </h3>
+        <div className="space-y-6">
+          {/* NHIỆM VỤ CẦN LÀM */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-amber-600" />
+              📝 NHIỆM VỤ CẦN LÀM ({tasks.filter(t => !t.is_completed).length})
+            </h3>
 
-          <div className="space-y-3">
-            {tasks.map(t => (
-              <div key={t.id} className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/40 flex items-center justify-between">
-                <div>
-                  <h4 className="font-extrabold text-sm text-slate-900">{t.title}</h4>
-                  <span className="text-xs font-bold text-amber-800">
-                    Hạn chót: {t.due_date ? new Date(t.due_date).toLocaleDateString('vi-VN') : 'Trong ngày'}
-                  </span>
+            <div className="space-y-3">
+              {tasks.filter(t => !t.is_completed).length === 0 ? (
+                <div className="p-6 bg-emerald-50 rounded-2xl text-center border border-emerald-200">
+                  <p className="text-sm font-black text-emerald-900">🎉 Hoan hô! Em đã hoàn thành tất cả nhiệm vụ được giao!</p>
                 </div>
+              ) : (
+                tasks.filter(t => !t.is_completed).map(t => (
+                  <div key={t.id} className="p-4 rounded-2xl border-2 border-amber-200 bg-amber-50/40 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900">{t.title}</h4>
+                      <span className="text-xs font-bold text-amber-800">
+                        Hạn chót: {t.due_date ? new Date(t.due_date).toLocaleDateString('vi-VN') : 'Trong ngày'}
+                      </span>
+                    </div>
 
-                <button
-                  onClick={() => handleCompleteTask(t.id)}
-                  disabled={t.is_completed}
-                  className={`px-4 py-2 rounded-2xl font-extrabold text-xs shadow transition-all ${
-                    t.is_completed
-                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-default'
-                      : 'bg-amber-500 hover:bg-amber-600 text-white'
-                  }`}
-                >
-                  {t.is_completed ? '✓ Đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                </button>
-              </div>
-            ))}
+                    <button
+                      onClick={() => handleCompleteTask(t.id)}
+                      className="px-4 py-2 rounded-2xl font-black text-xs shadow transition-all bg-amber-500 hover:bg-amber-600 text-white cursor-pointer active:scale-95 flex items-center gap-1.5"
+                    >
+                      <span>🚀 NỘP BÀI</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-emerald-200 shadow-md space-y-4">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              📚 BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM ({tasks.filter(t => t.is_completed).length})
+            </h3>
+
+            <div className="space-y-3">
+              {tasks.filter(t => t.is_completed).length === 0 ? (
+                <div className="p-6 bg-slate-50 rounded-2xl text-center border border-slate-200">
+                  <p className="text-xs font-extrabold text-slate-400">Em chưa có bài nộp nào trong mục này.</p>
+                </div>
+              ) : (
+                tasks.filter(t => t.is_completed).map(t => (
+                  <div key={t.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex items-center justify-between">
+                    <div>
+                      <h4 className="font-extrabold text-sm text-slate-900">{t.title}</h4>
+                      <span className="text-xs font-black text-amber-800 block mt-0.5">
+                        🟡 Đã nộp – Chờ giáo viên duyệt & chốt điểm
+                      </span>
+                    </div>
+
+                    <span className="px-3 py-1.5 rounded-xl font-black text-xs bg-amber-100 text-amber-900 border border-amber-300">
+                      ⏳ Đang chờ duyệt
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

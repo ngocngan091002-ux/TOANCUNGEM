@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark, approveSubmission
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -97,6 +97,7 @@ export const TeacherDashboard: React.FC = () => {
   // STATE MODAL CHI TIẾT BÀI LÀM CỦA 1 HỌC SINH (DEEP DETAIL VIEW)
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<{ student: UserProfile; completion?: any; submission?: any; questions?: any[] } | null>(null);
   const [teacherRemarkText, setTeacherRemarkText] = useState<string>('');
+  const [overrideScoreText, setOverrideScoreText] = useState<string>('10');
   const [savingRemark, setSavingRemark] = useState<boolean>(false);
 
   const handleOpenViewTaskModal = async (task: DailyTask) => {
@@ -113,13 +114,15 @@ export const TeacherDashboard: React.FC = () => {
   };
 
   const handleOpenStudentDetailModal = (st: UserProfile, comp?: any) => {
+    const sub = comp?.submission || null;
     setSelectedStudentDetail({
       student: st,
       completion: comp,
-      submission: comp?.submission || null,
+      submission: sub,
       questions: comp?.assignment_questions || []
     });
-    setTeacherRemarkText(comp?.submission?.teacher_remark || '');
+    setTeacherRemarkText(sub?.teacher_remark || '');
+    setOverrideScoreText(sub?.score !== undefined ? String(sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score) : '10');
   };
 
   const handleSaveTeacherRemark = async () => {
@@ -134,6 +137,31 @@ export const TeacherDashboard: React.FC = () => {
       }
     } catch (e: any) {
       alert('Lỗi lưu nhận xét: ' + e.message);
+    } finally {
+      setSavingRemark(false);
+    }
+  };
+
+  const handleApproveAndFinalizeScore = async () => {
+    if (!selectedStudentDetail) return;
+
+    setSavingRemark(true);
+    try {
+      const scoreNum = parseFloat(overrideScoreText) || 10;
+
+      if (selectedStudentDetail.submission?.id) {
+        await approveSubmission(selectedStudentDetail.submission.id, scoreNum, teacherRemarkText, user?.id);
+      }
+
+      alert('✅ DUYỆT VÀ CHỐT ĐIỂM THÀNH CÔNG! Kết quả đã được công bố cho học sinh.');
+      setSelectedStudentDetail(null);
+
+      if (selectedViewTask) {
+        const completions = await getTaskCompletionList(selectedViewTask.id);
+        setViewTaskCompletions(completions);
+      }
+    } catch (e: any) {
+      alert('Lỗi duyệt và chốt điểm: ' + e.message);
     } finally {
       setSavingRemark(false);
     }
@@ -2772,7 +2800,7 @@ export const TeacherDashboard: React.FC = () => {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                     {(() => {
-                      // 5. SORT: Completed (🟢) -> In Progress (🟡) -> Not Done (🔴)
+                      // 4 TRẠNG THÁI: teacher_reviewed (🟢) -> submitted (🟠) -> in_progress (🟡) -> not_started (🔴)
                       const list = students.map(st => {
                         const comp = viewTaskCompletions.find(c =>
                           c.student_id === st.id ||
@@ -2781,13 +2809,24 @@ export const TeacherDashboard: React.FC = () => {
                           (c.student?.student_code && c.student?.student_code === st.student_code)
                         );
                         const sub = comp?.submission;
-                        const state = comp ? 'completed' : (sub ? 'in_progress' : 'not_started');
+
+                        let state: 'teacher_reviewed' | 'submitted' | 'in_progress' | 'not_started' = 'not_started';
+                        if (sub?.status === 'teacher_reviewed') {
+                          state = 'teacher_reviewed';
+                        } else if (sub?.status === 'submitted' || comp) {
+                          state = 'submitted';
+                        } else if (sub?.status === 'in_progress') {
+                          state = 'in_progress';
+                        }
+
                         return { student: st, comp, sub, state };
                       });
 
                       list.sort((a, b) => {
-                        if (a.state === 'completed' && b.state !== 'completed') return -1;
-                        if (a.state !== 'completed' && b.state === 'completed') return 1;
+                        const priority = { teacher_reviewed: 1, submitted: 2, in_progress: 3, not_started: 4 };
+                        if (priority[a.state] !== priority[b.state]) {
+                          return priority[a.state] - priority[b.state];
+                        }
                         if (a.comp?.completed_at && b.comp?.completed_at) {
                           return new Date(b.comp.completed_at).getTime() - new Date(a.comp.completed_at).getTime();
                         }
@@ -2803,31 +2842,37 @@ export const TeacherDashboard: React.FC = () => {
                             key={st.id}
                             onClick={() => handleOpenStudentDetailModal(st, comp)}
                             className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs hover:shadow-md hover:scale-[1.01] ${
-                              state === 'completed'
+                              state === 'teacher_reviewed'
                                 ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 hover:border-emerald-500'
-                                : state === 'in_progress'
+                                : state === 'submitted'
                                 ? 'bg-amber-50/90 border-amber-300 text-amber-950 hover:border-amber-500'
+                                : state === 'in_progress'
+                                ? 'bg-blue-50/90 border-blue-300 text-blue-950 hover:border-blue-500'
                                 : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <span className="text-xl">
-                                {state === 'completed' ? '🟢' : state === 'in_progress' ? '🟡' : '🔴'}
+                                {state === 'teacher_reviewed' ? '🟢' : state === 'submitted' ? '🟠' : state === 'in_progress' ? '🟡' : '🔴'}
                               </span>
                               <div>
                                 <div className="font-black text-sm text-slate-900">{st.full_name}</div>
                                 <div className="text-[11px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</div>
                                 
-                                {state === 'completed' && (
+                                {state === 'teacher_reviewed' && (
                                   <div className="text-[11px] font-black text-emerald-800 mt-0.5">
-                                    🟢 Đã hoàn thành
-                                    {scoreDisplay ? ` · ${scoreDisplay}` : ''}
-                                    {durationDisplay ? ` · ${durationDisplay}` : ''}
+                                    🟢 Đã duyệt · {scoreDisplay || 'Đã chốt'} {durationDisplay ? `· ${durationDisplay}` : ''}
+                                  </div>
+                                )}
+
+                                {state === 'submitted' && (
+                                  <div className="text-[11px] font-black text-amber-800 mt-0.5">
+                                    🟠 Đã nộp – Chờ duyệt {durationDisplay ? `· ${durationDisplay}` : ''}
                                   </div>
                                 )}
 
                                 {state === 'in_progress' && (
-                                  <div className="text-[11px] font-black text-amber-800 mt-0.5">
+                                  <div className="text-[11px] font-black text-blue-800 mt-0.5">
                                     🟡 Đang làm bài...
                                   </div>
                                 )}
@@ -2869,7 +2914,7 @@ export const TeacherDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* ⭐ 6. MODAL CHI TIẾT BÀI LÀM CỦA 1 HỌC SINH (DEEP DETAIL VIEW) */}
+      {/* ⭐ 6. MODAL CHI TIẾT BÀI LÀM CỦA 1 HỌC SINH (DEEP DETAIL VIEW + CHỐT ĐIỂM) */}
       {selectedStudentDetail && (
         <div className="fixed inset-0 bg-slate-900/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-2xl max-h-[90vh] shadow-2xl flex flex-col overflow-hidden animate-fadeIn">
@@ -2900,7 +2945,7 @@ export const TeacherDashboard: React.FC = () => {
               {/* METRICS CARDS */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
                 <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200">
-                  <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM ĐẠT ĐƯỢC:</span>
+                  <span className="text-[10px] text-slate-500 font-extrabold uppercase block">ĐIỂM CHẤM TẠM TÍNH:</span>
                   <span className="text-base font-black text-amber-900">
                     {selectedStudentDetail.submission?.score !== undefined 
                       ? `${selectedStudentDetail.submission.score > 10 ? Math.round((selectedStudentDetail.submission.score / 100) * 10 * 10) / 10 : selectedStudentDetail.submission.score}/10`
@@ -2911,7 +2956,9 @@ export const TeacherDashboard: React.FC = () => {
                 <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200">
                   <span className="text-[10px] text-emerald-700 font-extrabold uppercase block">TRẠNG THÁI:</span>
                   <span className="text-xs font-black text-emerald-900">
-                    {selectedStudentDetail.completion ? '🟢 Đã hoàn thành' : '🔴 Chưa làm'}
+                    {selectedStudentDetail.submission?.status === 'teacher_reviewed' 
+                      ? '🟢 Đã duyệt & chốt' 
+                      : (selectedStudentDetail.completion ? '🟠 Đã nộp – Chờ duyệt' : '🔴 Chưa làm')}
                   </span>
                 </div>
 
@@ -2934,10 +2981,10 @@ export const TeacherDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* CHI TIẾT TỪNG CÂU HỎI */}
+              {/* CHI TIẾT TỪNG CÂU HỎI VỚI HIỂN THỊ ĐÁP ÁN ĐÚNG/SAI */}
               <div className="space-y-3">
                 <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
-                  CHI TIẾT CÂU HỎI VÀ ĐÁP ÁN ĐÃ CHỌN:
+                  CHI TIẾT CÂU HỎI VÀ ĐÁP ÁN ĐÃ CHỌN CỦA HỌC SINH:
                 </h4>
 
                 {selectedStudentDetail.questions && selectedStudentDetail.questions.length > 0 ? (
@@ -2949,18 +2996,18 @@ export const TeacherDashboard: React.FC = () => {
                       <div key={q.id || idx} className="p-3.5 rounded-2xl border-2 border-amber-200 bg-amber-50/40 space-y-2 text-xs">
                         <div className="flex items-center justify-between font-black text-slate-900">
                           <span>Câu {idx + 1}: {q.question_text}</span>
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] ${isCorrect ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' : 'bg-rose-100 text-rose-900 border border-rose-300'}`}>
-                            {isCorrect ? '✓ Đúng' : '❌ Sai'}
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black ${isCorrect ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'}`}>
+                            {isCorrect ? '🟢 ĐÚNG' : '🔴 SAI'}
                           </span>
                         </div>
 
                         <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
-                          <div className="p-2 bg-white rounded-xl border border-slate-200">
-                            <span className="text-slate-400 text-[10px] block">Đáp án học sinh chọn:</span>
-                            <span className="text-amber-950 font-black">{resp?.selected_options?.join(', ') || 'Đã chọn đáp án đúng'}</span>
+                          <div className={`p-2 rounded-xl border ${isCorrect ? 'bg-white border-slate-200' : 'bg-rose-50 border-rose-300'}`}>
+                            <span className="text-slate-400 text-[10px] block">Em chọn:</span>
+                            <span className={`font-black ${isCorrect ? 'text-amber-950' : 'text-rose-900'}`}>{resp?.selected_options?.join(', ') || 'Đã chọn'}</span>
                           </div>
                           <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-300">
-                            <span className="text-emerald-700 text-[10px] block">Đáp án chuẩn:</span>
+                            <span className="text-emerald-700 text-[10px] block">Đáp án đúng:</span>
                             <span className="text-emerald-950 font-black">{q.correct_answers?.join(', ') || 'Chính xác'}</span>
                           </div>
                         </div>
@@ -2974,26 +3021,43 @@ export const TeacherDashboard: React.FC = () => {
                 )}
               </div>
 
-              {/* NHẬN XÉT CỦA GIÁO VIÊN */}
-              <div className="p-4 bg-amber-100/60 rounded-2xl border-2 border-amber-300 space-y-2">
-                <label className="text-xs font-black text-amber-950 flex items-center justify-between">
-                  <span>✍️ NHẬN XÉT CỦA GIÁO VIÊN VỀ BÀI LÀM NÀY:</span>
-                </label>
-                <textarea
-                  value={teacherRemarkText}
-                  onChange={(e) => setTeacherRemarkText(e.target.value)}
-                  placeholder="Nhập lời khen hoặc dặn dò của Thầy/Cô cho học sinh này..."
-                  className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold h-20 focus:outline-none focus:border-amber-500"
-                />
-                {selectedStudentDetail.submission?.id && (
-                  <button
-                    onClick={handleSaveTeacherRemark}
-                    disabled={savingRemark}
-                    className="w-full py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-extrabold rounded-xl text-xs shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                  >
-                    💾 {savingRemark ? 'Đang lưu...' : 'Lưu Nhận Xét CỦA GIÁO VIÊN'}
-                  </button>
-                )}
+              {/* NHẬP ĐIỂM CHÍNH THỨC & NHẬN XÉT CỦA GIÁO VIÊN */}
+              <div className="p-4 bg-amber-100/60 rounded-2xl border-2 border-amber-300 space-y-3">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                  <label className="text-xs font-black text-amber-950">
+                    🎯 ĐIỂM CHÍNH THỨC (Thang điểm 10):
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10"
+                    step="0.5"
+                    value={overrideScoreText}
+                    onChange={(e) => setOverrideScoreText(e.target.value)}
+                    className="w-24 p-2 bg-white border-2 border-amber-400 rounded-xl text-center text-sm font-black text-amber-950 focus:outline-none focus:border-amber-600"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-black text-amber-950 block">
+                    ✍️ NHẬN XÉT CỦA GIÁO VIÊN VỀ BÀI LÀM NÀY:
+                  </label>
+                  <textarea
+                    value={teacherRemarkText}
+                    onChange={(e) => setTeacherRemarkText(e.target.value)}
+                    placeholder="Nhập lời khen hoặc dặn dò của Thầy/Cô cho học sinh này..."
+                    className="w-full p-2.5 bg-white border border-amber-300 rounded-xl text-xs font-bold h-20 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <button
+                  onClick={handleApproveAndFinalizeScore}
+                  disabled={savingRemark}
+                  className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border-2 border-emerald-300"
+                >
+                  <CheckCircle2 className="w-5 h-5 text-amber-300" />
+                  {savingRemark ? 'Đang duyệt & chốt điểm...' : '✅ DUYỆT VÀ CHỐT ĐIỂM (CÔNG BỐ KẾT QUẢ CHO HỌC SINH)'}
+                </button>
               </div>
 
             </div>

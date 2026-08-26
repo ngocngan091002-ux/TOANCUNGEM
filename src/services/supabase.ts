@@ -801,6 +801,34 @@ export async function updateTeacherRemark(submissionId: string, remark: string):
   if (error) throw error;
 }
 
+export async function approveSubmission(
+  submissionId: string, 
+  finalScore: number, 
+  remark?: string, 
+  teacherId?: string
+): Promise<any> {
+  const payload: any = {
+    score: finalScore,
+    status: 'teacher_reviewed',
+    teacher_remark: remark || '',
+    reviewed_at: new Date().toISOString()
+  };
+
+  if (teacherId) {
+    payload.reviewed_by = teacherId;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('assignment_submissions')
+    .update(payload)
+    .eq('id', submissionId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // --- ASSIGNMENTS & QUESTIONS ---
 export async function getAssignments(classId?: string, isTeacher = false): Promise<Assignment[]> {
   try {
