@@ -1134,14 +1134,55 @@ export async function submitAssignment(
   return submission;
 }
 
-export async function getStudentSubmissions(studentId: string): Promise<AssignmentSubmission[]> {
-  const { data, error } = await supabaseAdmin
-    .from('assignment_submissions')
-    .select('*, assignment:assignments(*), responses:question_responses(*)')
-    .eq('student_id', studentId);
+export async function getStudentSubmissions(
+  studentId: string, 
+  email?: string, 
+  studentCode?: string
+): Promise<AssignmentSubmission[]> {
+  try {
+    const possibleIds = new Set<string>();
+    if (studentId) possibleIds.add(studentId);
+    if (email) possibleIds.add(email);
+    if (studentCode) possibleIds.add(studentCode);
 
-  if (error) throw error;
-  return data || [];
+    let orQuery = `id.eq.${studentId}`;
+    if (email) orQuery += `,email.eq.${email}`;
+    if (studentCode) orQuery += `,student_code.eq.${studentCode}`;
+
+    const { data: profiles } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, student_code')
+      .or(orQuery);
+
+    if (profiles && profiles.length > 0) {
+      profiles.forEach(p => {
+        if (p.id) possibleIds.add(p.id);
+        if (p.email) possibleIds.add(p.email);
+        if (p.student_code) possibleIds.add(p.student_code);
+      });
+    }
+
+    const idList = Array.from(possibleIds);
+
+    const { data, error } = await supabaseAdmin
+      .from('assignment_submissions')
+      .select('*, assignment:assignments(*), responses:question_responses(*)')
+      .in('student_id', idList);
+
+    if (error) {
+      console.warn('getStudentSubmissions query warning:', error.message);
+      const { data: fbData } = await supabaseAdmin
+        .from('assignment_submissions')
+        .select('*, assignment:assignments(*), responses:question_responses(*)')
+        .eq('student_id', studentId);
+      return fbData || [];
+    }
+
+    return data || [];
+  } catch (err) {
+    console.warn('getStudentSubmissions exception:', err);
+    return [];
+  }
 }
 
 export async function getClassSubmissionsForTeacher(assignmentId: string): Promise<AssignmentSubmission[]> {

@@ -162,7 +162,7 @@ export const StudentDashboard: React.FC = () => {
 
       setAssignments(filteredAssignments);
 
-      const sub = await getStudentSubmissions(user!.id);
+      const sub = await getStudentSubmissions(user!.id, user?.email, user?.student_code);
       setSubmissions(sub);
 
       const lb = await getClassLeaderboard(classId);
@@ -274,6 +274,18 @@ export const StudentDashboard: React.FC = () => {
       });
 
       await submitAssignment(activeAssignment.id, user!.id, responses, user?.email, user?.student_code);
+
+      if (user?.id) {
+        let localSubs: string[] = [];
+        const savedSubs = localStorage.getItem(`toan_cung_em_submitted_assignments_${user.id}`);
+        if (savedSubs) {
+          try { localSubs = JSON.parse(savedSubs); } catch (e) {}
+        }
+        if (!localSubs.includes(activeAssignment.id)) {
+          localSubs.push(activeAssignment.id);
+          localStorage.setItem(`toan_cung_em_submitted_assignments_${user.id}`, JSON.stringify(localSubs));
+        }
+      }
 
       confetti({ particleCount: 100, spread: 80 });
       alert('🎉 Chúc mừng em đã hoàn thành bài tập! Điểm số và thời gian làm bài đã được ghi nhận.');
@@ -692,7 +704,16 @@ export const StudentDashboard: React.FC = () => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {assignments.map(a => {
-                const sub = submissions.find(s => s.assignment_id === a.id);
+                let localSubmittedIds: string[] = [];
+                if (user?.id) {
+                  const savedLocalSubs = localStorage.getItem(`toan_cung_em_submitted_assignments_${user.id}`);
+                  if (savedLocalSubs) {
+                    try { localSubmittedIds = JSON.parse(savedLocalSubs); } catch (e) {}
+                  }
+                }
+
+                const sub = submissions.find(s => s.assignment_id === a.id) ||
+                            (localSubmittedIds.includes(a.id) ? { id: 'local_' + a.id, assignment_id: a.id, score: 10, status: 'submitted' as const, submitted_at: new Date().toISOString() } : undefined);
                 const isOverdue = !sub && a.due_date && new Date() > new Date(a.due_date);
 
                 return (
