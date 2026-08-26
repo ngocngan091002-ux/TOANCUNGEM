@@ -2815,18 +2815,18 @@ export const TeacherDashboard: React.FC = () => {
                     DANH SÁCH CHI TIẾT SĨ SỐ HỌC SINH LỚP ({students.length} EM):
                   </h4>
                   <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300">
-                    💡 Bấm vào từng em để xem chi tiết bài làm & nhận xét
+                    💡 Tự động ghi nhận thời gian học sinh bấm báo cáo hoàn thành
                   </span>
                 </div>
 
                 {loadingTaskCompletions ? (
                   <div className="text-center py-10 font-black text-amber-800 animate-pulse flex items-center justify-center gap-2">
-                    <RefreshCw className="w-5 h-5 animate-spin" /> Đang tải dữ liệu bài làm của học sinh từ CSDL...
+                    <RefreshCw className="w-5 h-5 animate-spin" /> Đang tải dữ liệu báo cáo từ CSDL...
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-96 overflow-y-auto pr-1">
                     {(() => {
-                      // 4 TRẠNG THÁI: teacher_reviewed (🟢) -> submitted (🟠) -> in_progress (🟡) -> not_started (🔴)
+                      // BÁO CÁO NHIỆM VỤ HÀNG NGÀY: ĐÃ HOÀN THÀNH LÚC MẤY GIỜ vs CHƯA HOÀN THÀNH
                       const list = students.map(st => {
                         const comp = viewTaskCompletions.find(c =>
                           c.student_id === st.id ||
@@ -2834,89 +2834,63 @@ export const TeacherDashboard: React.FC = () => {
                           (c.student?.email && c.student?.email === st.email) ||
                           (c.student?.student_code && c.student?.student_code === st.student_code)
                         );
-                        const sub = comp?.submission;
-
-                        let state: 'teacher_reviewed' | 'submitted' | 'in_progress' | 'not_started' = 'not_started';
-                        if (sub?.status === 'teacher_reviewed') {
-                          state = 'teacher_reviewed';
-                        } else if (sub?.status === 'submitted' || comp) {
-                          state = 'submitted';
-                        } else if (sub?.status === 'in_progress') {
-                          state = 'in_progress';
-                        }
-
-                        return { student: st, comp, sub, state };
+                        const isDone = !!comp;
+                        return { student: st, comp, isDone };
                       });
 
                       list.sort((a, b) => {
-                        const priority = { teacher_reviewed: 1, submitted: 2, in_progress: 3, not_started: 4 };
-                        if (priority[a.state] !== priority[b.state]) {
-                          return priority[a.state] - priority[b.state];
-                        }
+                        if (a.isDone && !b.isDone) return -1;
+                        if (!a.isDone && b.isDone) return 1;
                         if (a.comp?.completed_at && b.comp?.completed_at) {
                           return new Date(b.comp.completed_at).getTime() - new Date(a.comp.completed_at).getTime();
                         }
                         return a.student.full_name.localeCompare(b.student.full_name, 'vi');
                       });
 
-                      return list.map(({ student: st, comp, sub, state }) => {
-                        const scoreDisplay = sub?.score !== undefined ? `${sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 điểm` : null;
-                        const durationDisplay = comp?.completed_at ? `${new Date(comp.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}` : '';
+                      return list.map(({ student: st, comp, isDone }) => {
+                        const timeStr = comp?.completed_at 
+                          ? new Date(comp.completed_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                          : '';
 
                         return (
                           <div
                             key={st.id}
-                            onClick={() => handleOpenStudentDetailModal(st, comp)}
-                            className={`p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 shadow-xs hover:shadow-md hover:scale-[1.01] ${
-                              state === 'teacher_reviewed'
-                                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950 hover:border-emerald-500'
-                                : state === 'submitted'
-                                ? 'bg-amber-50/90 border-amber-300 text-amber-950 hover:border-amber-500'
-                                : state === 'in_progress'
-                                ? 'bg-blue-50/90 border-blue-300 text-blue-950 hover:border-blue-500'
-                                : 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                            className={`p-3.5 rounded-2xl border-2 transition-all flex items-center justify-between gap-3 shadow-xs ${
+                              isDone
+                                ? 'bg-emerald-50/90 border-emerald-300 text-emerald-950'
+                                : 'bg-slate-50 border-slate-200 text-slate-500'
                             }`}
                           >
                             <div className="flex items-center gap-3">
                               <span className="text-xl">
-                                {state === 'teacher_reviewed' ? '🟢' : state === 'submitted' ? '🟠' : state === 'in_progress' ? '🟡' : '🔴'}
+                                {isDone ? '🟢' : '🔴'}
                               </span>
                               <div>
                                 <div className="font-black text-sm text-slate-900">{st.full_name}</div>
                                 <div className="text-[11px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</div>
                                 
-                                {state === 'teacher_reviewed' && (
-                                  <div className="text-[11px] font-black text-emerald-800 mt-0.5">
-                                    🟢 Đã duyệt · {scoreDisplay || 'Đã chốt'} {durationDisplay ? `· ${durationDisplay}` : ''}
+                                {isDone ? (
+                                  <div className="text-[11px] font-black text-emerald-800 mt-0.5 flex items-center gap-1">
+                                    <span>🟢 Đã hoàn thành</span>
+                                    {timeStr && <span className="bg-emerald-200/80 px-2 py-0.5 rounded-md text-[10px] text-emerald-950">lúc {timeStr}</span>}
                                   </div>
-                                )}
-
-                                {state === 'submitted' && (
-                                  <div className="text-[11px] font-black text-amber-800 mt-0.5">
-                                    🟠 Đã nộp – Chờ duyệt {durationDisplay ? `· ${durationDisplay}` : ''}
-                                  </div>
-                                )}
-
-                                {state === 'in_progress' && (
-                                  <div className="text-[11px] font-black text-blue-800 mt-0.5">
-                                    🟡 Đang làm bài...
-                                  </div>
-                                )}
-
-                                {state === 'not_started' && (
-                                  <div className="text-[11px] font-extrabold text-slate-400 mt-0.5">
-                                    🔴 Chưa làm
+                                ) : (
+                                  <div className="text-[11px] font-extrabold text-rose-600 mt-0.5">
+                                    🔴 Chưa hoàn thành
                                   </div>
                                 )}
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-xl text-[11px] font-black shadow-xs whitespace-nowrap"
-                            >
-                              Chi tiết 👁️
-                            </button>
+                            {isDone ? (
+                              <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-xl text-[11px] font-black shadow-xs whitespace-nowrap">
+                                ✓ Hoàn thành {timeStr}
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 bg-slate-100 text-slate-500 border border-slate-300 rounded-xl text-[11px] font-bold whitespace-nowrap">
+                                Chưa hoàn thành
+                              </span>
+                            )}
                           </div>
                         );
                       });
