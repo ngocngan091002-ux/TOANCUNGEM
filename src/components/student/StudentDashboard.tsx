@@ -785,12 +785,10 @@ export const StudentDashboard: React.FC = () => {
                               </span>
                             </div>
 
-                            {sub.teacher_remark && (
-                              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
-                                <span className="text-emerald-800 font-black block text-[10px]">✍️ Lời nhắn từ Thầy/Cô:</span>
-                                "{sub.teacher_remark}"
-                              </div>
-                            )}
+                            <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
+                              <span className="text-emerald-800 font-black block text-[10px]">✍️ NHẬN XÉT CỦA GIÁO VIÊN:</span>
+                              "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
+                            </div>
 
                             <button
                               type="button"
@@ -1307,16 +1305,12 @@ export const StudentDashboard: React.FC = () => {
                   </span>
                 </div>
 
-                {selectedSubmissionDetail.submission.teacher_remark ? (
-                  <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
-                    <span className="text-emerald-800 font-black block mb-1">✍️ Lời nhắn / Nhận xét của Thầy/Cô:</span>
-                    "{selectedSubmissionDetail.submission.teacher_remark}"
-                  </div>
-                ) : (
-                  <div className="p-3 bg-white/80 rounded-xl border border-emerald-200 text-xs font-bold text-slate-500 italic">
-                    Thầy/Cô đã duyệt bài làm và khen ngợi sự nỗ lực của em!
-                  </div>
-                )}
+                <div className="p-3 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800 space-y-1">
+                  <span className="text-emerald-800 font-black block text-xs">✍️ NHẬN XÉT CỦA GIÁO VIÊN VỀ BÀI LÀM NÀY:</span>
+                  <p className="text-slate-900 font-extrabold bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200 text-xs leading-relaxed">
+                    "{selectedSubmissionDetail.submission.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
+                  </p>
+                </div>
               </div>
 
               {/* CHI TIẾT CÂU HỎI VÀ ĐÁP ÁN */}
