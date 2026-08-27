@@ -2953,17 +2953,6 @@ export const TeacherDashboard: React.FC = () => {
                               <div>
                                 <div className="font-black text-sm text-slate-900">{st.full_name}</div>
                                 <div className="text-[11px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</div>
-                                
-                                {isDone ? (
-                                  <div className="text-[11px] font-black text-emerald-800 mt-0.5 flex items-center gap-1">
-                                    <span>🟢 Đã hoàn thành</span>
-                                    {timeStr && <span className="bg-emerald-200/80 px-2 py-0.5 rounded-md text-[10px] text-emerald-950">lúc {timeStr}</span>}
-                                  </div>
-                                ) : (
-                                  <div className="text-[11px] font-extrabold text-rose-600 mt-0.5">
-                                    🔴 Chưa hoàn thành
-                                  </div>
-                                )}
                               </div>
                             </div>
 
