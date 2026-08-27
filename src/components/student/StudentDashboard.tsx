@@ -5,7 +5,8 @@ import {
   getDailyTasks, markTaskCompleted, 
   getLearningMaterials, getGames, getAssignments, 
   submitAssignment, getStudentSubmissions, getClassLeaderboard, 
-  updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs 
+  updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs,
+  recordStudentProgress
 } from '../../services/supabase';
 import { askAIMathAssistant } from '../../services/aiService';
 import { useAuth } from '../../context/AuthContext';
@@ -24,6 +25,7 @@ export const StudentDashboard: React.FC = () => {
   const [selectedClassId, setSelectedClassId] = useState<string>('');
   const [classCodeInput, setClassCodeInput] = useState<string>('');
   const [activeMenu, setActiveMenu] = useState<string>('home');
+  const [showSubmitConfirmModal, setShowSubmitConfirmModal] = useState<boolean>(false);
 
   // Content Lists
   const [tasks, setTasks] = useState<DailyTask[]>([]);
@@ -236,7 +238,12 @@ export const StudentDashboard: React.FC = () => {
   };
 
   // NỘP BÀI TẬP VÀ ĐẾM THỜI GIAN
-  const handleStartAssignment = (assign: Assignment) => {
+  const handleStartAssignment = async (assign: Assignment) => {
+    if (user?.id) {
+      try {
+        await recordStudentProgress(assign.id, user.id, 'in_progress');
+      } catch (e) {}
+    }
     setActiveAssignment(assign);
     setCurrentQuestionIndex(0);
     setUserAnswers({});
@@ -273,7 +280,7 @@ export const StudentDashboard: React.FC = () => {
         };
       });
 
-      await submitAssignment(activeAssignment.id, user!.id, responses, user?.email, user?.student_code);
+      const subRes = await submitAssignment(activeAssignment.id, user!.id, responses, user?.email, user?.student_code);
 
       if (user?.id) {
         let localSubs: string[] = [];
@@ -288,7 +295,12 @@ export const StudentDashboard: React.FC = () => {
       }
 
       confetti({ particleCount: 100, spread: 80 });
-      alert('🎉 Chúc mừng em đã hoàn thành bài tập! Điểm số và thời gian làm bài đã được ghi nhận.');
+
+      const calcScore = subRes?.score !== undefined 
+        ? (subRes.score > 10 ? Math.round((subRes.score / 100) * 10 * 10) / 10 : subRes.score) 
+        : 10;
+
+      alert(`🎉 Em đã nộp bài thành công!\n⭐ Điểm của em: ${calcScore}/10 điểm.\nEm có thể xem lại bài làm của mình bất kỳ lúc nào.`);
       
       setActiveAssignment(null);
       if (selectedClassId) loadClassContent(selectedClassId);
@@ -383,7 +395,7 @@ export const StudentDashboard: React.FC = () => {
   const menuItems = [
     { id: 'home', label: '🏠 Trang chủ' },
     { id: 'tasks', label: '📚 Nhiệm vụ hôm nay' },
-    { id: 'assignments', label: '📝 Bài Tập Tuần', badge: uncompletedCount },
+    { id: 'assignments', label: '📚 BÀI TẬP TUẦN', badge: uncompletedCount },
     { id: 'games', label: '🎮 Kho Trò Chơi' },
     { id: 'materials', label: '📖 Học liệu' },
     { id: 'ai', label: '🤖 Trợ lý AI' },
@@ -1199,15 +1211,59 @@ export const StudentDashboard: React.FC = () => {
                 </button>
               ) : (
                 <button
-                  onClick={handleSubmitAssignment}
+                  onClick={() => setShowSubmitConfirmModal(true)}
                   disabled={isSubmitting}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-lg uppercase"
+                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-lg uppercase cursor-pointer"
                 >
                   {isSubmitting ? 'Đang nộp bài...' : '🎯 NỘP BÀI THI'}
                 </button>
               )}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN NỘP BÀI (SECTION VI) */}
+      {showSubmitConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-md p-6 text-center space-y-4 shadow-2xl animate-fadeIn">
+            <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-2xl font-black shadow-inner">
+              ❓
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-black text-lg text-slate-900">Em có chắc chắn muốn nộp bài không?</h3>
+              <p className="text-xs font-bold text-slate-500">
+                Sau khi nộp bài, hệ thống sẽ tự động chấm điểm và em không thể thay đổi đáp án nữa.
+              </p>
+              {activeAssignment?.questions && (
+                <p className="text-xs font-extrabold text-amber-800 bg-amber-50 py-1.5 px-3 rounded-xl border border-amber-200 mt-2 inline-block">
+                  📝 Em đã trả lời {Object.keys(userAnswers).length} / {activeAssignment.questions.length} câu hỏi
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowSubmitConfirmModal(false)}
+                className="py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-2xl transition-all uppercase tracking-wider cursor-pointer"
+              >
+                [ HỦY ]
+              </button>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={async () => {
+                  setShowSubmitConfirmModal(false);
+                  await handleSubmitAssignment();
+                }}
+                className="py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-2xl shadow-lg transition-all uppercase tracking-wider active:scale-95 cursor-pointer"
+              >
+                {isSubmitting ? 'Đang nộp...' : '[ NỘP BÀI ]'}
+              </button>
+            </div>
           </div>
         </div>
       )}

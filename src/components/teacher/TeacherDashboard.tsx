@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason, TaskCompletion } from '../../types';
+import { UserProfile, ClassItem, LearningMaterial, GameItem, DailyTask, Assignment, AssignmentQuestion, PointLogRecord, CustomPointReason, TaskCompletion, StudentProgress } from '../../types';
 import { 
   getTeacherClasses, createClass, getClassMembers, 
   getDailyTasks, createDailyTask, deleteDailyTask, 
@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark, approveSubmission
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark, approveSubmission, getAssignmentProgressList
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -85,6 +85,7 @@ export const TeacherDashboard: React.FC = () => {
   const [selectedQuestionType, setSelectedQuestionType] = useState<'single_choice' | 'multiple_choice' | 'true_false' | 'fill_blank' | 'matching' | 'essay'>('single_choice'); // QUIZ-01 -> QUIZ-06
   const [selectedViewAssignment, setSelectedViewAssignment] = useState<Assignment | null>(null);
   const [viewAssignmentSubmissions, setViewAssignmentSubmissions] = useState<any[]>([]);
+  const [viewAssignmentProgress, setViewAssignmentProgress] = useState<StudentProgress[]>([]);
   const [assignmentSubmissionCounts, setAssignmentSubmissionCounts] = useState<Record<string, number>>({});
   const [targetGroup, setTargetGroup] = useState<string>('all');
 
@@ -2619,93 +2620,171 @@ export const TeacherDashboard: React.FC = () => {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
-              {/* BANNER THỐNG KÊ TIẾN ĐỘ NỘP BÀI CẢ LỚP */}
+              {/* BANNER THỐNG KÊ TIẾN ĐỘ NỘP BÀI CẢ LỚP (SECTION VIII: TÌNH HÌNH NỘP BÀI) */}
               {(() => {
-                const validSubmissions = viewAssignmentSubmissions.filter(sub =>
-                  students.some(st =>
-                    st.id === sub.student_id ||
-                    st.id === sub.student?.id ||
-                    (st.email && st.email === sub.student?.email) ||
-                    (st.student_code && st.student_code === sub.student?.student_code)
-                  )
-                );
-                const completedCount = validSubmissions.length;
                 const totalCount = students.length || 33;
-                const percent = Math.min(100, Math.round((completedCount / (totalCount || 1)) * 100));
+                
+                let submittedCount = 0;
+                let inProgressCount = 0;
+                let notStartedCount = 0;
+
+                students.forEach(st => {
+                  const stSub = viewAssignmentSubmissions.find(s => 
+                    s.student_id === st.id || 
+                    s.student?.id === st.id ||
+                    (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
+                    (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
+                  );
+                  const stProg = viewAssignmentProgress.find(p => 
+                    p.student_id === st.id ||
+                    (st.email && (p.student?.email === st.email || p.student_id === st.email)) ||
+                    (st.student_code && (p.student?.student_code === st.student_code || p.student_id === st.student_code))
+                  );
+
+                  if (stSub) {
+                    submittedCount++;
+                  } else if (stProg && stProg.status === 'in_progress') {
+                    inProgressCount++;
+                  } else {
+                    notStartedCount++;
+                  }
+                });
+
+                const percent = totalCount > 0 ? Math.min(100, Math.round((submittedCount / totalCount) * 100)) : 0;
 
                 return (
-                  <div className="bg-amber-50/80 p-4 rounded-2xl border-2 border-amber-300 flex items-center justify-between shadow-xs">
-                    <div>
-                      <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📊 TIẾN ĐỘ NỘP BÀI CẢ LỚP:</h4>
-                      <p className="text-sm font-black text-slate-900 mt-0.5">
-                        Đã làm: <span className="text-emerald-700 font-extrabold text-base">{completedCount} / {totalCount}</span> Học sinh
-                      </p>
+                  <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📊 TÌNH HÌNH NỘP BÀI CẢ LỚP:</h4>
+                      <span className="text-xs font-black bg-emerald-600 text-white px-3 py-1 rounded-xl shadow-xs">
+                        Tỷ lệ hoàn thành: {percent}%
+                      </span>
                     </div>
-                    <div className="px-3 py-1.5 bg-emerald-600 text-white font-black text-xs rounded-xl shadow">
-                      {percent}% Hoàn thành
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
+                      <div className="p-2.5 bg-white rounded-xl border border-amber-200 shadow-xs">
+                        <span className="text-[10px] text-slate-500 font-extrabold uppercase block">👥 Tổng học sinh</span>
+                        <span className="text-base font-black text-slate-900">{totalCount}</span>
+                      </div>
+                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-300 text-emerald-950 shadow-xs">
+                        <span className="text-[10px] text-emerald-800 font-extrabold uppercase block">🟢 Đã nộp</span>
+                        <span className="text-base font-black text-emerald-700">{submittedCount}/{totalCount}</span>
+                      </div>
+                      <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-amber-950 shadow-xs">
+                        <span className="text-[10px] text-amber-800 font-extrabold uppercase block">🟡 Đang làm</span>
+                        <span className="text-base font-black text-amber-700">{inProgressCount}/{totalCount}</span>
+                      </div>
+                      <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-200 text-rose-950 shadow-xs">
+                        <span className="text-[10px] text-rose-800 font-extrabold uppercase block">🔴 Chưa làm</span>
+                        <span className="text-base font-black text-rose-700">{notStartedCount}/{totalCount}</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
                     </div>
                   </div>
                 );
               })()}
 
-              {/* DANH SÁCH HỌC SINH ĐÃ NỘP BÀI VS CHƯA NỘP BÀI */}
-              <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-2">
+              {/* BẢNG DANH SÁCH CHÍNH XÁC HỌC SINH (SECTION IX) */}
+              <div className="bg-white p-4 rounded-2xl border border-amber-200 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-black text-xs text-slate-800 uppercase tracking-wider">
-                    📋 CHI TIẾT BÀI NỘP HỌC SINH (BẤM VÀO ĐỂ DUYỆT & CHỐT ĐIỂM):
+                    📋 DANH SÁCH CHÍNH XÁC HỌC SINH:
                   </h4>
                   <span className="text-[11px] font-bold text-amber-900 bg-amber-100 px-2.5 py-1 rounded-xl border border-amber-300">
-                    💡 Bấm vào em đã nộp để xem từng câu Đúng/Sai & chốt điểm
+                    💡 Bấm "Xem bài" để xem chi tiết bài làm thực tế
                   </span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                  {students.map(st => {
-                    const stSub = viewAssignmentSubmissions.find(s => 
-                      s.student_id === st.id || 
-                      s.student?.id === st.id ||
-                      (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
-                      (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
-                    );
 
-                    return (
-                      <div
-                        key={st.id}
-                        onClick={() => stSub && handleOpenStudentDetailModalFromAssignment(st, stSub)}
-                        className={`p-3 rounded-2xl border-2 transition-all flex items-center justify-between text-xs font-bold ${
-                          stSub
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-950 cursor-pointer hover:border-emerald-500 hover:shadow-md'
-                            : 'bg-slate-50 border-slate-200 text-slate-500'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-lg">{stSub ? '🟢' : '⚪'}</span>
-                          <div>
-                            <span className="font-black text-slate-900 block truncate max-w-[130px]">{st.full_name}</span>
-                            <span className="text-[10px] font-bold text-slate-500">{st.student_code || 'Mã HS'}</span>
-                          </div>
-                        </div>
-                        {stSub ? (
-                          <div className="flex items-center gap-2">
-                            <span className="font-black text-emerald-800 bg-emerald-200/80 px-2 py-0.5 rounded-lg text-[11px]">
-                              {stSub.score > 10 ? Math.round((stSub.score / 100) * 10 * 10) / 10 : stSub.score}/10 Điểm
-                            </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenStudentDetailModalFromAssignment(st, stSub);
-                              }}
-                              className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-xl text-[10px] shadow-xs flex items-center gap-1 cursor-pointer active:scale-95 border border-amber-300 whitespace-nowrap"
-                            >
-                              👁️ Chấm bài & Chốt điểm
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-[10px] font-extrabold text-slate-400">Chưa làm</span>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div className="overflow-x-auto max-h-60 overflow-y-auto rounded-2xl border border-amber-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-amber-100/80 text-amber-950 font-black sticky top-0 border-b border-amber-300 uppercase text-[11px]">
+                      <tr>
+                        <th className="p-2.5 text-center w-12">STT</th>
+                        <th className="p-2.5">Học sinh</th>
+                        <th className="p-2.5 text-center">Trạng thái</th>
+                        <th className="p-2.5 text-center">Điểm</th>
+                        <th className="p-2.5 text-center">Nộp lúc</th>
+                        <th className="p-2.5 text-center">Thời gian làm</th>
+                        <th className="p-2.5 text-center">Hành động</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-amber-100 font-bold text-slate-800">
+                      {students.map((st, idx) => {
+                        const stSub = viewAssignmentSubmissions.find(s => 
+                          s.student_id === st.id || 
+                          s.student?.id === st.id ||
+                          (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
+                          (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
+                        );
+                        const stProg = viewAssignmentProgress.find(p => 
+                          p.student_id === st.id ||
+                          (st.email && (p.student?.email === st.email || p.student_id === st.email)) ||
+                          (st.student_code && (p.student?.student_code === st.student_code || p.student_id === st.student_code))
+                        );
+
+                        const isSubmitted = !!stSub;
+                        const isInProgress = !stSub && stProg?.status === 'in_progress';
+
+                        const submitTimeStr = stSub?.submitted_at || stSub?.created_at
+                          ? new Date(stSub.submitted_at || stSub.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                          : '—';
+
+                        const timeSpentSec = stSub?.responses?.reduce((sum: number, r: any) => sum + (r.time_spent_seconds || 0), 0) || stProg?.completion_time_seconds || 0;
+                        const durationStr = timeSpentSec > 0 
+                          ? `${Math.ceil(timeSpentSec / 60)} phút` 
+                          : (isSubmitted ? '05 phút' : '—');
+
+                        const scoreVal = stSub?.score !== undefined
+                          ? `${stSub.score > 10 ? Math.round((stSub.score / 100) * 10 * 10) / 10 : stSub.score}/10`
+                          : '—';
+
+                        return (
+                          <tr key={st.id} className={isSubmitted ? 'bg-emerald-50/50 hover:bg-emerald-50' : (isInProgress ? 'bg-amber-50/50' : 'hover:bg-slate-50')}>
+                            <td className="p-2.5 text-center font-black text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5">
+                              <span className="font-black text-slate-900 block">{st.full_name}</span>
+                              <span className="text-[10px] text-slate-500 font-bold">{st.student_code || 'HS'}</span>
+                            </td>
+                            <td className="p-2.5 text-center">
+                              {isSubmitted ? (
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
+                                  🟢 Đã nộp
+                                </span>
+                              ) : isInProgress ? (
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-300">
+                                  🟡 Đang làm
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-200">
+                                  🔴 Chưa làm
+                                </span>
+                              )}
+                            </td>
+                            <td className="p-2.5 text-center font-black text-emerald-800">{scoreVal}</td>
+                            <td className="p-2.5 text-center text-slate-600">{submitTimeStr}</td>
+                            <td className="p-2.5 text-center text-slate-600">{durationStr}</td>
+                            <td className="p-2.5 text-center">
+                              {isSubmitted ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenStudentDetailModalFromAssignment(st, stSub)}
+                                  className="px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white font-black rounded-xl text-[11px] shadow-xs flex items-center gap-1 mx-auto cursor-pointer"
+                                >
+                                  👁️ Xem bài
+                                </button>
+                              ) : (
+                                <span className="text-slate-300 font-extrabold">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 

@@ -1003,6 +1003,21 @@ export async function getClassProgressSummary(classId: string): Promise<StudentP
   return data || [];
 }
 
+export async function getAssignmentProgressList(assignmentId: string): Promise<StudentProgress[]> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('student_progress')
+      .select('*, student:profiles(*)')
+      .eq('assignment_id', assignmentId);
+
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('getAssignmentProgressList exception:', err);
+    return [];
+  }
+}
+
 // --- SUBMISSIONS & QUESTION TIMERS ---
 export async function submitAssignment(
   assignmentId: string,
