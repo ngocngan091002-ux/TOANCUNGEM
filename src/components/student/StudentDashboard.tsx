@@ -644,30 +644,30 @@ export const StudentDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM */}
+          {/* NHIỆM VỤ ĐÃ HOÀN THÀNH HÔM NAY */}
           <div className="bg-white p-6 rounded-3xl border-2 border-emerald-200 shadow-md space-y-4">
             <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              📚 BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM ({tasks.filter(t => t.is_completed).length})
+              ✓ NHIỆM VỤ ĐÃ HOÀN THÀNH HÔM NAY ({tasks.filter(t => t.is_completed).length})
             </h3>
 
             <div className="space-y-3">
               {tasks.filter(t => t.is_completed).length === 0 ? (
                 <div className="p-6 bg-slate-50 rounded-2xl text-center border border-slate-200">
-                  <p className="text-xs font-extrabold text-slate-400">Em chưa có bài nộp nào trong mục này.</p>
+                  <p className="text-xs font-extrabold text-slate-400">Em chưa hoàn thành nhiệm vụ nào hôm nay.</p>
                 </div>
               ) : (
                 tasks.filter(t => t.is_completed).map(t => (
                   <div key={t.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex items-center justify-between">
                     <div>
                       <h4 className="font-extrabold text-sm text-slate-900">{t.title}</h4>
-                      <span className="text-xs font-black text-amber-800 block mt-0.5">
-                        🟡 Đã nộp – Chờ giáo viên duyệt & chốt điểm
+                      <span className="text-xs font-black text-emerald-800 block mt-0.5">
+                        🟢 Đã hoàn thành báo cáo đầy đủ
                       </span>
                     </div>
 
-                    <span className="px-3 py-1.5 rounded-xl font-black text-xs bg-amber-100 text-amber-900 border border-amber-300">
-                      ⏳ Đang chờ duyệt
+                    <span className="px-3 py-1.5 rounded-xl font-black text-xs bg-emerald-100 text-emerald-950 border border-emerald-300">
+                      ✓ Hoàn thành
                     </span>
                   </div>
                 ))
@@ -813,6 +813,60 @@ export const StudentDashboard: React.FC = () => {
               })}
             </div>
           )}
+
+          {/* BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM CỦA BÀI TẬP TUẦN */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-emerald-200 shadow-md space-y-4 mt-6">
+            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              📚 BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM ({submissions.length})
+            </h3>
+
+            <div className="space-y-3">
+              {submissions.length === 0 ? (
+                <div className="p-6 bg-slate-50 rounded-2xl text-center border border-slate-200">
+                  <p className="text-xs font-extrabold text-slate-400">Em chưa có bài nộp nào trong mục này.</p>
+                </div>
+              ) : (
+                submissions.map(sub => {
+                  const assign = assignments.find(a => a.id === sub.assignment_id);
+                  const title = assign?.title || 'Bài tập tuần';
+                  const isReviewed = sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed';
+
+                  return (
+                    <div key={sub.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                      <div>
+                        <h4 className="font-extrabold text-sm text-slate-900">{title}</h4>
+                        {isReviewed ? (
+                          <div className="text-xs font-black text-emerald-800 block mt-0.5">
+                            🟢 Đã được Thầy/Cô duyệt & chốt điểm ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
+                            {sub.teacher_remark && <span className="block text-slate-600 font-bold italic mt-0.5">✍️ "{sub.teacher_remark}"</span>}
+                          </div>
+                        ) : (
+                          <span className="text-xs font-black text-amber-800 block mt-0.5">
+                            🟡 Đã nộp – Chờ giáo viên duyệt & chốt điểm
+                          </span>
+                        )}
+                      </div>
+
+                      {isReviewed ? (
+                        <button
+                          type="button"
+                          onClick={() => assign && setSelectedSubmissionDetail({ assignment: assign, submission: sub })}
+                          className="px-4 py-2 rounded-xl font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow flex items-center gap-1 cursor-pointer active:scale-95 whitespace-nowrap self-start sm:self-auto"
+                        >
+                          <Eye className="w-4 h-4" /> 👁️ Xem bài làm & điểm
+                        </button>
+                      ) : (
+                        <span className="px-3 py-1.5 rounded-xl font-black text-xs bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap self-start sm:self-auto">
+                          ⏳ Đang chờ duyệt
+                        </span>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
 
