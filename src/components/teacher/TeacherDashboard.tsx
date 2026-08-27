@@ -3154,7 +3154,7 @@ export const TeacherDashboard: React.FC = () => {
                   className="w-full py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 border-2 border-emerald-300"
                 >
                   <CheckCircle2 className="w-5 h-5 text-amber-300" />
-                  {savingRemark ? 'Đang lưu nhận xét...' : '💾 LƯU NHẬN XẾT & CẬP NHẬT ĐIỂM SỐ'}
+                  {savingRemark ? 'Đang lưu nhận xét...' : '💾 LƯU NHẬN XÉT & CẬP NHẬT ĐIỂM SỐ'}
                 </button>
               </div>
 
