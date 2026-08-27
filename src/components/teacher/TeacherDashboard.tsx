@@ -7,7 +7,7 @@ import {
   getAssignments, createAssignmentWithQuestions, 
   getClassSubmissionsForTeacher, updateTeacherGrading, uploadFileToStorage, 
   batchImportStudentsToClass, removeStudentFromClass, supabase, supabaseAdmin,
-  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark, approveSubmission, getAssignmentProgressList
+  addStudentPointLog, getClassPointLogs, getAssignmentSubmissionCounts, getTaskCompletionList, updateTeacherRemark, approveSubmission, getAssignmentProgressList, subscribeToSubmissions
 } from '../../services/supabase';
 import { exportClassToExcel, parseStudentExcel } from '../../services/excelService';
 import { suggestGrade2Questions, suggestGradingAndRemark, analyzeStudentWeaknesses } from '../../services/aiService';
@@ -432,8 +432,23 @@ export const TeacherDashboard: React.FC = () => {
       getAssignmentSubmissionCounts().then(counts => {
         setAssignmentSubmissionCounts(counts);
       });
+
+      const unsubscribe = subscribeToSubmissions(() => {
+        getAssignmentSubmissionCounts().then(counts => {
+          setAssignmentSubmissionCounts(counts);
+        });
+        if (selectedViewAssignment) {
+          getClassSubmissionsForTeacher(selectedViewAssignment.id).then(subs => {
+            setViewAssignmentSubmissions(subs);
+          });
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }
-  }, [activeTab, selectedClass]);
+  }, [activeTab, selectedClass, selectedViewAssignment]);
 
   const loadTeacherClasses = async () => {
     try {

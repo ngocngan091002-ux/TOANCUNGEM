@@ -6,7 +6,7 @@ import {
   getLearningMaterials, getGames, getAssignments, 
   submitAssignment, getStudentSubmissions, getClassLeaderboard, 
   updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs,
-  recordStudentProgress
+  recordStudentProgress, subscribeToSubmissions
 } from '../../services/supabase';
 import { askAIMathAssistant } from '../../services/aiService';
 import { useAuth } from '../../context/AuthContext';
@@ -74,8 +74,20 @@ export const StudentDashboard: React.FC = () => {
   useEffect(() => {
     if (selectedClassId) {
       loadClassContent(selectedClassId);
+
+      const unsubscribe = subscribeToSubmissions(() => {
+        if (user?.id) {
+          getStudentSubmissions(user.id, user.email, user.student_code).then(sub => {
+            setSubmissions(sub);
+          });
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }
-  }, [selectedClassId]);
+  }, [selectedClassId, user]);
 
   const loadStudentClasses = async () => {
     try {

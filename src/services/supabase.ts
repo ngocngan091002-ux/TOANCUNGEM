@@ -1439,3 +1439,32 @@ export async function getClassPointLogs(classId?: string): Promise<PointLogRecor
   }
   return [];
 }
+
+export function subscribeToSubmissions(callback: () => void) {
+  try {
+    const channel = supabase
+      .channel('submissions_realtime_channel_' + Math.random())
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'assignment_submissions' },
+        () => {
+          callback();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'student_progress' },
+        () => {
+          callback();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch (e) {}
+    };
+  } catch (e) {
+    console.warn('Realtime subscription warning:', e);
+    return () => {};
+  }
+}
