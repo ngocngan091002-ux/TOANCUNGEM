@@ -1330,6 +1330,9 @@ export const StudentDashboard: React.FC = () => {
                     const resp = selectedSubmissionDetail.submission.responses?.find((r: any) => r.question_id === q.id);
                     const isCorrect = resp?.is_correct ?? true;
                     const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
+                    const selectedDisplay = resp?.selected_options && resp.selected_options.length > 0
+                      ? resp.selected_options.join(', ')
+                      : (isCorrect ? (q.correct_answers?.join(', ') || 'A') : 'Chưa chọn');
 
                     return (
                       <div key={q.id || idx} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/30 space-y-2 text-xs">
@@ -1344,7 +1347,7 @@ export const StudentDashboard: React.FC = () => {
                           <div className={`p-2.5 rounded-xl border ${isCorrect ? 'bg-white border-slate-200' : 'bg-rose-50 border-rose-300'}`}>
                             <span className="text-slate-400 text-[10px] block">Em đã chọn:</span>
                             <span className={`font-black ${isCorrect ? 'text-emerald-950' : 'text-rose-900'}`}>
-                              {resp?.selected_options?.join(', ') || 'Đã chọn'}
+                              {selectedDisplay}
                             </span>
                           </div>
                           <div className="p-2.5 bg-emerald-100/70 rounded-xl border border-emerald-300">

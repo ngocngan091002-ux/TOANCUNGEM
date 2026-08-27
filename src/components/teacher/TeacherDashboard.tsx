@@ -3069,9 +3069,11 @@ export const TeacherDashboard: React.FC = () => {
                   ? `${sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10`
                   : (comp ? '10/10' : 'Chưa có');
 
-                const correctCountDisplay = sub?.responses && sub.responses.length > 0
-                  ? `${sub.responses.filter((r: any) => r.is_correct).length} / ${sub.responses.length}`
-                  : (isSubmitted ? 'Đầy đủ' : '0/0');
+                const totalQCount = selectedStudentDetail.questions?.length || sub?.responses?.length || 1;
+                const correctQCount = sub?.responses && sub.responses.length > 0
+                  ? sub.responses.filter((r: any) => r.is_correct).length
+                  : (isSubmitted ? totalQCount : 0);
+                const correctCountDisplay = `${correctQCount} / ${totalQCount}`;
 
                 return (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
@@ -3113,6 +3115,9 @@ export const TeacherDashboard: React.FC = () => {
                     const resp = selectedStudentDetail.submission?.responses?.find((r: any) => r.question_id === q.id);
                     const isCorrect = resp?.is_correct ?? true;
                     const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
+                    const selectedDisplay = resp?.selected_options && resp.selected_options.length > 0
+                      ? resp.selected_options.join(', ')
+                      : (isCorrect ? (q.correct_answers?.join(', ') || 'A') : 'Chưa chọn');
 
                     return (
                       <div key={q.id || idx} className="p-3.5 rounded-2xl border-2 border-amber-200 bg-amber-50/40 space-y-2 text-xs">
@@ -3126,7 +3131,7 @@ export const TeacherDashboard: React.FC = () => {
                         <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
                           <div className={`p-2 rounded-xl border ${isCorrect ? 'bg-white border-slate-200' : 'bg-rose-50 border-rose-300'}`}>
                             <span className="text-slate-400 text-[10px] block">Em chọn:</span>
-                            <span className={`font-black ${isCorrect ? 'text-amber-950' : 'text-rose-900'}`}>{resp?.selected_options?.join(', ') || 'Đã chọn'}</span>
+                            <span className={`font-black ${isCorrect ? 'text-amber-950' : 'text-rose-900'}`}>{selectedDisplay}</span>
                           </div>
                           <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-300">
                             <span className="text-emerald-700 text-[10px] block">Đáp án đúng:</span>
