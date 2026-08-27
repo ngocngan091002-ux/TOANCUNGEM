@@ -3069,10 +3069,16 @@ export const TeacherDashboard: React.FC = () => {
                   ? `${sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10`
                   : (comp ? '10/10' : 'Chưa có');
 
-                const totalQCount = selectedStudentDetail.questions?.length || sub?.responses?.length || 1;
+                const totalQCount = (selectedStudentDetail.questions && selectedStudentDetail.questions.length > 0)
+                  ? selectedStudentDetail.questions.length
+                  : (sub?.responses && sub.responses.length > 0 ? sub.responses.length : 1);
+
                 const correctQCount = sub?.responses && sub.responses.length > 0
                   ? sub.responses.filter((r: any) => r.is_correct).length
-                  : (isSubmitted ? totalQCount : 0);
+                  : (sub?.score !== undefined 
+                      ? Math.round(((sub.score > 10 ? sub.score / 10 : sub.score) / 10) * totalQCount) 
+                      : (isSubmitted ? totalQCount : 0));
+
                 const correctCountDisplay = `${correctQCount} / ${totalQCount}`;
 
                 return (
