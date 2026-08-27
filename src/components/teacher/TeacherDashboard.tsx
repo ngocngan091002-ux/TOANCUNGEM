@@ -2625,8 +2625,6 @@ export const TeacherDashboard: React.FC = () => {
                 const totalCount = students.length || 33;
                 
                 let submittedCount = 0;
-                let inProgressCount = 0;
-                let notStartedCount = 0;
 
                 students.forEach(st => {
                   const stSub = viewAssignmentSubmissions.find(s => 
@@ -2635,21 +2633,13 @@ export const TeacherDashboard: React.FC = () => {
                     (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
                     (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
                   );
-                  const stProg = viewAssignmentProgress.find(p => 
-                    p.student_id === st.id ||
-                    (st.email && (p.student?.email === st.email || p.student_id === st.email)) ||
-                    (st.student_code && (p.student?.student_code === st.student_code || p.student_id === st.student_code))
-                  );
 
                   if (stSub) {
                     submittedCount++;
-                  } else if (stProg && stProg.status === 'in_progress') {
-                    inProgressCount++;
-                  } else {
-                    notStartedCount++;
                   }
                 });
 
+                const unsubmittedCount = Math.max(0, totalCount - submittedCount);
                 const percent = totalCount > 0 ? Math.min(100, Math.round((submittedCount / totalCount) * 100)) : 0;
 
                 return (
@@ -2661,27 +2651,23 @@ export const TeacherDashboard: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs font-bold">
-                      <div className="p-2.5 bg-white rounded-xl border border-amber-200 shadow-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center text-xs font-bold">
+                      <div className="p-3 bg-white rounded-2xl border border-amber-200 shadow-xs">
                         <span className="text-[10px] text-slate-500 font-extrabold uppercase block">👥 Tổng học sinh</span>
                         <span className="text-base font-black text-slate-900">{totalCount}</span>
                       </div>
-                      <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-300 text-emerald-950 shadow-xs">
+                      <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-300 text-emerald-950 shadow-xs">
                         <span className="text-[10px] text-emerald-800 font-extrabold uppercase block">🟢 Đã nộp</span>
                         <span className="text-base font-black text-emerald-700">{submittedCount}/{totalCount}</span>
                       </div>
-                      <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-300 text-amber-950 shadow-xs">
-                        <span className="text-[10px] text-amber-800 font-extrabold uppercase block">🟡 Đang làm</span>
-                        <span className="text-base font-black text-amber-700">{inProgressCount}/{totalCount}</span>
-                      </div>
-                      <div className="p-2.5 bg-rose-50 rounded-xl border border-rose-200 text-rose-950 shadow-xs">
+                      <div className="p-3 bg-rose-50 rounded-2xl border border-rose-200 text-rose-950 shadow-xs">
                         <span className="text-[10px] text-rose-800 font-extrabold uppercase block">🔴 Chưa làm</span>
-                        <span className="text-base font-black text-rose-700">{notStartedCount}/{totalCount}</span>
+                        <span className="text-base font-black text-rose-700">{unsubmittedCount}/{totalCount}</span>
                       </div>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
                       <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
                     </div>
                   </div>
@@ -2720,20 +2706,14 @@ export const TeacherDashboard: React.FC = () => {
                           (st.email && (s.student?.email === st.email || s.student_id === st.email)) ||
                           (st.student_code && (s.student?.student_code === st.student_code || s.student_id === st.student_code))
                         );
-                        const stProg = viewAssignmentProgress.find(p => 
-                          p.student_id === st.id ||
-                          (st.email && (p.student?.email === st.email || p.student_id === st.email)) ||
-                          (st.student_code && (p.student?.student_code === st.student_code || p.student_id === st.student_code))
-                        );
 
                         const isSubmitted = !!stSub;
-                        const isInProgress = !stSub && stProg?.status === 'in_progress';
 
                         const submitTimeStr = stSub?.submitted_at || stSub?.created_at
                           ? new Date(stSub.submitted_at || stSub.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
                           : '—';
 
-                        const timeSpentSec = stSub?.responses?.reduce((sum: number, r: any) => sum + (r.time_spent_seconds || 0), 0) || stProg?.completion_time_seconds || 0;
+                        const timeSpentSec = stSub?.responses?.reduce((sum: number, r: any) => sum + (r.time_spent_seconds || 0), 0) || 0;
                         const durationStr = timeSpentSec > 0 
                           ? `${Math.ceil(timeSpentSec / 60)} phút` 
                           : (isSubmitted ? '05 phút' : '—');
@@ -2743,7 +2723,7 @@ export const TeacherDashboard: React.FC = () => {
                           : '—';
 
                         return (
-                          <tr key={st.id} className={isSubmitted ? 'bg-emerald-50/50 hover:bg-emerald-50' : (isInProgress ? 'bg-amber-50/50' : 'hover:bg-slate-50')}>
+                          <tr key={st.id} className={isSubmitted ? 'bg-emerald-50/50 hover:bg-emerald-50' : 'hover:bg-slate-50'}>
                             <td className="p-2.5 text-center font-black text-slate-500">{idx + 1}</td>
                             <td className="p-2.5">
                               <span className="font-black text-slate-900 block">{st.full_name}</span>
@@ -2753,10 +2733,6 @@ export const TeacherDashboard: React.FC = () => {
                               {isSubmitted ? (
                                 <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-300">
                                   🟢 Đã nộp
-                                </span>
-                              ) : isInProgress ? (
-                                <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-300">
-                                  🟡 Đang làm
                                 </span>
                               ) : (
                                 <span className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-200">
