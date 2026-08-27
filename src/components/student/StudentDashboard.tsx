@@ -725,7 +725,7 @@ export const StudentDashboard: React.FC = () => {
                 }
 
                 const sub = submissions.find(s => s.assignment_id === a.id) ||
-                            (localSubmittedIds.includes(a.id) ? { id: 'local_' + a.id, assignment_id: a.id, score: 10, status: 'submitted' as const, submitted_at: new Date().toISOString() } : undefined);
+                            (localSubmittedIds.includes(a.id) ? { id: 'local_' + a.id, assignment_id: a.id, score: 10, status: 'submitted' as const, submitted_at: new Date().toISOString(), teacher_remark: '' } : undefined);
                 const isOverdue = !sub && a.due_date && new Date() > new Date(a.due_date);
 
                 return (
@@ -737,15 +737,9 @@ export const StudentDashboard: React.FC = () => {
                         </span>
 
                         {sub ? (
-                          (sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed') ? (
-                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
-                              🟢 Cô Đã Duyệt ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
-                            </span>
-                          ) : (
-                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1">
-                              🟠 Đã Nộp – Chờ Duyệt
-                            </span>
-                          )
+                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
+                            🟢 Đã Nộp ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)}/10 Điểm)
+                          </span>
                         ) : isOverdue ? (
                           <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
                             🔴 Quá Hạn
@@ -774,41 +768,29 @@ export const StudentDashboard: React.FC = () => {
 
                     <div className="pt-2">
                       {sub ? (
-                        (sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed') ? (
-                          <div className="p-3 bg-emerald-50 rounded-2xl border-2 border-emerald-300 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-emerald-900">
-                                🎯 Điểm chính thức: <strong className="text-base text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score} / 10</strong>
-                              </span>
-                              <span className="text-[10px] bg-emerald-200 text-emerald-950 font-black px-2 py-0.5 rounded-lg">
-                                ✓ Đã chốt
-                              </span>
-                            </div>
-
-                            <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
-                              <span className="text-emerald-800 font-black block text-[10px]">✍️ NHẬN XÉT CỦA GIÁO VIÊN:</span>
-                              "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => setSelectedSubmissionDetail({ assignment: a, submission: sub })}
-                              className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all mt-1"
-                            >
-                              <Eye className="w-4 h-4" /> [ 👁️ XEM BÀI LÀM & ĐÁP ÁN ĐÚNG ]
-                            </button>
+                        <div className="p-3 bg-emerald-50 rounded-2xl border-2 border-emerald-300 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-emerald-900">
+                              🎯 Điểm chính thức: <strong className="text-base text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)} / 10</strong>
+                            </span>
+                            <span className="text-[10px] bg-emerald-200 text-emerald-950 font-black px-2 py-0.5 rounded-lg">
+                              ✓ Đã hoàn thành
+                            </span>
                           </div>
-                        ) : (
-                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-amber-950">🟠 Đã nộp bài thành công</span>
-                              <span className="text-[10px] bg-amber-200 text-amber-950 font-bold px-2 py-0.5 rounded-lg">⏳ Chờ duyệt</span>
-                            </div>
-                            <p className="text-[11px] font-bold text-amber-800">
-                              Điểm số & chi tiết đáp án sẽ hiển thị ngay khi Giáo viên duyệt bài nhé!
-                            </p>
+
+                          <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
+                            <span className="text-emerald-800 font-black block text-[10px]">✍️ NHẬN XÉT CỦA GIÁO VIÊN:</span>
+                            "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
                           </div>
-                        )
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSubmissionDetail({ assignment: a, submission: sub })}
+                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all mt-1"
+                          >
+                            <Eye className="w-4 h-4" /> [ 👁️ XEM BÀI LÀM & ĐÁP ÁN ĐÚNG ]
+                          </button>
+                        </div>
                       ) : (
                         <button
                           onClick={() => handleStartAssignment(a)}
@@ -840,25 +822,16 @@ export const StudentDashboard: React.FC = () => {
                 submissions.map(sub => {
                   const assign = assignments.find(a => a.id === sub.assignment_id);
                   const title = assign?.title || 'Bài tập tuần';
-                  const isReviewed = sub.status === 'finalized_by_teacher' || sub.status === 'teacher_reviewed';
-
-                  return (
-                    <div key={sub.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                      <div>
-                        <h4 className="font-extrabold text-sm text-slate-900">{title}</h4>
-                        {isReviewed ? (
+                    return (
+                      <div key={sub.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+                        <div>
+                          <h4 className="font-extrabold text-sm text-slate-900">{title}</h4>
                           <div className="text-xs font-black text-emerald-800 block mt-0.5">
-                            🟢 Đã được Thầy/Cô duyệt & chốt điểm ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : sub.score}/10 Điểm)
-                            {sub.teacher_remark && <span className="block text-slate-600 font-bold italic mt-0.5">✍️ "{sub.teacher_remark}"</span>}
+                            🟢 Đã hoàn thành ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)}/10 Điểm)
+                            <span className="block text-slate-600 font-bold italic mt-0.5">✍️ "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần!'}"</span>
                           </div>
-                        ) : (
-                          <span className="text-xs font-black text-amber-800 block mt-0.5">
-                            🟡 Đã nộp – Chờ giáo viên duyệt & chốt điểm
-                          </span>
-                        )}
-                      </div>
+                        </div>
 
-                      {isReviewed ? (
                         <button
                           type="button"
                           onClick={() => assign && setSelectedSubmissionDetail({ assignment: assign, submission: sub })}
@@ -866,13 +839,8 @@ export const StudentDashboard: React.FC = () => {
                         >
                           <Eye className="w-4 h-4" /> 👁️ Xem bài làm & điểm
                         </button>
-                      ) : (
-                        <span className="px-3 py-1.5 rounded-xl font-black text-xs bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap self-start sm:self-auto">
-                          ⏳ Đang chờ duyệt
-                        </span>
-                      )}
-                    </div>
-                  );
+                      </div>
+                    );
                 })
               )}
             </div>
