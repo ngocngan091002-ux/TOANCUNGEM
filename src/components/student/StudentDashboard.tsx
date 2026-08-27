@@ -230,7 +230,7 @@ export const StudentDashboard: React.FC = () => {
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, is_completed: true, completed_count: (t.completed_count || 0) + 1 } : t));
       confetti({ particleCount: 80, spread: 60 });
 
-      alert('🎉 Em đã nộp bài thành công!\n\nBài làm của em đã được gửi đến giáo viên.\n⏳ Đang chờ giáo viên kiểm tra và chốt điểm.');
+      alert('🎉 Chúc mừng em đã hoàn thành nhiệm vụ!');
     } catch (err: any) {
       console.error('handleCompleteTask error:', err);
       alert('⚠️ Chưa thể lưu kết quả. Vui lòng thử lại.');
@@ -646,9 +646,9 @@ export const StudentDashboard: React.FC = () => {
 
                     <button
                       onClick={() => handleCompleteTask(t.id)}
-                      className="px-4 py-2 rounded-2xl font-black text-xs shadow transition-all bg-amber-500 hover:bg-amber-600 text-white cursor-pointer active:scale-95 flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-2xl font-black text-xs shadow transition-all bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer active:scale-95 flex items-center gap-1.5"
                     >
-                      <span>🚀 NỘP BÀI</span>
+                      <span>✓ HOÀN THÀNH</span>
                     </button>
                   </div>
                 ))
