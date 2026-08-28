@@ -1143,42 +1143,52 @@ export async function getStudentSubmissions(
   studentCode?: string
 ): Promise<AssignmentSubmission[]> {
   try {
-    const possibleIds = new Set<string>();
-    if (studentId) possibleIds.add(studentId);
-    if (email) possibleIds.add(email);
-    if (studentCode) possibleIds.add(studentCode);
+    const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    const uuidSet = new Set<string>();
 
-    let orQuery = `id.eq.${studentId}`;
-    if (email) orQuery += `,email.eq.${email}`;
-    if (studentCode) orQuery += `,student_code.eq.${studentCode}`;
+    if (isUuid(studentId)) uuidSet.add(studentId);
 
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+    const cleanCode = studentCode ? studentCode.trim().toUpperCase() : '';
+
+    // Tra cứu profiles trong CSDL để lấy toàn bộ UUID hợp lệ liên quan đến học sinh này
     const { data: profiles } = await supabaseAdmin
       .from('profiles')
-      .select('id, email, student_code')
-      .or(orQuery);
+      .select('id, email, student_code');
 
     if (profiles && profiles.length > 0) {
       profiles.forEach(p => {
-        if (p.id) possibleIds.add(p.id);
-        if (p.email) possibleIds.add(p.email);
-        if (p.student_code) possibleIds.add(p.student_code);
+        const pEmail = p.email ? p.email.trim().toLowerCase() : '';
+        const pCode = p.student_code ? p.student_code.trim().toUpperCase() : '';
+
+        if (
+          (isUuid(studentId) && p.id === studentId) ||
+          (cleanEmail && pEmail && pEmail === cleanEmail) ||
+          (cleanCode && pCode && pCode === cleanCode)
+        ) {
+          if (isUuid(p.id)) uuidSet.add(p.id);
+        }
       });
     }
 
-    const idList = Array.from(possibleIds);
+    const uuidList = Array.from(uuidSet);
+    if (uuidList.length === 0) return [];
 
     const { data, error } = await supabaseAdmin
       .from('assignment_submissions')
       .select('*, assignment:assignments(*), responses:question_responses(*)')
-      .in('student_id', idList);
+      .in('student_id', uuidList);
 
     if (error) {
-      console.warn('getStudentSubmissions query warning:', error.message);
-      const { data: fbData } = await supabaseAdmin
-        .from('assignment_submissions')
-        .select('*, assignment:assignments(*), responses:question_responses(*)')
-        .eq('student_id', studentId);
-      return fbData || [];
+      console.warn('getStudentSubmissions query error:', error.message);
+      if (isUuid(studentId)) {
+        const { data: fbData } = await supabaseAdmin
+          .from('assignment_submissions')
+          .select('*, assignment:assignments(*), responses:question_responses(*)')
+          .eq('student_id', studentId);
+        return fbData || [];
+      }
+      return [];
     }
 
     return data || [];
