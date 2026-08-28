@@ -65,6 +65,15 @@ export const StudentDashboard: React.FC = () => {
   ]);
   const [aiChatLoading, setAiChatLoading] = useState<boolean>(false);
 
+  // REALTIME POINT NOTIFICATION TOAST
+  const [pointNotificationToast, setPointNotificationToast] = useState<{
+    show: boolean;
+    title: string;
+    reason: string;
+    icon: string;
+    pts: number;
+  } | null>(null);
+
   useEffect(() => {
     if (user?.id) {
       loadStudentClasses();
@@ -72,22 +81,57 @@ export const StudentDashboard: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (selectedClassId) {
+    if (selectedClassId && user?.id) {
       loadClassContent(selectedClassId);
 
-      const unsubscribe = subscribeToSubmissions(() => {
-        if (user?.id) {
-          getStudentSubmissions(user.id, user.email, user.student_code).then(sub => {
-            setSubmissions(sub);
-          });
-        }
-      });
+      // KÊNH REALTIME SUPABASE TỰ ĐỘNG LẮNG NGHE GIÁO VIÊN CỘNG ĐIỂM (0 GIÂY KHÔNG F5)
+      const channel = supabase
+        .channel(`student_realtime_points_${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'student_points_log', filter: `student_id=eq.${user.id}` },
+          (payload: any) => {
+            const newLog = payload.new;
+            const ptsAdded = newLog.points_change || 0;
+            const reasonText = newLog.reason || 'Tích cực học tập';
+            const iconEmoji = newLog.icon || '⭐';
+
+            setPointNotificationToast({
+              show: true,
+              title: ptsAdded >= 0 ? `🎉 Bạn vừa được cộng +${ptsAdded} điểm!` : `⚠️ Bạn vừa bị trừ ${ptsAdded} điểm`,
+              reason: reasonText,
+              icon: iconEmoji,
+              pts: ptsAdded
+            });
+
+            setTimeout(() => {
+              setPointNotificationToast(null);
+            }, 6000);
+
+            loadClassContent(selectedClassId);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'student_points_log' },
+          () => {
+            loadClassContent(selectedClassId);
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'assignment_submissions' },
+          () => {
+            loadClassContent(selectedClassId);
+          }
+        )
+        .subscribe();
 
       return () => {
-        unsubscribe();
+        supabase.removeChannel(channel);
       };
     }
-  }, [selectedClassId, user]);
+  }, [selectedClassId, user?.id]);
 
   const loadStudentClasses = async () => {
     try {
@@ -1644,6 +1688,289 @@ export const StudentDashboard: React.FC = () => {
           </div>
         );
       })()}
+
+      {/* 🏆 8. BẢNG XẾP HẠNG THI ĐUA HỌC SINH (100% CSDL SUPABASE REALTIME & ĐỘNG TRỰC TIẾP) */}
+      {activeMenu === 'leaderboard' && (() => {
+        // Tính điểm tuần này của học sinh
+        const now = new Date();
+        const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + (now.getDay() === 0 ? -6 : 1)));
+        startOfWeek.setHours(0, 0, 0, 0);
+
+        const weeklyLogs = myPointLogs.filter(l => l.created_at && new Date(l.created_at) >= startOfWeek);
+        const weeklySubs = submissions.filter(s => s.submitted_at && new Date(s.submitted_at) >= startOfWeek);
+
+        const weeklyPoints = weeklyLogs.reduce((sum, l) => sum + (Number(l.points_change) || 0), 0)
+          + weeklySubs.reduce((sum, s) => sum + (s.score > 10 ? Math.round(s.score / 10) : Number(s.score || 0)), 0);
+
+        const myEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.student_code === user?.student_code);
+        const myRankInClass = myEntry ? myEntry.rank : 1;
+        const unlockedBadgesCount = [
+          submissions.length >= 5,
+          myTotalPoints >= 100,
+          submissions.some(s => s.score >= 10),
+          submissions.length >= 1
+        ].filter(Boolean).length;
+
+        return (
+          <div className="space-y-6 animate-fadeIn">
+            {/* HEADER BANNER */}
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-6 rounded-3xl shadow-xl border-4 border-amber-300 space-y-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-xs font-black uppercase text-amber-100 border border-white/30 inline-block mb-1">
+                    🏆 THI ĐUA HỌC TẬP LỚP HAI 4 (REALTIME SUPABASE)
+                  </span>
+                  <h2 className="text-2xl sm:text-3xl font-black">🏆 BẢNG XẾP HẠNG HỌC SINH</h2>
+                  <p className="text-xs font-extrabold text-amber-100 opacity-90">
+                    Thứ hạng được hệ thống tự động tính toán trực tiếp từ dữ liệu CSDL theo điểm số thực tế
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadClassContent(selectedClassId)}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-md text-white rounded-2xl font-black text-xs border border-white/40 shadow flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+                >
+                  <RefreshCw className="w-4 h-4" /> Cập nhật điểm CSDL
+                </button>
+              </div>
+            </div>
+
+            {/* 4 THẺ THỐNG KÊ TỔNG QUAN PHÍA TRÊN BẢNG XẾP HẠNG */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
+                <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
+                  ⭐ Điểm của em
+                </span>
+                <h3 className="text-2xl font-black text-amber-900">{myTotalPoints} <span className="text-xs font-bold text-amber-700">điểm</span></h3>
+                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 w-max">
+                  ✓ 100% CSDL Supabase
+                </span>
+              </div>
+
+              <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
+                <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
+                  🏆 Xếp hạng
+                </span>
+                <h3 className="text-2xl font-black text-purple-900">#{myRankInClass} <span className="text-xs font-bold text-purple-700">trong lớp</span></h3>
+                <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
+                  Xếp hạng động
+                </span>
+              </div>
+
+              <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
+                <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
+                  📈 Điểm tuần này
+                </span>
+                <h3 className="text-2xl font-black text-emerald-800">+{weeklyPoints} <span className="text-xs font-bold text-emerald-700">điểm</span></h3>
+                <span className="text-[10px] font-extrabold text-teal-950 bg-teal-100 px-2 py-0.5 rounded-lg border border-teal-300 w-max">
+                  Tích lũy tuần này
+                </span>
+              </div>
+
+              <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
+                <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
+                  🎖️ Huy hiệu
+                </span>
+                <h3 className="text-2xl font-black text-rose-900">{unlockedBadgesCount} <span className="text-xs font-bold text-rose-700">huy hiệu</span></h3>
+                <span className="text-[10px] font-extrabold text-rose-950 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-300 w-max">
+                  Đã mở khóa
+                </span>
+              </div>
+            </div>
+
+            {/* BẢNG XẾP HẠNG TOP HỌC SINH TÍNH TỪ CSDL SUPABASE */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">🥇</span> BẢNG XẾP HẠNG HỌC SINH LỚP HAI 4 ({leaderboard.length} Học Sinh)
+                </h3>
+                <span className="text-[10px] font-black bg-emerald-100 text-emerald-950 px-2.5 py-1 rounded-xl border border-emerald-300">
+                  ⚡ Tự động cập nhật Realtime
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border-2 border-amber-200">
+                <table className="w-full text-left text-xs font-bold">
+                  <thead className="bg-amber-200/70 text-amber-950 font-black uppercase text-[10px] tracking-wider border-b border-amber-300">
+                    <tr>
+                      <th className="p-3 text-center w-16">Hạng</th>
+                      <th className="p-3">Họ và Tên Học Sinh</th>
+                      <th className="p-3 text-center">Nhiệm Vụ</th>
+                      <th className="p-3 text-center">Bài Tập Tuần</th>
+                      <th className="p-3 text-right pr-4">Tổng Điểm</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 text-slate-800">
+                    {leaderboard.map((st, idx) => {
+                      const isMe = st.student_id === user?.id || (user?.email && st.email === user.email);
+                      const rankBadge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                      const rowBg = isMe 
+                        ? 'bg-amber-100/90 border-2 border-amber-400 font-black text-slate-900 shadow-xs' 
+                        : idx < 3 
+                        ? 'bg-amber-50/50 hover:bg-amber-100/40' 
+                        : 'hover:bg-amber-50/30';
+
+                      return (
+                        <tr key={st.student_id || idx} className={`${rowBg} transition-colors`}>
+                          <td className="p-3 text-center font-black text-base">
+                            <span className={idx < 3 ? 'text-xl' : 'text-slate-600 font-mono text-xs'}>{rankBadge}</span>
+                          </td>
+                          <td className="p-3 font-extrabold flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black text-white shadow-xs ${
+                              idx === 0 ? 'bg-amber-500 ring-2 ring-amber-300' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-amber-700' : 'bg-teal-600'
+                            }`}>
+                              {st.student_name ? st.student_name.charAt(0) : 'H'}
+                            </div>
+                            <div>
+                              <span className="text-slate-900 font-black block">{st.student_name} {isMe && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.2 rounded-md ml-1 font-black">BẠN</span>}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">Mã: {st.student_code || '---'}</span>
+                            </div>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-purple-100 text-purple-950 border border-purple-300">
+                              {st.tasks_completed} bài
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-blue-100 text-blue-950 border border-blue-300">
+                              {st.assignment_score}đ
+                            </span>
+                          </td>
+                          <td className="p-3 text-right pr-4">
+                            <span className="px-3 py-1 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs">
+                              ⭐ {st.total_points} điểm
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* 📜 7. LỊCH SỬ ĐIỂM THỰC TẾ TRONG SUPABASE CSDL CỦA HỌC SINH */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">📜</span> LỊCH SỬ TÍCH ĐIỂM CHI TIẾT (CSDL SUPABASE)
+                </h3>
+                <span className="text-[10px] font-black bg-amber-100 text-amber-950 px-2.5 py-1 rounded-xl border border-amber-300">
+                  {myPointLogs.length} Nhật ký ghi nhận
+                </span>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-amber-200">
+                <table className="w-full text-left text-xs font-bold">
+                  <thead className="bg-amber-100/80 text-amber-950 font-black uppercase text-[10px] border-b border-amber-200">
+                    <tr>
+                      <th className="p-3">Ngày Giờ</th>
+                      <th className="p-3">Biểu Tượng & Lý Do Tích Điểm</th>
+                      <th className="p-3 text-right">Số Điểm</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 text-slate-800">
+                    {myPointLogs.length > 0 ? (
+                      myPointLogs.map((log, lIdx) => {
+                        const dateStr = log.created_at 
+                          ? new Date(log.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+                          : 'Vừa xong';
+                        const ptsVal = log.points_change || 0;
+                        const isPositive = ptsVal >= 0;
+
+                        return (
+                          <tr key={log.id || lIdx} className="hover:bg-amber-50/50">
+                            <td className="p-3 text-slate-500 font-extrabold whitespace-nowrap">{dateStr}</td>
+                            <td className="p-3 font-black text-slate-900">
+                              <span className="text-base mr-1.5">{log.icon || '⭐'}</span>
+                              <span>{log.reason || 'Tích cực học tập'}</span>
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap">
+                              <span className={`px-2.5 py-1 rounded-xl font-black text-xs ${
+                                isPositive ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'
+                              }`}>
+                                {isPositive ? `+${ptsVal}` : ptsVal} điểm
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td colSpan={3} className="p-6 text-center text-slate-400 font-bold">
+                          Chưa có nhật ký tích điểm riêng nào được ghi nhận trong CSDL. Em hãy hăng hái phát biểu và làm bài tập nhé!
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 👤 9. HỒ SƠ HỌC SINH */}
+      {activeMenu === 'profile' && (
+        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6 max-w-2xl mx-auto">
+          <div className="text-center space-y-2 border-b border-amber-200 pb-4">
+            <div className="w-20 h-20 bg-amber-500 text-white font-black text-3xl rounded-full flex items-center justify-center mx-auto shadow-md border-4 border-amber-200">
+              {user?.full_name?.charAt(0) || 'H'}
+            </div>
+            <h3 className="text-xl font-black text-slate-900">{user?.full_name || 'Học sinh'}</h3>
+            <span className="px-3 py-1 bg-amber-100 text-amber-950 rounded-xl text-xs font-black border border-amber-300 inline-block">
+              Lớp Hai 4 | Khối 2
+            </span>
+          </div>
+
+          <div className="space-y-3 text-xs font-extrabold text-slate-700">
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
+              <span>Mã Học Sinh:</span>
+              <span className="font-mono text-amber-900 font-black">{user?.student_code || 'Chưa cập nhật'}</span>
+            </div>
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
+              <span>Tài Khoản Đăng Nhập:</span>
+              <span className="text-slate-900 font-black">{user?.email}</span>
+            </div>
+            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
+              <span>Tổng Điểm Tích Lũy CSDL:</span>
+              <span className="text-emerald-700 font-black">⭐ {myTotalPoints} điểm</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🎉 REALTIME TOAST THÔNG BÁO CỘNG ĐIỂM CHO HỌC SINH */}
+      {pointNotificationToast && (
+        <div className="fixed bottom-6 right-6 z-[100] max-w-sm bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-4 rounded-3xl shadow-2xl border-4 border-amber-300 space-y-2 animate-bounce">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl bg-white/20 backdrop-blur-md p-2 rounded-2xl border border-white/30">
+                {pointNotificationToast.icon || '🎉'}
+              </span>
+              <div>
+                <h4 className="font-black text-sm text-yellow-200">
+                  {pointNotificationToast.title}
+                </h4>
+                <p className="text-xs font-extrabold text-white">
+                  Lý do: {pointNotificationToast.reason}
+                </p>
+                <span className="text-[10px] font-bold text-amber-100 block mt-0.5">
+                  Cố gắng tiếp tục nhé! ⭐
+                </span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setPointNotificationToast(null)}
+              className="p-1 bg-white/20 hover:bg-white/30 text-white rounded-xl"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL LÀM BÀI TRẮC NGHIỆM CHO HỌC SINH */}
       {activeAssignment && (

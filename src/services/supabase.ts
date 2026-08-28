@@ -1303,23 +1303,30 @@ export async function updateTeacherGrading(
   if (error) throw error;
 }
 
-// --- LEADERBOARD ---
+// --- LEADERBOARD (100% CSDL SUPABASE REALTIME & ĐỘNG TRỰC TIẾP) ---
 export async function getClassLeaderboard(classId: string): Promise<LeaderboardEntry[]> {
   const members = await getClassMembers(classId);
   if (!members || members.length === 0) return [];
 
   const studentIds = members.map(m => m.student_id);
 
+  // 1. Lấy tất cả lượt hoàn thành nhiệm vụ
   const { data: completions } = await supabaseAdmin
     .from('task_completions')
     .select('student_id')
     .in('student_id', studentIds);
 
+  // 2. Lấy tất cả bài tập đã làm
   const { data: submissions } = await supabaseAdmin
     .from('assignment_submissions')
     .select('student_id, score, status, assignment:assignments(type)')
-    .in('student_id', studentIds)
-    .eq('status', 'finalized_by_teacher');
+    .in('student_id', studentIds);
+
+  // 3. Lấy tất cả nhật ký cộng/trừ điểm trực tiếp từ Giáo viên
+  const { data: pointLogs } = await supabaseAdmin
+    .from('student_points_log')
+    .select('student_id, points_change')
+    .in('student_id', studentIds);
 
   const leaderboard: LeaderboardEntry[] = members.map(m => {
     const student = m.student;
@@ -1332,7 +1339,15 @@ export async function getClassLeaderboard(classId: string): Promise<LeaderboardE
     const avgExercise = exerciseSubs.length > 0 ? exerciseSubs.reduce((a, b) => a + Number(b.score), 0) / exerciseSubs.length : 0;
     const avgTest = testSubs.length > 0 ? testSubs.reduce((a, b) => a + Number(b.score), 0) / testSubs.length : 0;
 
-    const totalPoints = (studentCompletions * 10) + Math.round(avgExercise) + Math.round(avgTest * 1.5);
+    // Điểm cộng/trừ trực tiếp từ Giáo viên
+    const studentLogs = pointLogs?.filter(p => p.student_id === m.student_id) || [];
+    const teacherPoints = studentLogs.reduce((sum, l) => sum + (Number(l.points_change) || 0), 0);
+
+    // Điểm bài tập tuần
+    const subPoints = studentSubs.reduce((sum, s) => sum + (s.score > 10 ? Math.round(s.score / 10) : Number(s.score || 0)), 0);
+
+    // Tổng điểm thực tế 100% CSDL Supabase
+    const totalPoints = Math.max(0, teacherPoints + subPoints + (studentCompletions * 10));
 
     return {
       student_id: m.student_id,
@@ -1347,6 +1362,7 @@ export async function getClassLeaderboard(classId: string): Promise<LeaderboardE
     };
   });
 
+  // Tự động sắp xếp lại vị trí Xếp hạng động theo điểm tổng cộng giảm dần
   leaderboard.sort((a, b) => b.total_points - a.total_points);
   leaderboard.forEach((entry, idx) => entry.rank = idx + 1);
 
@@ -1467,6 +1483,13 @@ export function subscribeToSubmissions(callback: () => void) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'student_progress' },
+        () => {
+          callback();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'student_points_log' },
         () => {
           callback();
         }
