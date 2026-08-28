@@ -1399,94 +1399,114 @@ export const StudentDashboard: React.FC = () => {
 
             </div>
 
-            {/* 4. 🏆 THÀNH TÍCH CỦA EM & 7. 🎯 MỤC TIÊU TIẾP THEO */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              
-              {/* 4. 🏅 BỘ SƯU TẬP THÀNH TÍCH CỦA EM (ĐIỀU KIỆN MỞ KHÓA THỰC TẾ) */}
-              <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                    <span className="text-xl">🏅</span> BỘ SƯU TẬP THÀNH TÍCH CỦA EM
-                  </h3>
-                  <span className="text-[10px] font-black bg-amber-100 text-amber-950 px-2 py-1 rounded-xl border border-amber-300">
-                    Mở khóa theo CSDL
-                  </span>
-                </div>
+            {/* 4. 🏆 THÀNH TÍCH CỦA EM & 7. 🎯 MỤC TIÊU TIẾP THEO (100% CSDL THỰC TẾ) */}
+            {(() => {
+              const totalAnsCount = submissions.reduce((acc, s) => acc + (s.responses?.length || 0), 0);
+              const hasScore10 = submissions.some(s => s.score >= 10);
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  {[
-                    { title: 'Ngôi sao chăm chỉ', desc: 'Nộp ít nhất 1 bài tập', icon: '🏅', unlocked: submissions.length >= 1 },
-                    { title: '7 ngày liên tiếp', desc: 'Tích lũy hoạt động CSDL', icon: '🔥', unlocked: streakDays >= 3 },
-                    { title: 'Siêu tốc', desc: 'Hoàn thành bài nộp', icon: '⚡', unlocked: submissions.length >= 2 },
-                    { title: 'Bách phát bách trúng', desc: 'Đạt điểm 10/10 tuyệt đối', icon: '🎯', unlocked: submissions.some(s => s.score >= 10) },
-                    { title: 'Nhà Toán học nhí', desc: 'Đạt trên 100 điểm tích lũy', icon: '📚', unlocked: myTotalPoints >= 100 },
-                    { title: 'Thành tích bí mật', desc: 'Đạt 500 điểm tích lũy', icon: '🔒', unlocked: myTotalPoints >= 500 },
-                  ].map((b, idx) => (
-                    <div
-                      key={idx}
-                      className={`p-3.5 rounded-2xl border-2 text-center space-y-1 transition-all ${
-                        b.unlocked
-                          ? 'bg-gradient-to-b from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-xs font-black'
-                          : 'bg-slate-50 border-slate-200 text-slate-400 opacity-50 grayscale font-bold'
-                      }`}
-                    >
-                      <div className="text-3xl mb-1">{b.icon}</div>
-                      <h5 className="font-black text-xs leading-tight text-slate-900">{b.title}</h5>
-                      <p className="text-[10px] text-slate-500 font-bold leading-tight">{b.desc}</p>
-                      <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full block w-max mx-auto mt-1 ${
-                        b.unlocked ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-600'
-                      }`}>
-                        {b.unlocked ? '✓ Đã mở' : '🔒 Đang khóa'}
+              const badgesList = [
+                { title: 'Ngôi sao chăm chỉ', desc: 'Hoàn thành từ 5 bài tập trở lên', icon: '🏅', unlocked: submissions.length >= 5 },
+                { title: '7 ngày liên tiếp', desc: 'Học liên tục 7 ngày trong CSDL', icon: '🔥', unlocked: streakDays >= 7 },
+                { title: 'Siêu tốc', desc: 'Làm đúng 1 câu trong 15s', icon: '⚡', unlocked: submissions.some(s => s.responses?.some((r: any) => r.is_correct && r.time_spent_seconds && r.time_spent_seconds <= 15)) },
+                { title: 'Bách phát bách trúng', desc: 'Đạt điểm 10/10 tuyệt đối', icon: '🎯', unlocked: hasScore10 },
+                { title: 'Nhà Toán học nhí', desc: 'Nộp bài tập đầu tiên', icon: '📚', unlocked: submissions.length >= 1 },
+                { title: 'Thành tích bí mật', desc: 'Đạt 500 điểm tích lũy', icon: '🔒', unlocked: myTotalPoints >= 500 },
+              ];
+
+              const unlockedCount = badgesList.filter(b => b.unlocked).length;
+              const targetPointsMilestone = Math.max(100, Math.ceil((myTotalPoints + 1) / 100) * 100);
+              const pointsDiffNeeded = targetPointsMilestone - myTotalPoints;
+
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* 4. 🏅 BỘ SƯU TẬP THÀNH TÍCH CỦA EM */}
+                  <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                        <span className="text-xl">🏅</span> BỘ SƯU TẬP THÀNH TÍCH CỦA EM
+                      </h3>
+                      <span className="text-[10px] font-black bg-amber-100 text-amber-950 px-2 py-1 rounded-xl border border-amber-300">
+                        {unlockedCount} / {badgesList.length} Huy hiệu
                       </span>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* 7. 🎯 MỤC TIÊU TIẾP THEO (TÍNH THỰC TẾ THEO CSDL) */}
-              <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                    <span className="text-xl">🚀</span> MỤC TIÊU TIẾP THEO CỦA EM
-                  </h3>
-                  <span className="text-[10px] font-black bg-rose-100 text-rose-900 px-2 py-1 rounded-xl border border-rose-300">
-                    Theo tiến độ thật
-                  </span>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="p-3 bg-amber-50 rounded-2xl border border-amber-300 space-y-1">
-                    <div className="flex items-center justify-between text-xs font-black text-amber-950">
-                      <span>🎯 Đạt điểm 10/10 ở bài tập tuần tiếp theo</span>
-                      <span className="text-emerald-700 font-bold">✓ Đang thực hiện</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {badgesList.map((b, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3.5 rounded-2xl border-2 text-center space-y-1 transition-all ${
+                            b.unlocked
+                              ? 'bg-gradient-to-b from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-xs font-black'
+                              : 'bg-slate-50 border-slate-200 text-slate-400 opacity-50 grayscale font-bold'
+                          }`}
+                        >
+                          <div className="text-3xl mb-1">{b.icon}</div>
+                          <h5 className="font-black text-xs leading-tight text-slate-900">{b.title}</h5>
+                          <p className="text-[10px] text-slate-500 font-bold leading-tight">{b.desc}</p>
+                          <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full block w-max mx-auto mt-1 ${
+                            b.unlocked ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {b.unlocked ? '✓ Đã mở' : '🔒 Đang khóa'}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  <div className="p-3 bg-purple-50 rounded-2xl border border-purple-300 space-y-1">
-                    <div className="flex items-center justify-between text-xs font-black text-purple-950">
-                      <span>📚 Hoàn thành các bài tập được giao</span>
-                      <span className="text-purple-700 font-bold">{submissions.length} / {Math.max(submissions.length, assignments.length)} bài</span>
+                  {/* 7. 🎯 MỤC TIÊU TIẾP THEO (TÍNH THỰC TẾ THEO CSDL) */}
+                  <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                        <span className="text-xl">🚀</span> MỤC TIÊU TIẾP THEO CỦA EM
+                      </h3>
+                      <span className="text-[10px] font-black bg-rose-100 text-rose-900 px-2 py-1 rounded-xl border border-rose-300">
+                        {(hasScore10 ? 1 : 0) + (submissions.length > 0 ? 1 : 0)} / 3 Mục tiêu đã đạt
+                      </span>
                     </div>
-                  </div>
 
-                  {/* THANH TIẾN TRÌNH TÍCH ĐIỂM DỰA TRÊN MYTOTALPOINTS THỰC TẾ */}
-                  <div className="p-4 bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl border-2 border-amber-300 space-y-2">
-                    <div className="flex items-center justify-between text-xs font-black text-amber-950">
-                      <span>🏆 Cần tích lũy để mở khóa mốc điểm mới:</span>
-                      <span className="text-amber-900 font-black">{myTotalPoints} / {Math.max(100, Math.ceil((myTotalPoints + 1) / 100) * 100)} điểm</span>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-amber-50 rounded-2xl border border-amber-300 space-y-1">
+                        <div className="flex items-center justify-between text-xs font-black text-amber-950">
+                          <span>🎯 Đạt điểm 10/10 ở bài tập tuần</span>
+                          <span className={`font-bold ${hasScore10 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {hasScore10 ? '✓ Đã hoàn thành' : '🎯 Đang thực hiện'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-purple-50 rounded-2xl border border-purple-300 space-y-1">
+                        <div className="flex items-center justify-between text-xs font-black text-purple-950">
+                          <span>📚 Hoàn thành các bài tập được giao</span>
+                          <span className="text-purple-700 font-bold">{submissions.length} / {Math.max(submissions.length, assignments.length)} bài</span>
+                        </div>
+                      </div>
+
+                      <div className="p-3 bg-teal-50 rounded-2xl border border-teal-300 space-y-1">
+                        <div className="flex items-center justify-between text-xs font-black text-teal-950">
+                          <span>🧠 Rèn luyện giải câu hỏi môn Toán</span>
+                          <span className="text-teal-700 font-bold">Đã trả lời {totalAnsCount} câu hỏi</span>
+                        </div>
+                      </div>
+
+                      {/* THANH TIẾN TRÌNH TÍCH ĐIỂM DỰA TRÊN MYTOTALPOINTS THỰC TẾ */}
+                      <div className="p-4 bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl border-2 border-amber-300 space-y-2">
+                        <div className="flex items-center justify-between text-xs font-black text-amber-950">
+                          <span>🏆 Còn {pointsDiffNeeded} điểm để đạt mốc {targetPointsMilestone} điểm:</span>
+                          <span className="text-amber-900 font-black">{myTotalPoints} / {targetPointsMilestone} điểm</span>
+                        </div>
+                        <div className="w-full bg-white h-3.5 rounded-full overflow-hidden border border-amber-300">
+                          <div 
+                            className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500 shadow-sm"
+                            style={{ width: `${Math.min(100, Math.round((myTotalPoints / targetPointsMilestone) * 100))}%` }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="w-full bg-white h-3.5 rounded-full overflow-hidden border border-amber-300">
-                      <div 
-                        className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500 shadow-sm"
-                        style={{ width: `${Math.min(100, Math.round((myTotalPoints / Math.max(100, Math.ceil((myTotalPoints + 1) / 100) * 100)) * 100))}%` }}
-                      />
-                    </div>
+
                   </div>
                 </div>
-
-              </div>
-
-            </div>
+              );
+            })()}
 
             {/* 5. 🎮 TIẾN TRÌNH "HÀNH TRÌNH TOÁN HỌC" (UNLOCK THEO BÀI NỘP CSDL) */}
             <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
