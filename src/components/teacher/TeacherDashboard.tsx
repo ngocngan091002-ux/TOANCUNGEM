@@ -424,17 +424,18 @@ export const TeacherDashboard: React.FC = () => {
 
   useEffect(() => {
     if (selectedClass && activeTab === 'assignments') {
+      const stIds = students.map(s => s.id);
       getAssignments(selectedClass.id, true).then(a => {
         if (a && a.length > 0) {
           setAssignments(a);
         }
       });
-      getAssignmentSubmissionCounts().then(counts => {
+      getAssignmentSubmissionCounts(stIds).then(counts => {
         setAssignmentSubmissionCounts(counts);
       });
 
       const unsubscribe = subscribeToSubmissions(() => {
-        getAssignmentSubmissionCounts().then(counts => {
+        getAssignmentSubmissionCounts(stIds).then(counts => {
           setAssignmentSubmissionCounts(counts);
         });
         if (selectedViewAssignment) {
@@ -448,7 +449,7 @@ export const TeacherDashboard: React.FC = () => {
         unsubscribe();
       };
     }
-  }, [activeTab, selectedClass, selectedViewAssignment]);
+  }, [activeTab, selectedClass, selectedViewAssignment, students]);
 
   const loadTeacherClasses = async () => {
     try {
@@ -518,7 +519,7 @@ export const TeacherDashboard: React.FC = () => {
       setPointLogs(finalLogs);
       localStorage.setItem(localKey, JSON.stringify(finalLogs));
 
-      const subCounts = await getAssignmentSubmissionCounts();
+      const subCounts = await getAssignmentSubmissionCounts(stList.map(s => s.id));
       setAssignmentSubmissionCounts(subCounts);
     } catch (err) {
       console.error('Error loading class data:', err);

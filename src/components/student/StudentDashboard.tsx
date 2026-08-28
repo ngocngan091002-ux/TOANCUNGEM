@@ -736,8 +736,7 @@ export const StudentDashboard: React.FC = () => {
                   }
                 }
 
-                const sub = submissions.find(s => s.assignment_id === a.id) ||
-                            (localSubmittedIds.includes(a.id) ? { id: 'local_' + a.id, assignment_id: a.id, score: 10, status: 'submitted' as const, submitted_at: new Date().toISOString(), teacher_remark: '' } : undefined);
+                const sub = submissions.find(s => s.assignment_id === a.id);
                 const isOverdue = !sub && a.due_date && new Date() > new Date(a.due_date);
 
                 return (

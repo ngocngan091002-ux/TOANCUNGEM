@@ -1231,36 +1231,49 @@ export async function getClassSubmissionsForTeacher(assignmentId: string): Promi
   }
 }
 
-export async function getAssignmentSubmissionCounts(): Promise<Record<string, number>> {
+export async function getAssignmentSubmissionCounts(classStudentIds?: string[]): Promise<Record<string, number>> {
   try {
     const { data: subData } = await supabaseAdmin
       .from('assignment_submissions')
-      .select('assignment_id, student_id');
+      .select('assignment_id, student_id, student:profiles(id, email, student_code)');
 
     const { data: progData } = await supabaseAdmin
       .from('student_progress')
-      .select('assignment_id, student_id')
+      .select('assignment_id, student_id, student:profiles(id, email, student_code)')
       .eq('status', 'completed');
 
+    const validStudentSet = classStudentIds && classStudentIds.length > 0 ? new Set(classStudentIds) : null;
     const counts: Record<string, Set<string>> = {};
 
-    if (subData) {
-      subData.forEach((s: any) => {
-        if (s.assignment_id && s.student_id) {
-          if (!counts[s.assignment_id]) counts[s.assignment_id] = new Set();
-          counts[s.assignment_id].add(s.student_id);
-        }
-      });
-    }
+    const processItem = (s: any) => {
+      if (!s.assignment_id) return;
+      const sId = s.student_id;
+      const profId = s.student?.id;
+      const profCode = s.student?.student_code;
+      const profEmail = s.student?.email;
 
-    if (progData) {
-      progData.forEach((p: any) => {
-        if (p.assignment_id && p.student_id) {
-          if (!counts[p.assignment_id]) counts[p.assignment_id] = new Set();
-          counts[p.assignment_id].add(p.student_id);
-        }
-      });
-    }
+      let isClassMember = true;
+      if (validStudentSet) {
+        isClassMember = (sId && validStudentSet.has(sId)) || 
+                        (profId && validStudentSet.has(profId)) ||
+                        (profCode && validStudentSet.has(profCode)) ||
+                        (profEmail && validStudentSet.has(profEmail));
+      }
+
+      if (isClassMember) {
+        const matchedKey = (sId && validStudentSet?.has(sId)) ? sId : 
+                           (profId && validStudentSet?.has(profId)) ? profId :
+                           (profCode && validStudentSet?.has(profCode)) ? profCode :
+                           (profEmail && validStudentSet?.has(profEmail)) ? profEmail :
+                           (sId || profId || profCode || profEmail || 'unknown');
+
+        if (!counts[s.assignment_id]) counts[s.assignment_id] = new Set();
+        counts[s.assignment_id].add(matchedKey);
+      }
+    };
+
+    if (subData) subData.forEach(processItem);
+    if (progData) progData.forEach(processItem);
 
     const result: Record<string, number> = {};
     Object.keys(counts).forEach(aid => {
