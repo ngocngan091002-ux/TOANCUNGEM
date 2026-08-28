@@ -431,14 +431,20 @@ export const StudentDashboard: React.FC = () => {
 
   const uncompletedCount = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id)).length;
 
-  // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY THỰC TẾ (KHÔNG ĐIỂM ẢO)
+  // Tìm bản ghi điểm thi đua thực tế của học sinh hiện tại từ CSDL Supabase
+  const myEntry = leaderboard.find(lb => 
+    (user?.id && lb.student_id === user.id) ||
+    (user?.email && lb.email && lb.email.toLowerCase() === user.email.toLowerCase()) ||
+    (user?.student_code && lb.student_code && lb.student_code.toUpperCase() === user.student_code.toUpperCase()) ||
+    (user?.full_name && lb.student_name && lb.student_name.trim().toLowerCase() === user.full_name.trim().toLowerCase())
+  );
+
+  // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY THỰC TẾ (ĐỒNG BỘ 100% CSDL SUPABASE VỚI BẢNG XẾP HẠNG)
   const myPointsFromLogs = myPointLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
-  const myTotalPoints = Math.max(0, myPointsFromLogs);
+  const myTotalPoints = myEntry ? myEntry.total_points : Math.max(0, myPointsFromLogs);
   const myStars = myPointLogs.filter(l => l.type === 'reward').length;
 
-  const myRankInClass = leaderboard.length > 0
-    ? (leaderboard.findIndex(item => item.student_id === user?.id || item.email === user?.email) + 1 || 1)
-    : 1;
+  const myRankInClass = myEntry ? myEntry.rank : 1;
 
   const studentBadges = [
     { title: 'Ngôi sao đầu tiên', minPoints: 10, icon: '⭐' },
@@ -1699,16 +1705,16 @@ export const StudentDashboard: React.FC = () => {
         const weeklyLogs = myPointLogs.filter(l => l.created_at && new Date(l.created_at) >= startOfWeek);
         const weeklySubs = submissions.filter(s => s.submitted_at && new Date(s.submitted_at) >= startOfWeek);
 
-        const weeklyPoints = weeklyLogs.reduce((sum, l) => sum + (Number(l.points_change) || 0), 0)
+        const calculatedWeekly = weeklyLogs.reduce((sum, l) => sum + (Number(l.points_change) || 0), 0)
           + weeklySubs.reduce((sum, s) => sum + (s.score > 10 ? Math.round(s.score / 10) : Number(s.score || 0)), 0);
 
-        const myEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.student_code === user?.student_code);
-        const myRankInClass = myEntry ? myEntry.rank : 1;
+        const weeklyPoints = calculatedWeekly > 0 ? calculatedWeekly : myTotalPoints;
+
         const unlockedBadgesCount = [
-          submissions.length >= 5,
-          myTotalPoints >= 100,
-          submissions.some(s => s.score >= 10),
-          submissions.length >= 1
+          submissions.length >= 5 || myTotalPoints >= 30,
+          myTotalPoints >= 10,
+          submissions.some(s => s.score >= 10) || myTotalPoints >= 20,
+          submissions.length >= 1 || myTotalPoints > 0
         ].filter(Boolean).length;
 
         return (
