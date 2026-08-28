@@ -1796,8 +1796,6 @@ export const StudentDashboard: React.FC = () => {
                     <tr>
                       <th className="p-3 text-center w-16">Hạng</th>
                       <th className="p-3">Họ và Tên Học Sinh</th>
-                      <th className="p-3 text-center">Nhiệm Vụ</th>
-                      <th className="p-3 text-center">Bài Tập Tuần</th>
                       <th className="p-3 text-right pr-4">Tổng Điểm</th>
                     </tr>
                   </thead>
@@ -1826,16 +1824,6 @@ export const StudentDashboard: React.FC = () => {
                               <span className="text-slate-900 font-black block">{st.student_name} {isMe && <span className="text-[10px] bg-amber-500 text-white px-1.5 py-0.2 rounded-md ml-1 font-black">BẠN</span>}</span>
                               <span className="text-[10px] text-slate-500 font-mono">Mã: {st.student_code || '---'}</span>
                             </div>
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-purple-100 text-purple-950 border border-purple-300">
-                              {st.tasks_completed} bài
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <span className="px-2.5 py-1 rounded-xl text-[11px] font-black bg-blue-100 text-blue-950 border border-blue-300">
-                              {st.assignment_score}đ
-                            </span>
                           </td>
                           <td className="p-3 text-right pr-4">
                             <span className="px-3 py-1 rounded-xl text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs">
