@@ -42,20 +42,24 @@ export async function getProfileByIdOrEmail(userId: string, email?: string): Pro
     // 1. Ưu tiên tra cứu theo Email hoặc Mã Học Sinh để lấy Họ và Tên thực tế đầy đủ nhất trong DB
     if (email) {
       const cleanEmail = email.trim().toLowerCase();
-      const { data: byEmail } = await supabaseAdmin
+      const codePart = cleanEmail.includes('@') ? cleanEmail.split('@')[0] : cleanEmail;
+
+      const { data: list } = await supabaseAdmin
         .from('profiles')
         .select('*')
-        .or(`email.eq.${cleanEmail},student_code.ilike.${cleanEmail}`)
-        .maybeSingle();
+        .or(`email.eq.${cleanEmail},student_code.ilike.${cleanEmail},student_code.ilike.${codePart}`);
 
-      if (byEmail && byEmail.full_name) {
-        if (byEmail.id !== userId) {
+      if (list && list.length > 0) {
+        // Ưu tiên bản ghi có Tên thật tiếng Việt đầy đủ (không phải mã HS20...)
+        const bestMatch = list.find(p => p.full_name && p.full_name.split(' ').length >= 2 && !p.full_name.toUpperCase().startsWith('HS20')) || list[0];
+
+        if (bestMatch.id !== userId) {
           try {
-            await supabaseAdmin.from('profiles').update({ id: userId }).eq('email', cleanEmail);
-            byEmail.id = userId;
+            await supabaseAdmin.from('profiles').update({ id: userId, full_name: bestMatch.full_name }).eq('id', bestMatch.id);
+            bestMatch.id = userId;
           } catch (e) {}
         }
-        return byEmail as UserProfile;
+        return bestMatch as UserProfile;
       }
     }
 

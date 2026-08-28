@@ -65,17 +65,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // 3. Luôn kiểm tra CSDL để nạp đúng Họ và Tên chuẩn 100% của học sinh (VD: Trần Dương Thanh Ngọc, Nguyễn Lâm Lan Anh)
+      // 3. Luôn kiểm tra CSDL để nạp đúng Họ và Tên chuẩn 100% của học sinh (VD: Huỳnh Phương Bảo Anh, Nguyễn Lâm Lan Anh)
       if (email && profile) {
-        const { data: dbReal } = await supabaseAdmin
+        const codePart = email.includes('@') ? email.split('@')[0] : email;
+        const { data: dbList } = await supabaseAdmin
           .from('profiles')
           .select('full_name, student_code')
-          .or(`email.eq.${email},student_code.ilike.${email}`)
-          .maybeSingle();
+          .or(`email.eq.${email},student_code.ilike.${email},student_code.ilike.${codePart}`);
 
-        if (dbReal && dbReal.full_name) {
-          profile.full_name = dbReal.full_name;
-          if (dbReal.student_code) profile.student_code = dbReal.student_code;
+        if (dbList && dbList.length > 0) {
+          const matched = dbList.find(d => d.full_name && d.full_name.split(' ').length >= 2 && !d.full_name.toUpperCase().startsWith('HS20')) || dbList[0];
+          if (matched && matched.full_name) {
+            profile.full_name = matched.full_name;
+            if (matched.student_code) profile.student_code = matched.student_code;
+
+            // Đồng bộ trực tiếp vào CSDL profiles nếu chưa chuẩn
+            try {
+              await supabaseAdmin.from('profiles').update({ full_name: matched.full_name }).eq('id', profile.id);
+            } catch (e) {}
+          }
         }
       }
 
