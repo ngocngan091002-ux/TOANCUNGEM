@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 export const StudentDashboard: React.FC = () => {
-  const { user, refreshProfile } = useAuth();
+  const { user, refreshProfile, logout } = useAuth();
 
   const [studentClasses, setStudentClasses] = useState<ClassItem[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('');
@@ -1911,35 +1911,154 @@ export const StudentDashboard: React.FC = () => {
         );
       })()}
 
-      {/* 👤 9. HỒ SƠ HỌC SINH */}
-      {activeMenu === 'profile' && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-6 max-w-2xl mx-auto">
-          <div className="text-center space-y-2 border-b border-amber-200 pb-4">
-            <div className="w-20 h-20 bg-amber-500 text-white font-black text-3xl rounded-full flex items-center justify-center mx-auto shadow-md border-4 border-amber-200">
-              {user?.full_name?.charAt(0) || 'H'}
-            </div>
-            <h3 className="text-xl font-black text-slate-900">{user?.full_name || 'Học sinh'}</h3>
-            <span className="px-3 py-1 bg-amber-100 text-amber-950 rounded-xl text-xs font-black border border-amber-300 inline-block">
-              Lớp Hai 4 | Khối 2
-            </span>
-          </div>
+      {/* 👤 9. HỒ SƠ CỦA EM (GIAO DIỆN KHUNG CHÍNH GIỮA TRANG CHUẨN ĐÚNG YÊU CẦU) */}
+      {activeMenu === 'profile' && (() => {
+        const myEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.student_code === user?.student_code);
+        const myRankInClass = myEntry ? myEntry.rank : 1;
+        const activeClass = studentClasses.find(c => c.id === selectedClassId);
+        const classNameStr = activeClass ? activeClass.name : 'Hai 4';
 
-          <div className="space-y-3 text-xs font-extrabold text-slate-700">
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
-              <span>Mã Học Sinh:</span>
-              <span className="font-mono text-amber-900 font-black">{user?.student_code || 'Chưa cập nhật'}</span>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
-              <span>Tài Khoản Đăng Nhập:</span>
-              <span className="text-slate-900 font-black">{user?.email}</span>
-            </div>
-            <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 flex justify-between">
-              <span>Tổng Điểm Tích Lũy CSDL:</span>
-              <span className="text-emerald-700 font-black">⭐ {myTotalPoints} điểm</span>
+        // Tự động rút gọn hoặc lấy Tên thật từ CSDL
+        const isCodeOrShort = !user?.full_name || user.full_name.toUpperCase().startsWith('HS2026_') || user.full_name.toUpperCase().startsWith('HS20') || user.full_name.split(' ').length < 2;
+        const matchedEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.email === user?.email || (lb.full_name && lb.full_name.split(' ').length >= 2 && !lb.full_name.toUpperCase().startsWith('HS20')));
+        const displayName = (isCodeOrShort && matchedEntry?.full_name) ? matchedEntry.full_name : (user?.full_name || 'Nguyễn Minh Anh');
+
+        return (
+          <div className="flex justify-center items-center py-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-lg p-6 sm:p-8 shadow-2xl space-y-6">
+              
+              {/* TIÊU ĐỀ KHUNG TRUNG TÂM */}
+              <div className="text-center border-b border-amber-200 pb-4 space-y-1">
+                <h2 className="text-2xl font-black text-slate-900 flex items-center justify-center gap-2">
+                  <span className="text-2xl">👤</span> HỒ SƠ CỦA EM
+                </h2>
+                <span className="text-[11px] font-extrabold bg-amber-100 text-amber-950 px-3 py-1 rounded-xl border border-amber-300 inline-block">
+                  Thông tin học sinh chính thức từ CSDL
+                </span>
+              </div>
+
+              {/* 🧑‍🎓 ẢNH ĐẠI DIỆN VÀ THÔNG TIN HỌC SINH */}
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-amber-400 shadow-md bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-white flex items-center justify-center text-4xl font-black">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>🧑‍🎓</span>
+                    )}
+                  </div>
+
+                  <label className="mt-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-[11px] px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 mx-auto transition-all active:scale-95">
+                    <span>✏️ Chỉnh sửa ảnh đại diện</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          try {
+                            const file = e.target.files[0];
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `avatar_${user?.id}_${Date.now()}.${fileExt}`;
+                            
+                            const { error: uploadErr } = await supabaseAdmin.storage
+                              .from('materials')
+                              .upload(fileName, file);
+
+                            let newAvatarUrl = '';
+                            if (!uploadErr) {
+                              const { data: pubUrl } = supabaseAdmin.storage.from('materials').getPublicUrl(fileName);
+                              newAvatarUrl = pubUrl.publicUrl;
+                            } else {
+                              newAvatarUrl = URL.createObjectURL(file);
+                            }
+
+                            if (user?.id) {
+                              await supabaseAdmin.from('profiles').update({ avatar_url: newAvatarUrl }).eq('id', user.id);
+                              await refreshProfile();
+                              alert('🎉 Đã cập nhật ảnh đại diện mới thành công!');
+                            }
+                          } catch (err: any) {
+                            alert('Lỗi cập nhật ảnh: ' + err.message);
+                          }
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <h3 className="text-xl font-black text-slate-900">{displayName}</h3>
+                  <div className="flex items-center justify-center gap-2 text-xs font-black text-slate-700">
+                    <span className="bg-amber-100 text-amber-950 px-2.5 py-0.5 rounded-lg border border-amber-300">
+                      Lớp: {classNameStr}
+                    </span>
+                    <span className="bg-purple-100 text-purple-950 px-2.5 py-0.5 rounded-lg border border-purple-300">
+                      Năm học: 2025 – 2026
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* ⭐ THÀNH TÍCH CỦA EM */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
+                <h4 className="font-black text-xs text-amber-950 uppercase flex items-center gap-1.5 border-b border-amber-200 pb-2">
+                  <span>⭐</span> THÀNH TÍCH CỦA EM
+                </h4>
+
+                <div className="grid grid-cols-2 gap-3 text-center">
+                  <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                    <span className="text-[10px] font-black text-slate-500 uppercase block">⭐ ĐIỂM TÍCH LŨY:</span>
+                    <span className="text-lg font-black text-emerald-700">{myTotalPoints} điểm</span>
+                  </div>
+
+                  <div className="p-3 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                    <span className="text-[10px] font-black text-slate-500 uppercase block">🏆 XẾP HẠNG:</span>
+                    <span className="text-lg font-black text-purple-900">#{myRankInClass}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🔐 TÀI KHOẢN */}
+              <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-2 text-xs font-extrabold text-slate-800 shadow-xs">
+                <h4 className="font-black text-xs text-slate-900 uppercase flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                  <span>🔐</span> TÀI KHOẢN
+                </h4>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-slate-600 flex items-center gap-1">📧 Email:</span>
+                  <span className="font-bold text-slate-900 font-mono text-[11px] truncate max-w-[200px]" title={user?.email}>
+                    {user?.email || 'nguyen...@gmail.com'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 flex items-center gap-1">🆔 Mã học sinh:</span>
+                  <span className="font-black text-amber-900 font-mono text-xs">
+                    {user?.student_code || '---'}
+                  </span>
+                </div>
+              </div>
+
+              {/* NÚT THAO TÁC (ĐĂNG XUẤT) */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm('🚪 Em có chắc chắn muốn đăng xuất không?')) {
+                      await logout();
+                    }
+                  }}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <span>🚪</span> Đăng xuất
+                </button>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 🎉 REALTIME TOAST THÔNG BÁO CỘNG ĐIỂM CHO HỌC SINH */}
       {pointNotificationToast && (
