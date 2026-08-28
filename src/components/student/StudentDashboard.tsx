@@ -1168,8 +1168,11 @@ export const StudentDashboard: React.FC = () => {
         const geometryPercent = totalGeometry > 0 ? Math.round((correctGeometry / totalGeometry) * 100) : fallbackAccuracy;
         const wordProblemPercent = totalWordProblem > 0 ? Math.round((correctWordProblem / totalWordProblem) * 100) : fallbackAccuracy;
 
-        // 4. LỜI NHẮN TỪ CÔ GIÁO THỰC TẾ LƯU TRONG CSDL
-        const realTeacherRemark = submissions.find(s => s.teacher_remark && s.teacher_remark.trim().length > 0)?.teacher_remark;
+        // 4. LỜI NHẮN TỪ CÔ GIÁO THỰC TẾ LƯU TRONG CSDL (LẤY BÀI MỚI NHẤT CÓ NHẬN XÉT)
+        const latestSubWithRemark = [...submissions]
+          .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime())
+          .find(s => s.teacher_remark && s.teacher_remark.trim().length > 0);
+        const realTeacherRemark = latestSubWithRemark?.teacher_remark;
 
         // 5. CHUỖI HỌC TẬP THỰC TẾ
         const streakDays = Math.max(submissions.length > 0 ? 1 : 0, new Set([...submissions.map(s => s.submitted_at?.split('T')[0]), ...myPointLogs.map(l => l.created_at?.split('T')[0])].filter(Boolean)).size);

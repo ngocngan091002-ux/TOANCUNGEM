@@ -148,9 +148,37 @@ export const TeacherDashboard: React.FC = () => {
     setSavingRemark(true);
     try {
       const scoreNum = parseFloat(overrideScoreText) || 10;
+      let targetSubId = selectedStudentDetail.submission?.id;
 
-      if (selectedStudentDetail.submission?.id) {
-        await approveSubmission(selectedStudentDetail.submission.id, scoreNum, teacherRemarkText);
+      if (!targetSubId && selectedViewAssignment?.id && selectedStudentDetail.student?.id) {
+        const { data: existing } = await supabaseAdmin
+          .from('assignment_submissions')
+          .select('id')
+          .eq('assignment_id', selectedViewAssignment.id)
+          .eq('student_id', selectedStudentDetail.student.id)
+          .maybeSingle();
+
+        if (existing) {
+          targetSubId = existing.id;
+        } else {
+          const { data: created } = await supabaseAdmin
+            .from('assignment_submissions')
+            .insert([{
+              assignment_id: selectedViewAssignment.id,
+              student_id: selectedStudentDetail.student.id,
+              score: scoreNum,
+              teacher_remark: teacherRemarkText,
+              status: 'finalized_by_teacher',
+              submitted_at: new Date().toISOString()
+            }])
+            .select()
+            .single();
+          targetSubId = created?.id;
+        }
+      }
+
+      if (targetSubId) {
+        await approveSubmission(targetSubId, scoreNum, teacherRemarkText);
       }
 
       alert('💾 ĐÃ LƯU NHẬN XẾT & CẬP NHẬT ĐIỂM SỐ THÀNH CÔNG!');
