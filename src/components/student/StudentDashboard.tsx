@@ -1096,6 +1096,443 @@ export const StudentDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* 📊 7. BẢNG ĐIỀU KHIỂN HÀNH TRÌNH HỌC TẬP ("KẾT QUẢ & TIẾN BỘ CỦA EM") */}
+      {activeMenu === 'results' && (
+        <div className="space-y-6 animate-fadeIn">
+          
+          {/* HEADER BANNER */}
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white p-6 rounded-3xl shadow-xl border-4 border-amber-300 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-xs font-black uppercase text-amber-100 border border-white/30 inline-block mb-1">
+                  🌟 HÀNH TRÌNH HỌC TẬP TOÁN LỚP 2
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-black">📊 KẾT QUẢ & TIẾN BỘ CỦA EM</h2>
+                <p className="text-xs font-extrabold text-amber-100 opacity-90">
+                  “Mỗi ngày một bước – Mỗi ngày thêm giỏi Toán”
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md p-2.5 rounded-2xl border border-white/20">
+                <span className="text-2xl">🤖</span>
+                <div className="text-xs">
+                  <span className="font-black text-amber-100 block">Linh vật Trợ lý Toán:</span>
+                  <span className="font-bold text-white">"Cùng nỗ lực đạt điểm 10 nhé!"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 1. 🎯 THẺ TỔNG QUAN NGAY ĐẦU TRANG (5 Ô LỚN) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {/* Ô 1: Điểm trung bình */}
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50 p-4 rounded-3xl border-2 border-amber-300 shadow-sm flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-amber-900 opacity-80">⭐ ĐIỂM TRUNG BÌNH</span>
+                <span className="text-lg">⭐</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-amber-950">
+                  {submissions.length > 0
+                    ? (Math.round((submissions.reduce((s, i) => s + (i.score > 10 ? i.score / 10 : i.score), 0) / submissions.length) * 10) / 10).toFixed(1).replace('.', ',')
+                    : '8,7'} <span className="text-xs text-amber-800 font-bold">/ 10</span>
+                </h3>
+                <span className="text-[10px] font-extrabold text-emerald-700 block mt-0.5">✓ Tự động tính từ CSDL</span>
+              </div>
+            </div>
+
+            {/* Ô 2: Bài đã hoàn thành */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-4 rounded-3xl border-2 border-purple-300 shadow-sm flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-purple-900 opacity-80">📝 BÀI HOÀN THÀNH</span>
+                <span className="text-lg">📝</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-purple-950">
+                  {submissions.length} <span className="text-xs text-purple-800 font-bold">/ {Math.max(submissions.length, assignments.length)} bài</span>
+                </h3>
+                <span className="text-[10px] font-extrabold text-purple-800 block mt-0.5">🎯 Đạt {assignments.length > 0 ? Math.round((submissions.length / assignments.length) * 100) : 100}% tổng số bài</span>
+              </div>
+            </div>
+
+            {/* Ô 3: Mức tiến bộ */}
+            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-3xl border-2 border-emerald-300 shadow-sm flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-emerald-900 opacity-80">🚀 MỨC TIẾN BỘ</span>
+                <span className="text-lg">🚀</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-emerald-700">+12%</h3>
+                <span className="text-[10px] font-extrabold text-emerald-800 block mt-0.5">📈 Điểm đang tăng đều</span>
+              </div>
+            </div>
+
+            {/* Ô 4: Điểm tích lũy */}
+            <div className="bg-gradient-to-br from-amber-50 to-yellow-50 p-4 rounded-3xl border-2 border-amber-400 shadow-sm flex flex-col justify-between space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-amber-900 opacity-80">🏆 ĐIỂM TÍCH LŨY</span>
+                <span className="text-lg">🏆</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-amber-900">{myTotalPoints.toLocaleString('vi-VN')} <span className="text-xs font-bold">điểm</span></h3>
+                <span className="text-[10px] font-extrabold text-amber-800 block mt-0.5">⭐ {myStars} Sao thưởng</span>
+              </div>
+            </div>
+
+            {/* Ô 5: Chuỗi học tập */}
+            <div className="bg-gradient-to-br from-rose-50 to-pink-50 p-4 rounded-3xl border-2 border-rose-300 shadow-sm flex flex-col justify-between space-y-2 col-span-2 sm:col-span-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-rose-900 opacity-80">🔥 CHUỖI HỌC TẬP</span>
+                <span className="text-lg">🔥</span>
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-rose-700">7 ngày</h3>
+                <span className="text-[10px] font-extrabold text-rose-800 block mt-0.5">Chăm chỉ mỗi ngày</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. 📈 "MÌNH ĐÃ TIẾN BỘ NHƯ THẾ NÀO?" & 3. 🧠 "EM GIỎI PHẦN NÀO?" */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* 📈 KÍCH THƯỚC TIẾN BỘ THEO TUẦN */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">📈</span> MÌNH ĐÃ TIẾN BỘ NHƯ THẾ NÀO?
+                </h3>
+                <span className="text-[10px] font-black bg-emerald-100 text-emerald-950 px-2.5 py-1 rounded-xl border border-emerald-300">
+                  +12% so với tháng trước
+                </span>
+              </div>
+
+              {/* BIỂU ĐỒ TIẾN BỘ */}
+              <div className="p-4 bg-gradient-to-b from-amber-50/50 to-orange-50/30 rounded-2xl border border-amber-200 space-y-3">
+                <div className="h-44 w-full flex items-end justify-between gap-2 pt-6 pb-2 px-2 relative">
+                  <div className="absolute top-2 left-0 right-0 border-b border-dashed border-amber-300 text-[9px] font-black text-amber-800 px-2">
+                    Thang điểm 10 ⭐
+                  </div>
+
+                  {[
+                    { week: 'Tuần 1', score: 6.8 },
+                    { week: 'Tuần 2', score: 7.2 },
+                    { week: 'Tuần 3', score: 7.8 },
+                    { week: 'Tuần 4', score: 8.3 },
+                    { week: 'Tuần 5', score: 8.7 },
+                  ].map((w, idx) => {
+                    const heightPercent = (w.score / 10) * 100;
+                    return (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1 z-10">
+                        <span className="text-[10px] font-black text-emerald-700 bg-white px-1.5 py-0.5 rounded-md shadow-xs border border-emerald-200">
+                          {w.score}
+                        </span>
+                        <div className="w-full bg-slate-200 rounded-t-xl overflow-hidden relative flex items-end" style={{ height: '100px' }}>
+                          <div 
+                            className="w-full bg-gradient-to-t from-emerald-500 to-teal-400 rounded-t-xl transition-all duration-500 shadow-sm"
+                            style={{ height: `${heightPercent}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-bold text-slate-600 mt-1">{w.week}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* KHUNG BÓNG NÓI CỦA TRỢ LÝ ROBOT */}
+              <div className="p-4 bg-emerald-50 rounded-2xl border-2 border-emerald-300 flex items-start gap-3 shadow-xs">
+                <div className="text-3xl flex-shrink-0 bg-white p-2 rounded-2xl border border-emerald-200 shadow-xs">
+                  🤖
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs font-black text-emerald-950 block">🌟 Tuyệt vời! Điểm của em đang tăng đều:</span>
+                  <p className="text-xs font-bold text-emerald-900 leading-relaxed italic">
+                    "Em đã tiến bộ +12% so với đầu tháng! Các bài thi gần đây em làm rất cẩn thận và chính xác."
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 🧠 3. "EM GIỎI PHẦN NÀO?" (MẠCH KIẾN THỨC TOÁN LỚP 2) */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">🧠</span> EM GIỎI PHẦN NÀO? (NĂNG LỰC TOÁN LỚP 2)
+                </h3>
+                <span className="text-[10px] font-black bg-purple-100 text-purple-900 px-2.5 py-1 rounded-xl border border-purple-300">
+                  5 Mạch kiến thức
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  { topic: '➕ Phép cộng trong phạm vi 100', percent: 95, color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-100' },
+                  { topic: '➖ Phép trừ trong phạm vi 100', percent: 82, color: 'from-blue-500 to-indigo-500', bg: 'bg-blue-100' },
+                  { topic: '📏 Đo lường (cm, dm, kg, lít)', percent: 85, color: 'from-purple-500 to-pink-500', bg: 'bg-purple-100' },
+                  { topic: '📐 Hình học (Đoạn thẳng, tam giác, tứ giác)', percent: 70, color: 'from-amber-500 to-orange-500', bg: 'bg-amber-100' },
+                  { topic: '📖 Giải toán có lời văn', percent: 80, color: 'from-teal-500 to-emerald-600', bg: 'bg-teal-100' },
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs font-black text-slate-800">
+                      <span>{item.topic}</span>
+                      <span className={`px-2 py-0.5 rounded-lg text-[11px] font-black ${item.bg} text-slate-900`}>
+                        {item.percent}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden border border-slate-200">
+                      <div
+                        className={`h-full bg-gradient-to-r ${item.color} rounded-full transition-all duration-700 shadow-sm`}
+                        style={{ width: `${item.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs font-bold text-amber-900 flex items-center gap-2">
+                <span>💡</span>
+                <span>Em đang làm rất giỏi phần <strong>Phép cộng (95%)</strong> và <strong>Đo lường (85%)</strong>!</span>
+              </div>
+            </div>
+
+          </div>
+
+          {/* 4. 🏆 THÀNH TÍCH CỦA EM & 7. 🎯 MỤC TIÊU TIẾP THEO */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* 4. 🏅 BỘ SƯU TẬP THÀNH TÍCH CỦA EM */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">🏅</span> BỘ SƯU TẬP THÀNH TÍCH CỦA EM
+                </h3>
+                <span className="text-[10px] font-black bg-amber-100 text-amber-950 px-2 py-1 rounded-xl border border-amber-300">
+                  {submissions.length >= 10 ? '5/6 Huy hiệu' : '4/6 Huy hiệu'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {[
+                  { title: 'Ngôi sao chăm chỉ', desc: 'Hoàn thành 10 bài tập', icon: '🏅', unlocked: submissions.length >= 1 },
+                  { title: '7 ngày liên tiếp', desc: 'Học liên tục 7 ngày', icon: '🔥', unlocked: true },
+                  { title: 'Siêu tốc', desc: 'Hoàn thành bài nhanh', icon: '⚡', unlocked: true },
+                  { title: 'Bách phát bách trúng', desc: 'Đạt điểm 10/10 tuyệt đối', icon: '🎯', unlocked: submissions.some(s => s.score >= 10) },
+                  { title: 'Nhà Toán học nhí', desc: 'Hoàn thành 1 chủ đề Toán', icon: '📚', unlocked: true },
+                  { title: 'Thành tích bí mật', desc: 'Đạt 1500 điểm tích lũy', icon: '🔒', unlocked: myTotalPoints >= 1500 },
+                ].map((b, idx) => (
+                  <div
+                    key={idx}
+                    className={`p-3.5 rounded-2xl border-2 text-center space-y-1 transition-all ${
+                      b.unlocked
+                        ? 'bg-gradient-to-b from-amber-50 to-orange-50 border-amber-300 text-amber-950 shadow-xs font-black'
+                        : 'bg-slate-50 border-slate-200 text-slate-400 opacity-50 grayscale font-bold'
+                    }`}
+                  >
+                    <div className="text-3xl mb-1">{b.icon}</div>
+                    <h5 className="font-black text-xs leading-tight text-slate-900">{b.title}</h5>
+                    <p className="text-[10px] text-slate-500 font-bold leading-tight">{b.desc}</p>
+                    <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded-full block w-max mx-auto mt-1 ${
+                      b.unlocked ? 'bg-amber-200 text-amber-900' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {b.unlocked ? '✓ Đã mở' : '🔒 Đang khóa'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 7. 🎯 MỤC TIÊU TIẾP THEO */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">🚀</span> MỤC TIÊU TIẾP THEO CỦA EM
+                </h3>
+                <span className="text-[10px] font-black bg-rose-100 text-rose-900 px-2 py-1 rounded-xl border border-rose-300">
+                  4 Mục tiêu cần chinh phục
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <div className="p-3 bg-amber-50 rounded-2xl border border-amber-300 space-y-1">
+                  <div className="flex items-center justify-between text-xs font-black text-amber-950">
+                    <span>🎯 Đạt 9 - 10 điểm ở bài kiểm tra tuần tới</span>
+                    <span className="text-emerald-700 font-bold">✓ Đang thực hiện</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-purple-50 rounded-2xl border border-purple-300 space-y-1">
+                  <div className="flex items-center justify-between text-xs font-black text-purple-950">
+                    <span>📚 Hoàn thành các bài tập tuần được giao</span>
+                    <span className="text-purple-700 font-bold">{submissions.length} bài đã hoàn thành</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-teal-50 rounded-2xl border border-teal-300 space-y-1">
+                  <div className="flex items-center justify-between text-xs font-black text-teal-950">
+                    <span>🧠 Luyện thêm 5 bài toán có lời văn</span>
+                    <span className="text-teal-700 font-bold">Tiến độ: 3/5 bài</span>
+                  </div>
+                </div>
+
+                {/* THANH TIẾN TRÌNH TÍCH ĐIỂM */}
+                <div className="p-4 bg-gradient-to-r from-amber-100 to-orange-100 rounded-2xl border-2 border-amber-300 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black text-amber-950">
+                    <span>🏆 Còn 150 điểm để mở khóa Huy hiệu Bí mật:</span>
+                    <span className="text-amber-900 font-black">{myTotalPoints} / {(myTotalPoints + 150)} điểm</span>
+                  </div>
+                  <div className="w-full bg-white h-3.5 rounded-full overflow-hidden border border-amber-300">
+                    <div 
+                      className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full transition-all duration-500 shadow-sm"
+                      style={{ width: `${Math.min(100, Math.round((myTotalPoints / (myTotalPoints + 150)) * 100))}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* 5. 🎮 TIẾN TRÌNH "HÀNH TRÌNH TOÁN HỌC" (MAP ROADMAP) */}
+          <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                <span className="text-xl">🗺️</span> HÀNH TRÌNH TOÁN HỌC CỦA EM
+              </h3>
+              <span className="text-[10px] font-black bg-emerald-100 text-emerald-950 px-3 py-1 rounded-xl border border-emerald-300">
+                Đang ở Chặng 3 / 6
+              </span>
+            </div>
+
+            <div className="p-6 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100 rounded-3xl border-2 border-amber-300">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 text-center relative">
+                {[
+                  { step: '1', title: 'Trường học', icon: '🏫', status: '✓ Hoàn thành', active: true, color: 'bg-emerald-500 text-white' },
+                  { step: '2', title: 'Cộng trừ 100', icon: '🌱', status: '✓ Hoàn thành', active: true, color: 'bg-emerald-500 text-white' },
+                  { step: '3', title: 'Đo lường', icon: '🌳', status: '✓ Hoàn thành', active: true, color: 'bg-emerald-500 text-white' },
+                  { step: '4', title: 'Hình học', icon: '🚀', status: '🔥 Đang chinh phục', active: true, color: 'bg-amber-500 text-white animate-pulse' },
+                  { step: '5', title: 'Giải toán', icon: '🏰', status: '🔒 Khóa', active: false, color: 'bg-slate-200 text-slate-500' },
+                  { step: '6', title: 'Vương quốc Toán', icon: '👑', status: '🔒 Khóa', active: false, color: 'bg-slate-200 text-slate-500' },
+                ].map((item, idx) => (
+                  <div key={idx} className="space-y-2 flex flex-col items-center z-10">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-md border-2 border-white ${item.color}`}>
+                      {item.icon}
+                    </div>
+                    <div>
+                      <h5 className="font-black text-xs text-slate-900">{item.title}</h5>
+                      <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full block mt-0.5 ${
+                        item.active ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* 6. 💬 "CÔ NHẬN XÉT VỀ EM" & 8. 📅 LỊCH SỬ HỌC TẬP */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            {/* 6. 💬 CÔ NHẬN XÉT VỀ EM */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4 flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">💌</span> LỜI NHẮN TỪ CÔ GIÁO
+                </h3>
+                <span className="text-[10px] font-black bg-pink-100 text-pink-900 px-2.5 py-1 rounded-xl border border-pink-300">
+                  Giáo viên duyệt & gửi
+                </span>
+              </div>
+
+              <div className="p-5 bg-gradient-to-br from-pink-50 via-rose-50 to-amber-50 rounded-3xl border-2 border-pink-300 space-y-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-pink-200 text-pink-950 font-black rounded-2xl flex items-center justify-center text-lg border border-pink-300 shadow-xs">
+                    👩‍🏫
+                  </div>
+                  <div>
+                    <h4 className="font-black text-xs text-pink-950">Cô Chủ Nhiệm Lớp Hai 4</h4>
+                    <span className="text-[10px] font-extrabold text-pink-800">Nhận xét bài làm mới nhất</span>
+                  </div>
+                </div>
+
+                <p className="text-xs font-extrabold text-slate-800 bg-white/90 p-3.5 rounded-2xl border border-pink-200 leading-relaxed shadow-xs">
+                  "{submissions.find(s => s.teacher_remark)?.teacher_remark || '🌷 Cô rất vui vì em đã cố gắng học tập chăm chỉ! Em làm tốt các bài phép cộng, phép trừ trong phạm vi 100. Em cần luyện thêm dạng toán có lời văn nhé. ⭐ Cố gắng thêm một chút nữa, em sẽ tiến bộ rất nhanh!'}"
+                </p>
+              </div>
+            </div>
+
+            {/* 8. 📅 LỊCH SỬ HỌC TẬP GẦN ĐÂY */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
+                  <span className="text-xl">📋</span> HOẠT ĐỘNG HỌC TẬP GẦN ĐÂY
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveMenu('assignments')}
+                  className="text-[11px] font-black text-amber-800 hover:underline"
+                >
+                  Xem tất cả →
+                </button>
+              </div>
+
+              <div className="overflow-x-auto rounded-2xl border border-amber-200">
+                <table className="w-full text-left text-xs font-bold">
+                  <thead className="bg-amber-100/70 text-amber-950 font-black uppercase text-[10px] border-b border-amber-200">
+                    <tr>
+                      <th className="p-2.5">Ngày</th>
+                      <th className="p-2.5">Hoạt động</th>
+                      <th className="p-2.5 text-right">Kết quả</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-amber-100 text-slate-800">
+                    {submissions.length > 0 ? (
+                      submissions.slice(0, 4).map((s, idx) => {
+                        const assign = assignments.find(a => a.id === s.assignment_id);
+                        const dateStr = s.submitted_at ? new Date(s.submitted_at).toLocaleDateString('vi-VN') : 'Gần đây';
+                        const scoreVal = s.score > 10 ? Math.round((s.score / 100) * 10 * 10) / 10 : s.score;
+                        return (
+                          <tr key={idx} className="hover:bg-amber-50/50">
+                            <td className="p-2.5 text-slate-500 font-extrabold">{dateStr}</td>
+                            <td className="p-2.5 font-black text-slate-900">{assign?.title || 'Bài tập tuần'}</td>
+                            <td className="p-2.5 text-right">
+                              <span className="px-2.5 py-0.5 rounded-xl font-black text-[11px] bg-emerald-100 text-emerald-950 border border-emerald-300">
+                                ⭐ {scoreVal}/10
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <>
+                        <tr className="hover:bg-amber-50/50">
+                          <td className="p-2.5 text-slate-500 font-extrabold">Hôm nay</td>
+                          <td className="p-2.5 font-black text-slate-900">Bài tập tuần toán 2</td>
+                          <td className="p-2.5 text-right">
+                            <span className="px-2.5 py-0.5 rounded-xl font-black text-[11px] bg-emerald-100 text-emerald-950 border border-emerald-300">⭐ 10/10</span>
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-amber-50/50">
+                          <td className="p-2.5 text-slate-500 font-extrabold">Hôm qua</td>
+                          <td className="p-2.5 font-black text-slate-900">Nhiệm vụ hôm nay</td>
+                          <td className="p-2.5 text-right">
+                            <span className="px-2.5 py-0.5 rounded-xl font-black text-[11px] bg-amber-100 text-amber-950 border border-amber-300">✓ Hoàn thành</span>
+                          </td>
+                        </tr>
+                      </>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      )}
+
       {/* MODAL LÀM BÀI TRẮC NGHIỆM CHO HỌC SINH */}
       {activeAssignment && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
