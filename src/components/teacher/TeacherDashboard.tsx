@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export const TeacherDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, refreshProfile, logout } = useAuth();
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -1162,6 +1162,7 @@ export const TeacherDashboard: React.FC = () => {
           { id: 'materials', label: '📖 Upload Học Liệu' },
           { id: 'games', label: '🎮 Tạo Trò Chơi' },
           { id: 'ai', label: '🧠 AI Hỗ Trợ Giáo Viên' },
+          { id: 'profile', label: '👤 Hồ sơ' },
         ].map(tab => (
           <button
             key={tab.id}
@@ -2331,6 +2332,155 @@ export const TeacherDashboard: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* 👤 8. HỒ SƠ GIÁO VIÊN (GIAO DIỆN KHUNG CHÍNH GIỮA TRANG CHUẨN GIỐNG HỌC SINH) */}
+      {activeTab === 'profile' && (() => {
+        const activeClassName = selectedClass ? selectedClass.name : 'Lớp Hai 4';
+        const totalStudentsCount = students.length;
+        const totalAssignmentsCount = assignments.length;
+        const displayName = user?.full_name || 'Cô Ngọc (Giáo Viên)';
+
+        return (
+          <div className="flex justify-center items-center py-4 animate-fadeIn">
+            <div className="bg-white rounded-3xl border-4 border-amber-300 w-full max-w-lg p-6 sm:p-8 shadow-2xl space-y-6">
+              
+              {/* TIÊU ĐỀ KHUNG TRUNG TÂM */}
+              <div className="text-center border-b border-amber-200 pb-4 space-y-1">
+                <h2 className="text-2xl font-black text-slate-900 flex items-center justify-center gap-2">
+                  <span className="text-2xl">👤</span> HỒ SƠ GIÁO VIÊN
+                </h2>
+                <span className="text-[11px] font-extrabold bg-amber-100 text-amber-950 px-3 py-1 rounded-xl border border-amber-300 inline-block">
+                  Thông tin Giáo viên quản lý từ CSDL
+                </span>
+              </div>
+
+              {/* 👩‍🏫 ẢNH ĐẠI DIỆN VÀ THÔNG TIN GIÁO VIÊN */}
+              <div className="flex flex-col items-center text-center space-y-3">
+                <div className="relative group">
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-amber-400 shadow-md bg-gradient-to-br from-amber-500 via-orange-500 to-amber-600 text-white flex items-center justify-center text-4xl font-black">
+                    {user?.avatar_url ? (
+                      <img src={user.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <span>👩‍🏫</span>
+                    )}
+                  </div>
+
+                  <label className="mt-2.5 bg-amber-500 hover:bg-amber-600 text-white font-black text-[11px] px-3.5 py-1.5 rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5 mx-auto transition-all active:scale-95">
+                    <span>✏️ Chỉnh sửa ảnh đại diện</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          try {
+                            const file = e.target.files[0];
+                            const fileExt = file.name.split('.').pop();
+                            const fileName = `avatar_teacher_${user?.id}_${Date.now()}.${fileExt}`;
+                            
+                            const { error: uploadErr } = await supabaseAdmin.storage
+                              .from('materials')
+                              .upload(fileName, file);
+
+                            let newAvatarUrl = '';
+                            if (!uploadErr) {
+                              const { data: pubUrl } = supabaseAdmin.storage.from('materials').getPublicUrl(fileName);
+                              newAvatarUrl = pubUrl.publicUrl;
+                            } else {
+                              newAvatarUrl = URL.createObjectURL(file);
+                            }
+
+                            if (user?.id) {
+                              await supabaseAdmin.from('profiles').update({ avatar_url: newAvatarUrl }).eq('id', user.id);
+                              await refreshProfile();
+                              alert('🎉 Đã cập nhật ảnh đại diện Giáo viên thành công!');
+                            }
+                          } catch (err: any) {
+                            alert('Lỗi cập nhật ảnh: ' + err.message);
+                          }
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div className="space-y-1 pt-1">
+                  <h3 className="text-xl font-black text-slate-900">{displayName}</h3>
+                  <div className="flex items-center justify-center gap-2 text-xs font-black text-slate-700">
+                    <span className="bg-amber-100 text-amber-950 px-2.5 py-0.5 rounded-lg border border-amber-300">
+                      Vai trò: Giáo viên Chủ Nhiệm
+                    </span>
+                    <span className="bg-purple-100 text-purple-950 px-2.5 py-0.5 rounded-lg border border-purple-300">
+                      Năm học: 2025 – 2026
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🏫 THỐNG KÊ QUẢN LÝ CỦA CÔ */}
+              <div className="p-4 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-100 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
+                <h4 className="font-black text-xs text-amber-950 uppercase flex items-center gap-1.5 border-b border-amber-200 pb-2">
+                  <span>🏫</span> THỐNG KÊ LỚP HỌC QUẢN LÝ
+                </h4>
+
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="p-2.5 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                    <span className="text-[10px] font-black text-slate-500 uppercase block">LỚP:</span>
+                    <span className="text-sm font-black text-amber-900">{activeClassName}</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                    <span className="text-[10px] font-black text-slate-500 uppercase block">HỌC SINH:</span>
+                    <span className="text-sm font-black text-emerald-700">{totalStudentsCount} em</span>
+                  </div>
+
+                  <div className="p-2.5 bg-white rounded-xl border border-amber-300 shadow-2xs">
+                    <span className="text-[10px] font-black text-slate-500 uppercase block">BÀI TẬP:</span>
+                    <span className="text-sm font-black text-purple-900">{totalAssignmentsCount} bài</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 🔐 TÀI KHOẢN GIÁO VIÊN */}
+              <div className="p-4 bg-slate-50 rounded-2xl border-2 border-slate-200 space-y-2 text-xs font-extrabold text-slate-800 shadow-xs">
+                <h4 className="font-black text-xs text-slate-900 uppercase flex items-center gap-1.5 border-b border-slate-200 pb-2">
+                  <span>🔐</span> TÀI KHOẢN GIÁO VIÊN
+                </h4>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-slate-600 flex items-center gap-1">📧 Email đăng nhập:</span>
+                  <span className="font-bold text-slate-900 font-mono text-[11px] truncate max-w-[220px]" title={user?.email}>
+                    {user?.email || 'co_ngoc@gmail.com'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600 flex items-center gap-1">🔑 Quyền hạn hệ thống:</span>
+                  <span className="font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 text-[10px]">
+                    Quản Lý Lớp & Học Liệu
+                  </span>
+                </div>
+              </div>
+
+              {/* NÚT THAO TÁC (ĐĂNG XUẤT) */}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm('🚪 Thầy/Cô có chắc chắn muốn đăng xuất không?')) {
+                      await logout();
+                    }
+                  }}
+                  className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white font-black text-xs rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                >
+                  <span>🚪</span> Đăng xuất
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
 
       {/* MODAL TẠO LỚP HỌC MỚI */}
       {showClassModal && (
