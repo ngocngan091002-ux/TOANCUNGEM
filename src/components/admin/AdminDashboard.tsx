@@ -309,7 +309,7 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const pendingTeachers = profiles.filter(p => p.role === 'teacher' && p.status === 'pending');
-  const teachers = profiles.filter(p => p.role === 'teacher');
+  const teachers = profiles.filter(p => p.role === 'teacher' || p.role === 'admin');
   const students = profiles.filter(p => p.role === 'student');
 
   return (
