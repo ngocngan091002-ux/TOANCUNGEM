@@ -1751,43 +1751,71 @@ export const StudentDashboard: React.FC = () => {
 
             {/* 4 THẺ THỐNG KÊ TỔNG QUAN PHÍA TRÊN BẢNG XẾP HẠNG */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* Thẻ 1: Điểm của em */}
               <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
-                  ⭐ {isTeacherPreview ? 'Điểm cao nhất' : 'Điểm của em'}
+                  ⭐ Điểm của em
                 </span>
-                <h3 className="text-2xl font-black text-amber-900">{isTeacherPreview ? (leaderboard[0]?.total_points || 36) : myTotalPoints} <span className="text-xs font-bold text-amber-700">điểm</span></h3>
-                <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 w-max">
-                  {isTeacherPreview ? `🏆 ${leaderboard[0]?.student_name || 'Hạng 1 lớp'}` : '✓ 100% CSDL Supabase'}
+                <h3 className="text-2xl font-black text-amber-900">
+                  {isTeacherPreview ? (
+                    <span className="text-xl text-purple-900 flex items-center gap-1 font-black">👁️ Xem Thử</span>
+                  ) : (
+                    <>{myTotalPoints} <span className="text-xs font-bold text-amber-700">điểm</span></>
+                  )}
+                </h3>
+                <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
+                  {isTeacherPreview ? 'Xem thử của giáo viên' : '✓ 100% CSDL Supabase'}
                 </span>
               </div>
 
+              {/* Thẻ 2: Xếp hạng */}
               <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   🏆 Xếp hạng
                 </span>
-                <h3 className="text-2xl font-black text-purple-900">{isTeacherPreview ? '👁️ Xem Thử' : `#${myRankInClass}`} <span className="text-xs font-bold text-purple-700">{isTeacherPreview ? 'Giáo viên' : 'trong lớp'}</span></h3>
+                <h3 className="text-2xl font-black text-purple-900">
+                  {isTeacherPreview ? (
+                    <span className="text-xl text-purple-900 flex items-center gap-1 font-black">👁️ Xem Thử</span>
+                  ) : (
+                    <>#{myRankInClass} <span className="text-xs font-bold text-purple-700">trong lớp</span></>
+                  )}
+                </h3>
                 <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
-                  {isTeacherPreview ? 'Trang xem thử Giáo viên' : 'Xếp hạng động'}
+                  {isTeacherPreview ? 'Xem thử của giáo viên' : 'Xếp hạng động'}
                 </span>
               </div>
 
+              {/* Thẻ 3: Điểm tuần này */}
               <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   📈 Điểm tuần này
                 </span>
-                <h3 className="text-2xl font-black text-emerald-800">+{isTeacherPreview ? (leaderboard[0]?.total_points || 25) : weeklyPoints} <span className="text-xs font-bold text-emerald-700">điểm</span></h3>
-                <span className="text-[10px] font-extrabold text-teal-950 bg-teal-100 px-2 py-0.5 rounded-lg border border-teal-300 w-max">
-                  Tích lũy tuần này
+                <h3 className="text-2xl font-black text-emerald-800">
+                  {isTeacherPreview ? (
+                    <span className="text-xl text-purple-900 flex items-center gap-1 font-black">👁️ Xem Thử</span>
+                  ) : (
+                    <>+{weeklyPoints} <span className="text-xs font-bold text-emerald-700">điểm</span></>
+                  )}
+                </h3>
+                <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
+                  {isTeacherPreview ? 'Xem thử của giáo viên' : 'Tích lũy tuần này'}
                 </span>
               </div>
 
+              {/* Thẻ 4: Huy hiệu */}
               <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   🎖️ Huy hiệu
                 </span>
-                <h3 className="text-2xl font-black text-rose-900">{isTeacherPreview ? leaderboard.length : unlockedBadgesCount} <span className="text-xs font-bold text-rose-700">{isTeacherPreview ? 'học sinh' : 'huy hiệu'}</span></h3>
-                <span className="text-[10px] font-extrabold text-rose-950 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-300 w-max">
-                  {isTeacherPreview ? `Lớp ${activeClassObj?.name || 'Hai 4'}` : 'Đã mở khóa'}
+                <h3 className="text-2xl font-black text-rose-900">
+                  {isTeacherPreview ? (
+                    <span className="text-xl text-purple-900 flex items-center gap-1 font-black">👁️ Xem Thử</span>
+                  ) : (
+                    <>{unlockedBadgesCount} <span className="text-xs font-bold text-rose-700">huy hiệu</span></>
+                  )}
+                </h3>
+                <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
+                  {isTeacherPreview ? 'Xem thử của giáo viên' : 'Đã mở khóa'}
                 </span>
               </div>
             </div>
