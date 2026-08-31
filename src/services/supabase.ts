@@ -130,13 +130,6 @@ export async function getAllProfiles(): Promise<UserProfile[]> {
       full_name: 'Quản Trị Viên Ngọc Ngân',
       role: 'admin',
       status: 'approved'
-    },
-    {
-      id: 'teacher-demo-01',
-      email: 'co_ngoc@gmail.com',
-      full_name: 'Cô Ngọc (Giáo Viên)',
-      role: 'teacher',
-      status: 'approved'
     }
   ];
 }
@@ -145,6 +138,15 @@ export async function updateUserStatus(userId: string, status: 'approved' | 'rej
   const { error } = await supabaseAdmin
     .from('profiles')
     .update({ status })
+    .eq('id', userId);
+
+  if (error) throw error;
+}
+
+export async function deleteUserProfile(userId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .delete()
     .eq('id', userId);
 
   if (error) throw error;

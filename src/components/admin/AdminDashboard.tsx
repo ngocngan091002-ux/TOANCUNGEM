@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserProfile, UserRole, ClassItem } from '../../types';
 import { 
-  getAllProfiles, updateUserStatus, supabase, supabaseAdmin, 
+  getAllProfiles, updateUserStatus, deleteUserProfile, supabase, supabaseAdmin, 
   getTeacherClasses, getClassMembers, batchImportStudentsToClass, removeStudentFromClass 
 } from '../../services/supabase';
 import { parseStudentExcel, exportClassToExcel } from '../../services/excelService';
@@ -217,6 +217,19 @@ export const AdminDashboard: React.FC = () => {
       setTimeout(() => setActionMsg(''), 4000);
     } catch (err: any) {
       alert('Lỗi đổi vai trò: ' + err.message);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (window.confirm(`⚠️ Thầy/Cô có chắc chắn muốn xóa tài khoản "${userName}" khỏi hệ thống CSDL không?`)) {
+      try {
+        await deleteUserProfile(userId);
+        setActionMsg(`🎉 Đã xóa hoàn toàn tài khoản "${userName}" khỏi CSDL!`);
+        fetchProfiles();
+        setTimeout(() => setActionMsg(''), 4000);
+      } catch (err: any) {
+        alert('Lỗi xóa tài khoản: ' + err.message);
+      }
     }
   };
 
@@ -594,6 +607,13 @@ export const AdminDashboard: React.FC = () => {
                           className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-900 hover:bg-emerald-200 transition-all border border-emerald-300"
                         >
                           Chuyển Thành Học Sinh
+                        </button>
+                        <button
+                          onClick={() => handleDeleteUser(p.id, p.full_name)}
+                          className="px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-600 hover:bg-rose-700 text-white transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                          title="Xóa vĩnh viễn tài khoản này khỏi CSDL"
+                        >
+                          <Trash2 className="w-3 h-3" /> Xóa
                         </button>
                       </div>
                     )}
