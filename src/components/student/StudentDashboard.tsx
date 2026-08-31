@@ -1242,11 +1242,15 @@ export const StudentDashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-xs font-black uppercase text-amber-100 border border-white/30 inline-block mb-1">
-                    🌟 HÀNH TRÌNH HỌC TẬP TOÁN LỚP 2 (DỮ LIỆU THỰC CSDL)
+                    {isTeacherPreview ? '👁️ CHẾ ĐỘ XEM THỬ CỦA GIÁO VIÊN' : '🌟 HÀNH TRÌNH HỌC TẬP TOÁN LỚP 2 (DỮ LIỆU THỰC CSDL)'}
                   </span>
-                  <h2 className="text-2xl sm:text-3xl font-black">📊 KẾT QUẢ & TIẾN BỘ CỦA EM</h2>
+                  <h2 className="text-2xl sm:text-3xl font-black">
+                    {isTeacherPreview ? '📊 KẾT QUẢ & TIẾN BỘ (XEM THỬ GIÁO VIÊN)' : '📊 KẾT QUẢ & TIẾN BỘ CỦA EM'}
+                  </h2>
                   <p className="text-xs font-extrabold text-amber-100 opacity-90">
-                    “Mỗi ngày một bước – Mỗi ngày thêm giỏi Toán”
+                    {isTeacherPreview
+                      ? 'Trang xem thử giao diện báo cáo tiến bộ và năng lực Toán Lớp 2 của Học sinh dành cho Giáo viên'
+                      : '“Mỗi ngày một bước – Mỗi ngày thêm giỏi Toán”'}
                   </p>
                 </div>
 
@@ -1255,7 +1259,7 @@ export const StudentDashboard: React.FC = () => {
                   <div className="text-xs">
                     <span className="font-black text-amber-100 block">Linh vật Trợ lý Toán:</span>
                     <span className="font-bold text-white">
-                      {hasSubmissions ? `Điểm TB thực tế: ${realAvgScore}/10` : 'Bắt đầu làm bài để ghi nhận kết quả!'}
+                      {isTeacherPreview ? '👁️ Chế độ Xem Thử' : (hasSubmissions ? `Điểm TB thực tế: ${realAvgScore}/10` : 'Bắt đầu làm bài để ghi nhận kết quả!')}
                     </span>
                   </div>
                 </div>
@@ -1272,10 +1276,14 @@ export const StudentDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-amber-950">
-                    {hasSubmissions ? realAvgScore.toFixed(1).replace('.', ',') : '0'} <span className="text-xs text-amber-800 font-bold">/ 10</span>
+                    {isTeacherPreview ? (
+                      <span className="text-xl text-purple-900 font-black">👁️ Xem Thử</span>
+                    ) : (
+                      <>{hasSubmissions ? realAvgScore.toFixed(1).replace('.', ',') : '0'} <span className="text-xs text-amber-800 font-bold">/ 10</span></>
+                    )}
                   </h3>
-                  <span className="text-[10px] font-extrabold text-emerald-700 block mt-0.5">
-                    {hasSubmissions ? `✓ Từ ${submissions.length} bài nộp thực tế` : 'Chưa có bài nộp'}
+                  <span className="text-[10px] font-extrabold text-purple-900 block mt-0.5">
+                    {isTeacherPreview ? 'Xem thử của giáo viên' : (hasSubmissions ? `✓ Từ ${submissions.length} bài nộp thực tế` : 'Chưa có bài nộp')}
                   </span>
                 </div>
               </div>
@@ -1288,10 +1296,14 @@ export const StudentDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-purple-950">
-                    {submissions.length} <span className="text-xs text-purple-800 font-bold">/ {Math.max(submissions.length, assignments.length)} bài</span>
+                    {isTeacherPreview ? (
+                      <span className="text-xl text-purple-900 font-black">👁️ Xem Thử</span>
+                    ) : (
+                      <>{submissions.length} <span className="text-xs text-purple-800 font-bold">/ {Math.max(submissions.length, assignments.length)} bài</span></>
+                    )}
                   </h3>
-                  <span className="text-[10px] font-extrabold text-purple-800 block mt-0.5">
-                    🎯 Đạt {assignments.length > 0 ? Math.round((submissions.length / assignments.length) * 100) : (submissions.length > 0 ? 100 : 0)}% tổng số bài
+                  <span className="text-[10px] font-extrabold text-purple-900 block mt-0.5">
+                    {isTeacherPreview ? 'Xem thử của giáo viên' : `🎯 Đạt ${assignments.length > 0 ? Math.round((submissions.length / assignments.length) * 100) : (submissions.length > 0 ? 100 : 0)}% tổng số bài`}
                   </span>
                 </div>
               </div>
@@ -1304,10 +1316,14 @@ export const StudentDashboard: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-2xl font-black text-emerald-700">
-                    {realProgressPercent >= 0 ? `+${realProgressPercent}%` : `${realProgressPercent}%`}
+                    {isTeacherPreview ? (
+                      <span className="text-xl text-purple-900 font-black">👁️ Xem Thử</span>
+                    ) : (
+                      <>{realProgressPercent >= 0 ? `+${realProgressPercent}%` : `${realProgressPercent}%`}</>
+                    )}
                   </h3>
-                  <span className="text-[10px] font-extrabold text-emerald-800 block mt-0.5">
-                    {realProgressPercent >= 0 ? '📈 Tiến bộ thực tế' : '💪 Cần cố gắng thêm'}
+                  <span className="text-[10px] font-extrabold text-purple-900 block mt-0.5">
+                    {isTeacherPreview ? 'Xem thử của giáo viên' : (realProgressPercent >= 0 ? '📈 Tiến bộ thực tế' : '💪 Cần cố gắng thêm')}
                   </span>
                 </div>
               </div>
@@ -1319,8 +1335,16 @@ export const StudentDashboard: React.FC = () => {
                   <span className="text-lg">🏆</span>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-amber-900">{myTotalPoints.toLocaleString('vi-VN')} <span className="text-xs font-bold">điểm</span></h3>
-                  <span className="text-[10px] font-extrabold text-amber-800 block mt-0.5">⭐ {myStars} Sao thưởng</span>
+                  <h3 className="text-2xl font-black text-amber-900">
+                    {isTeacherPreview ? (
+                      <span className="text-xl text-purple-900 font-black">👁️ Xem Thử</span>
+                    ) : (
+                      <>{myTotalPoints.toLocaleString('vi-VN')} <span className="text-xs font-bold">điểm</span></>
+                    )}
+                  </h3>
+                  <span className="text-[10px] font-extrabold text-purple-900 block mt-0.5">
+                    {isTeacherPreview ? 'Xem thử của giáo viên' : `⭐ ${myStars} Sao thưởng`}
+                  </span>
                 </div>
               </div>
 
@@ -1331,8 +1355,16 @@ export const StudentDashboard: React.FC = () => {
                   <span className="text-lg">🔥</span>
                 </div>
                 <div>
-                  <h3 className="text-2xl font-black text-rose-700">{streakDays} ngày</h3>
-                  <span className="text-[10px] font-extrabold text-rose-800 block mt-0.5">Hoạt động trong CSDL</span>
+                  <h3 className="text-2xl font-black text-rose-700">
+                    {isTeacherPreview ? (
+                      <span className="text-xl text-purple-900 font-black">👁️ Xem Thử</span>
+                    ) : (
+                      <>{streakDays} ngày</>
+                    )}
+                  </h3>
+                  <span className="text-[10px] font-extrabold text-purple-900 block mt-0.5">
+                    {isTeacherPreview ? 'Xem thử của giáo viên' : 'Hoạt động trong CSDL'}
+                  </span>
                 </div>
               </div>
             </div>
