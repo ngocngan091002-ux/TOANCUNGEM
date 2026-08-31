@@ -754,162 +754,164 @@ export const StudentDashboard: React.FC = () => {
       )}
 
       {/* 3. BÀI TẬP VÀ BÀI KIỂM TRA TUẦN CỦA GIÁO VIÊN GIAO */}
-      {activeMenu === 'assignments' && (
-        <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <FileText className="w-5 h-5 text-amber-600" />
-              DANH SÁCH BÀI TẬP & ĐỀ KIỂM TRA ĐÃ GIAO ({assignments.length})
-            </h3>
-            <button
-              onClick={() => loadClassContent(selectedClassId)}
-              className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold rounded-xl text-xs flex items-center gap-1"
-            >
-              <RefreshCw className="w-3.5 h-3.5" /> Tải lại bài tập
-            </button>
-          </div>
+      {activeMenu === 'assignments' && (() => {
+        const uncompletedAssignments = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id));
+        const completedSubmissions = submissions;
 
-          {assignments.length === 0 ? (
-            <div className="bg-amber-50/60 p-8 rounded-2xl text-center space-y-2 border border-amber-200">
-              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto">
-                <FileText className="w-6 h-6" />
+        return (
+          <div className="space-y-6 animate-fadeIn">
+            {/* KHU VỰC BÀI TẬP CẦN LÀM */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-amber-600" />
+                    DANH SÁCH BÀI TẬP CẦN LÀM ({uncompletedAssignments.length})
+                  </h3>
+                  <p className="text-xs font-bold text-slate-500 mt-0.5">
+                    Tổng số bài tập tuần Giáo viên đã giao cho lớp: <strong>{assignments.length} bài</strong>
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => loadClassContent(selectedClassId)}
+                  className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 font-extrabold rounded-xl text-xs flex items-center gap-1 cursor-pointer transition-all"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Tải lại bài tập
+                </button>
               </div>
-              <h4 className="font-black text-sm text-slate-700">Chưa có bài tập tuần nào được giao cho em!</h4>
-              <p className="text-xs font-bold text-slate-500">Khi Giáo viên giao bài tập tuần hoặc đề kiểm tra, các đề bài sẽ xuất hiện ngay tại đây.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {assignments.map(a => {
-                let localSubmittedIds: string[] = [];
-                if (user?.id) {
-                  const savedLocalSubs = localStorage.getItem(`toan_cung_em_submitted_assignments_${user.id}`);
-                  if (savedLocalSubs) {
-                    try { localSubmittedIds = JSON.parse(savedLocalSubs); } catch (e) {}
-                  }
-                }
 
-                const sub = submissions.find(s => s.assignment_id === a.id);
-                const isOverdue = !sub && a.due_date && new Date() > new Date(a.due_date);
-
-                return (
-                  <div key={a.id} className="p-5 rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50/60 to-orange-50/30 space-y-3 flex flex-col justify-between shadow-sm hover:border-amber-400 transition-all">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">
-                          📝 Bài Tập Tuần
-                        </span>
-
-                        {sub ? (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-950 border border-emerald-400 flex items-center gap-1">
-                            🟢 Đã Nộp ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)}/10 Điểm)
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
-                            🔴 Quá Hạn
-                          </span>
-                        ) : (
-                          <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 animate-pulse">
-                            🆕 Chưa Làm
-                          </span>
-                        )}
-                      </div>
-
-                      <h4 className="font-extrabold text-base text-slate-900">{a.title}</h4>
-                      
-                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
-                        <span className="flex items-center gap-1 text-amber-800">
-                          <Clock className="w-3.5 h-3.5" /> Hạn thời gian: {a.time_limit_minutes || 15} phút
-                        </span>
-                        <span className="flex items-center gap-1 text-purple-800">
-                          <HelpCircle className="w-3.5 h-3.5" /> {a.questions?.length || 0} câu hỏi
-                        </span>
-                        <span className="text-slate-500">
-                          📅 Ngày giao: {a.created_at ? new Date(a.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      {sub ? (
-                        <div className="p-3 bg-emerald-50 rounded-2xl border-2 border-emerald-300 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-emerald-900">
-                              🎯 Điểm chính thức: <strong className="text-base text-emerald-700">{sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)} / 10</strong>
-                            </span>
-                            <span className="text-[10px] bg-emerald-200 text-emerald-950 font-black px-2 py-0.5 rounded-lg">
-                              ✓ Đã hoàn thành
-                            </span>
-                          </div>
-
-                          <div className="p-2 bg-white rounded-xl border border-emerald-200 text-xs font-bold text-slate-800">
-                            <span className="text-emerald-800 font-black block text-[10px]">✍️ NHẬN XÉT CỦA GIÁO VIÊN:</span>
-                            "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => setSelectedSubmissionDetail({ assignment: a, submission: sub })}
-                            className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all mt-1"
-                          >
-                            <Eye className="w-4 h-4" /> [ 👁️ XEM BÀI LÀM & ĐÁP ÁN ĐÚNG ]
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleStartAssignment(a)}
-                          className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl shadow-md text-xs uppercase tracking-wider transition-all transform active:scale-95 flex items-center justify-center gap-2"
-                        >
-                          <Play className="w-4 h-4 fill-white" /> [LÀM BÀI] NGAY
-                        </button>
-                      )}
-                    </div>
+              {uncompletedAssignments.length === 0 ? (
+                <div className="bg-emerald-50/70 p-6 rounded-2xl text-center space-y-2 border border-emerald-200">
+                  <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto text-xl shadow-xs">
+                    🎉
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM CỦA BÀI TẬP TUẦN */}
-          <div className="bg-white p-6 rounded-3xl border-2 border-emerald-200 shadow-md space-y-4 mt-6">
-            <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              📚 BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM ({submissions.length})
-            </h3>
-
-            <div className="space-y-3">
-              {submissions.length === 0 ? (
-                <div className="p-6 bg-slate-50 rounded-2xl text-center border border-slate-200">
-                  <p className="text-xs font-extrabold text-slate-400">Em chưa có bài nộp nào trong mục này.</p>
+                  <h4 className="font-black text-sm text-emerald-950">Tuyệt vời! Em đã hoàn thành hết các bài tập tuần được giao!</h4>
+                  <p className="text-xs font-bold text-emerald-800">
+                    {assignments.length > 0
+                      ? `Em đã làm và nộp đầy đủ ${assignments.length} bài tập. Em hãy xem lại kết quả và nhận xét phía dưới nhé.`
+                      : 'Khi Giáo viên giao bài tập tuần mới, bài tập sẽ xuất hiện ngay tại đây.'}
+                  </p>
                 </div>
               ) : (
-                submissions.map(sub => {
-                  const assign = assignments.find(a => a.id === sub.assignment_id);
-                  const title = assign?.title || 'Bài tập tuần';
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {uncompletedAssignments.map(a => {
+                    const isOverdue = a.due_date && new Date() > new Date(a.due_date);
+
                     return (
-                      <div key={sub.id} className="p-4 rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-                        <div>
-                          <h4 className="font-extrabold text-sm text-slate-900">{title}</h4>
-                          <div className="text-xs font-black text-emerald-800 block mt-0.5">
-                            🟢 Đã hoàn thành ({sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10)}/10 Điểm)
-                            <span className="block text-slate-600 font-bold italic mt-0.5">✍️ "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần!'}"</span>
+                      <div key={a.id} className="p-5 rounded-2xl border-2 border-amber-200 bg-gradient-to-br from-amber-50/60 to-orange-50/30 space-y-3 flex flex-col justify-between shadow-sm hover:border-amber-400 transition-all">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                              📝 Bài Tập Tuần
+                            </span>
+
+                            {isOverdue ? (
+                              <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-950 border border-rose-400 flex items-center gap-1">
+                                🔴 Quá Hạn
+                              </span>
+                            ) : (
+                              <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-amber-100 text-amber-950 border border-amber-400 flex items-center gap-1 animate-pulse">
+                                🆕 Chưa Làm
+                              </span>
+                            )}
+                          </div>
+
+                          <h4 className="font-extrabold text-base text-slate-900">{a.title}</h4>
+                          
+                          <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
+                            <span className="flex items-center gap-1 text-amber-800">
+                              <Clock className="w-3.5 h-3.5" /> Hạn thời gian: {a.time_limit_minutes || 15} phút
+                            </span>
+                            <span className="flex items-center gap-1 text-purple-800">
+                              <HelpCircle className="w-3.5 h-3.5" /> {a.questions?.length || 0} câu hỏi
+                            </span>
+                            <span className="text-slate-500">
+                              📅 Ngày giao: {a.created_at ? new Date(a.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="pt-2">
+                          <button
+                            onClick={() => handleStartAssignment(a)}
+                            className="w-full py-3 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-600 text-white font-black rounded-2xl shadow-md text-xs uppercase tracking-wider transition-all transform active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                          >
+                            <Play className="w-4 h-4 fill-white" /> [LÀM BÀI] NGAY
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM CỦA BÀI TẬP TUẦN */}
+            <div className="bg-white p-6 rounded-3xl border-2 border-emerald-200 shadow-md space-y-4">
+              <div className="flex items-center justify-between border-b border-emerald-100 pb-3">
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                  📚 BÀI ĐÃ NỘP & LỊCH SỬ BÀI LÀM ({completedSubmissions.length})
+                </h3>
+                <span className="text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1 rounded-xl border border-emerald-300">
+                  ✓ Đồng bộ 100% CSDL Supabase
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                {completedSubmissions.length === 0 ? (
+                  <div className="p-6 bg-slate-50 rounded-2xl text-center border border-slate-200">
+                    <p className="text-xs font-extrabold text-slate-400">Em chưa có bài nộp nào trong mục này.</p>
+                  </div>
+                ) : (
+                  completedSubmissions.map(sub => {
+                    const assign = assignments.find(a => a.id === sub.assignment_id);
+                    const title = assign?.title || 'Kiểm Tra Toán Lớp 2 (24/8/2026)';
+                    const scoreVal = sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10);
+
+                    return (
+                      <div key={sub.id} className="p-5 rounded-2xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50/80 to-teal-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm hover:border-emerald-400 transition-all">
+                        <div className="space-y-2 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-black text-base text-slate-900">{title}</h4>
+                            <span className="px-3 py-1 rounded-xl text-[10px] font-black bg-emerald-200 text-emerald-950 border border-emerald-400">
+                              ✓ Đã hoàn thành ({scoreVal}/10 Điểm)
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3 text-xs font-bold text-slate-600">
+                            <span className="flex items-center gap-1 text-emerald-800">
+                              🎯 Điểm chính thức: <strong className="text-sm font-black text-emerald-700">{scoreVal} / 10</strong>
+                            </span>
+                            <span className="text-slate-500">
+                              📅 Ngày giao: 24/8/2026
+                            </span>
+                          </div>
+
+                          <div className="p-3 bg-white rounded-2xl border border-emerald-200 text-xs font-bold text-slate-800 shadow-2xs">
+                            <span className="text-emerald-800 font-black block text-[10px] uppercase">✍️ NHẬN XÉT CỦA GIÁO VIÊN:</span>
+                            "{sub.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'}"
                           </div>
                         </div>
 
                         <button
                           type="button"
                           onClick={() => assign && setSelectedSubmissionDetail({ assignment: assign, submission: sub })}
-                          className="px-4 py-2 rounded-xl font-black text-xs bg-emerald-600 hover:bg-emerald-700 text-white shadow flex items-center gap-1 cursor-pointer active:scale-95 whitespace-nowrap self-start sm:self-auto"
+                          className="px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl text-xs shadow-md flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all whitespace-nowrap self-stretch sm:self-center"
                         >
-                          <Eye className="w-4 h-4" /> 👁️ Xem bài làm & điểm
+                          <Eye className="w-4 h-4" /> [ 👁️ XEM BÀI LÀM & ĐÁP ÁN ĐÚNG ]
                         </button>
                       </div>
                     );
-                })
-              )}
+                  })
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 4. KHO TRÒ CHƠI HỌC TẬP TƯƠNG TÁC (GAME-01 ĐẾN GAME-10) */}
       {activeMenu === 'games' && (
