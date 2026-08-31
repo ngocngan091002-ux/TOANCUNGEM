@@ -447,6 +447,7 @@ export const StudentDashboard: React.FC = () => {
   const myStars = myPointLogs.filter(l => l.type === 'reward').length;
 
   const myRankInClass = myEntry ? myEntry.rank : (isTeacherPreview ? '—' : 1);
+  const streakDays = Math.max(submissions.length > 0 ? 1 : 0, new Set([...submissions.map(s => s.submitted_at?.split('T')[0]), ...myPointLogs.map(l => l.created_at?.split('T')[0])].filter(Boolean)).size);
 
   const studentBadges = [
     { title: 'Ngôi sao đầu tiên', minPoints: 10, icon: '⭐' },
@@ -506,15 +507,17 @@ export const StudentDashboard: React.FC = () => {
                   const matchedEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.email === user?.email || (lb.full_name && lb.full_name.split(' ').length >= 2 && !lb.full_name.toUpperCase().startsWith('HS20')));
                   const displayName = (isCodeOrShort && matchedEntry?.full_name) ? matchedEntry.full_name : (user?.full_name || 'Học sinh');
 
-                  return user?.role === 'student' ? (
-                    <>Chào mừng em, <span className="text-white underline decoration-amber-300">{displayName}</span>! 🌟</>
+                  return isTeacherPreview ? (
+                    <>👁️ CHẾ ĐỘ XEM THỬ TRANG HỌC SINH (GIÁO VIÊN) 🌟</>
                   ) : (
-                    <>Chào mừng em đến với Cổng Học Toán Lớp 2! 🌟</>
+                    <>Chào mừng em, <span className="text-white underline decoration-amber-300">{displayName}</span>! 🌟</>
                   );
                 })()}
               </h2>
               <p className="text-xs font-extrabold text-amber-950 opacity-90">
-                Chúc em có một ngày học tập thật vui vẻ và gặt hái nhiều điểm thưởng!
+                {isTeacherPreview
+                  ? 'Chào mừng Thầy/Cô! Đây là giao diện trải nghiệm thực tế của Học sinh Lớp Hai 4. Thầy/Cô có thể làm thử bài tập, trải nghiệm kho game hoặc kiểm tra giao diện học sinh.'
+                  : 'Chúc em có một ngày học tập thật vui vẻ và gặt hái nhiều điểm thưởng!'}
               </p>
             </div>
 
@@ -566,7 +569,7 @@ export const StudentDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* ⭐ BANNER THÔNG TIN TÍCH ĐIỂM HỌC SINH */}
+          {/* ⭐ BANNER THÔNG TIN TÍCH ĐIỂM HỌC SINH (HOẶC BANNER XEM THỬ CỦA GIÁO VIÊN) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-amber-950 p-5 rounded-3xl shadow-lg border-2 border-amber-300 flex items-center justify-between">
               <div>
@@ -581,9 +584,9 @@ export const StudentDashboard: React.FC = () => {
 
             <div className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-3xl shadow-lg border-2 border-purple-300 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase text-purple-200 opacity-90 block">🏆 HẠNG TRONG LỚP:</span>
-                <h3 className="text-2xl font-black text-yellow-300">{isTeacherPreview ? 'XEM THỬ' : `HẠNG #${myRankInClass}`}</h3>
-                <span className="text-[11px] font-extrabold text-purple-100">{isTeacherPreview ? 'Chế độ xem thử của Giáo viên' : 'Thi đua sôi nổi'}</span>
+                <span className="text-[10px] font-black uppercase text-purple-200 opacity-90 block">🏆 {isTeacherPreview ? 'VAI TRÒ HỆ THỐNG:' : 'HẠNG TRONG LỚP:'}</span>
+                <h3 className="text-2xl font-black text-yellow-300">{isTeacherPreview ? 'GIÁO VIÊN' : `HẠNG #${myRankInClass}`}</h3>
+                <span className="text-[11px] font-extrabold text-purple-100">{isTeacherPreview ? '👁️ Trang xem thử Giáo viên' : 'Thi đua sôi nổi'}</span>
               </div>
               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
                 🥇
@@ -592,12 +595,12 @@ export const StudentDashboard: React.FC = () => {
 
             <div className="bg-gradient-to-br from-rose-500 to-pink-600 text-white p-5 rounded-3xl shadow-lg border-2 border-pink-300 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase text-rose-200 opacity-90 block">🔥 CHUỖI THÀNH TÍCH:</span>
-                <h3 className="text-2xl font-black text-white">5 NGÀY</h3>
-                <span className="text-[11px] font-extrabold text-rose-100">Học tập chăm chỉ mỗi ngày</span>
+                <span className="text-[10px] font-black uppercase text-rose-200 opacity-90 block">{isTeacherPreview ? '🏫 SĨ SỐ LỚP HỌC:' : '🔥 CHUỖI THÀNH TÍCH:'}</span>
+                <h3 className="text-2xl font-black text-white">{isTeacherPreview ? `${leaderboard.length || 32} EM` : `${streakDays} NGÀY`}</h3>
+                <span className="text-[11px] font-extrabold text-rose-100">{isTeacherPreview ? `Lớp ${activeClassObj?.name || 'Hai 4'}` : 'Học tập chăm chỉ mỗi ngày'}</span>
               </div>
               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
-                🔥
+                {isTeacherPreview ? '🏫' : '🔥'}
               </div>
             </div>
           </div>
