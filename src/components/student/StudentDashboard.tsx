@@ -431,6 +431,8 @@ export const StudentDashboard: React.FC = () => {
 
   const uncompletedCount = assignments.filter(a => !submissions.some(s => s.assignment_id === a.id)).length;
 
+  const isTeacherPreview = user?.role === 'teacher' || user?.role === 'admin';
+
   // Tìm bản ghi điểm thi đua thực tế của học sinh hiện tại từ CSDL Supabase
   const myEntry = leaderboard.find(lb => 
     (user?.id && lb.student_id === user.id) ||
@@ -441,10 +443,10 @@ export const StudentDashboard: React.FC = () => {
 
   // ⭐ TÍNH TOÁN ĐIỂM TÍCH LŨY THỰC TẾ (ĐỒNG BỘ 100% CSDL SUPABASE VỚI BẢNG XẾP HẠNG)
   const myPointsFromLogs = myPointLogs.reduce((sum, l) => sum + (l.points_change || 0), 0);
-  const myTotalPoints = myEntry ? myEntry.total_points : Math.max(0, myPointsFromLogs);
+  const myTotalPoints = myEntry ? myEntry.total_points : (isTeacherPreview ? (leaderboard[0]?.total_points || 36) : Math.max(0, myPointsFromLogs));
   const myStars = myPointLogs.filter(l => l.type === 'reward').length;
 
-  const myRankInClass = myEntry ? myEntry.rank : 1;
+  const myRankInClass = myEntry ? myEntry.rank : (isTeacherPreview ? '—' : 1);
 
   const studentBadges = [
     { title: 'Ngôi sao đầu tiên', minPoints: 10, icon: '⭐' },
@@ -568,9 +570,9 @@ export const StudentDashboard: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-amber-400 via-orange-400 to-amber-500 text-amber-950 p-5 rounded-3xl shadow-lg border-2 border-amber-300 flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase text-amber-950 opacity-80 block">⭐ ĐIỂM TÍCH LŨY:</span>
+                <span className="text-[10px] font-black uppercase text-amber-950 opacity-80 block">⭐ {isTeacherPreview ? 'ĐIỂM CAO NHẤT LỚP:' : 'ĐIỂM TÍCH LŨY:'}</span>
                 <h3 className="text-2xl font-black text-white">{myTotalPoints} <span className="text-sm font-bold text-amber-100">ĐIỂM</span></h3>
-                <span className="text-[11px] font-extrabold text-amber-950">⭐ {myStars} Sao thưởng</span>
+                <span className="text-[11px] font-extrabold text-amber-950">{isTeacherPreview ? `🏆 ${leaderboard[0]?.student_name || 'Hạng 1 lớp'}` : `⭐ ${myStars} Sao thưởng`}</span>
               </div>
               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
                 🏆
@@ -580,8 +582,8 @@ export const StudentDashboard: React.FC = () => {
             <div className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-5 rounded-3xl shadow-lg border-2 border-purple-300 flex items-center justify-between">
               <div>
                 <span className="text-[10px] font-black uppercase text-purple-200 opacity-90 block">🏆 HẠNG TRONG LỚP:</span>
-                <h3 className="text-2xl font-black text-yellow-300">HẠNG #{myRankInClass}</h3>
-                <span className="text-[11px] font-extrabold text-purple-100">Thi đua sôi nổi</span>
+                <h3 className="text-2xl font-black text-yellow-300">{isTeacherPreview ? 'XEM THỬ' : `HẠNG #${myRankInClass}`}</h3>
+                <span className="text-[11px] font-extrabold text-purple-100">{isTeacherPreview ? 'Chế độ xem thử của Giáo viên' : 'Thi đua sôi nổi'}</span>
               </div>
               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
                 🥇
@@ -1746,11 +1748,11 @@ export const StudentDashboard: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-white p-4 rounded-3xl border-2 border-amber-200 shadow-md space-y-1 flex flex-col justify-between">
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
-                  ⭐ Điểm của em
+                  ⭐ {isTeacherPreview ? 'Điểm cao nhất' : 'Điểm của em'}
                 </span>
-                <h3 className="text-2xl font-black text-amber-900">{myTotalPoints} <span className="text-xs font-bold text-amber-700">điểm</span></h3>
+                <h3 className="text-2xl font-black text-amber-900">{isTeacherPreview ? (leaderboard[0]?.total_points || 36) : myTotalPoints} <span className="text-xs font-bold text-amber-700">điểm</span></h3>
                 <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-300 w-max">
-                  ✓ 100% CSDL Supabase
+                  {isTeacherPreview ? `🏆 ${leaderboard[0]?.student_name || 'Hạng 1 lớp'}` : '✓ 100% CSDL Supabase'}
                 </span>
               </div>
 
@@ -1758,9 +1760,9 @@ export const StudentDashboard: React.FC = () => {
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   🏆 Xếp hạng
                 </span>
-                <h3 className="text-2xl font-black text-purple-900">#{myRankInClass} <span className="text-xs font-bold text-purple-700">trong lớp</span></h3>
+                <h3 className="text-2xl font-black text-purple-900">{isTeacherPreview ? '👁️ Xem Thử' : `#${myRankInClass}`} <span className="text-xs font-bold text-purple-700">{isTeacherPreview ? 'Giáo viên' : 'trong lớp'}</span></h3>
                 <span className="text-[10px] font-extrabold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-lg border border-purple-300 w-max">
-                  Xếp hạng động
+                  {isTeacherPreview ? 'Trang xem thử Giáo viên' : 'Xếp hạng động'}
                 </span>
               </div>
 
@@ -1768,7 +1770,7 @@ export const StudentDashboard: React.FC = () => {
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   📈 Điểm tuần này
                 </span>
-                <h3 className="text-2xl font-black text-emerald-800">+{weeklyPoints} <span className="text-xs font-bold text-emerald-700">điểm</span></h3>
+                <h3 className="text-2xl font-black text-emerald-800">+{isTeacherPreview ? (leaderboard[0]?.total_points || 25) : weeklyPoints} <span className="text-xs font-bold text-emerald-700">điểm</span></h3>
                 <span className="text-[10px] font-extrabold text-teal-950 bg-teal-100 px-2 py-0.5 rounded-lg border border-teal-300 w-max">
                   Tích lũy tuần này
                 </span>
@@ -1778,9 +1780,9 @@ export const StudentDashboard: React.FC = () => {
                 <span className="text-[11px] font-black text-slate-500 uppercase flex items-center gap-1">
                   🎖️ Huy hiệu
                 </span>
-                <h3 className="text-2xl font-black text-rose-900">{unlockedBadgesCount} <span className="text-xs font-bold text-rose-700">huy hiệu</span></h3>
+                <h3 className="text-2xl font-black text-rose-900">{isTeacherPreview ? leaderboard.length : unlockedBadgesCount} <span className="text-xs font-bold text-rose-700">{isTeacherPreview ? 'học sinh' : 'huy hiệu'}</span></h3>
                 <span className="text-[10px] font-extrabold text-rose-950 bg-rose-100 px-2 py-0.5 rounded-lg border border-rose-300 w-max">
-                  Đã mở khóa
+                  {isTeacherPreview ? `Lớp ${activeClassObj?.name || 'Hai 4'}` : 'Đã mở khóa'}
                 </span>
               </div>
             </div>
