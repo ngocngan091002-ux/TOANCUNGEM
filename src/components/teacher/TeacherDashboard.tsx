@@ -1574,7 +1574,7 @@ export const TeacherDashboard: React.FC = () => {
                         <td className="p-3 text-center">
                           {(() => {
                             const doneCount = assignmentSubmissionCounts[a.id] || 0;
-                            const totalStudentsCount = students.length || 33;
+                            const totalStudentsCount = (students.length > 0) ? students.length : 32;
                             const isAllDone = doneCount > 0 && doneCount >= totalStudentsCount;
                             return (
                               <span className={`px-2.5 py-1 rounded-xl text-xs font-black border flex items-center justify-center gap-1 mx-auto w-max ${
@@ -1733,7 +1733,7 @@ export const TeacherDashboard: React.FC = () => {
                       title="Nhấp vào để xem chi tiết danh sách học sinh đã hoàn thành"
                     >
                       <CheckCircle2 className="w-4 h-4 text-amber-100" />
-                      📝 Đã hoàn thành: {t.completed_count} / {t.total_students || students.length} học sinh (Chi tiết 👁️)
+                      📝 Đã hoàn thành: {t.completed_count} / {students.length > 0 ? students.length : (t.total_students || 32)} học sinh (Chi tiết 👁️)
                     </button>
 
                     <button

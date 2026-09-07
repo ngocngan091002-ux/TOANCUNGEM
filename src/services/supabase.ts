@@ -611,14 +611,19 @@ export async function getDailyTasks(
     if (profByCode) matchingStudentId = profByCode.id;
   }
 
-  const { count: totalStudentsCount } = await supabaseAdmin
+  const { data: memberProfiles } = await supabaseAdmin
     .from('class_members')
-    .select('*', { count: 'exact', head: true })
+    .select('student_id, student:profiles(email, role)')
     .eq('class_id', classId);
 
-  const finalTotalStudents = (totalStudentsCount && totalStudentsCount > 0)
-    ? totalStudentsCount
-    : ((studentProfiles && studentProfiles.length > 0) ? studentProfiles.length : 33);
+  const actualStudentMembers = (memberProfiles || []).filter((m: any) => {
+    if (!m.student) return true;
+    if (m.student.email === 'ngocngan091002@gmail.com') return false;
+    if (m.student.role === 'teacher' || m.student.role === 'admin') return false;
+    return true;
+  });
+
+  const finalTotalStudents = actualStudentMembers.length > 0 ? actualStudentMembers.length : 32;
 
   return tasks.map(t => {
     const rawCompletions = completions?.filter(c => c.task_id === t.id) || [];
