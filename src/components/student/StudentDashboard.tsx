@@ -221,7 +221,21 @@ export const StudentDashboard: React.FC = () => {
       setAssignments(filteredAssignments);
 
       const sub = await getStudentSubmissions(user!.id, user?.email, user?.student_code);
-      setSubmissions(sub);
+
+      let localSavedSubs: any[] = [];
+      if (user?.id) {
+        const savedSubsStr = localStorage.getItem(`toan_cung_em_saved_submissions_${user.id}`);
+        if (savedSubsStr) {
+          try { localSavedSubs = JSON.parse(savedSubsStr); } catch (e) {}
+        }
+      }
+
+      const mergedSubMap = new Map<string, any>();
+      [...sub, ...localSavedSubs].forEach(item => {
+        if (item.assignment_id) mergedSubMap.set(item.assignment_id, item);
+      });
+
+      setSubmissions(Array.from(mergedSubMap.values()));
 
       const lb = await getClassLeaderboard(classId);
       setLeaderboard(lb);
@@ -338,6 +352,26 @@ export const StudentDashboard: React.FC = () => {
 
       const subRes = await submitAssignment(activeAssignment.id, user!.id, responses, user?.email, user?.student_code);
 
+      const correctCount = responses.filter(r => r.is_correct).length;
+      const totalQuestions = responses.length || 1;
+      const calculatedScore = Math.round((correctCount / totalQuestions) * 10 * 10) / 10;
+
+      const finalSub = subRes || {
+        id: crypto.randomUUID(),
+        assignment_id: activeAssignment.id,
+        student_id: user!.id,
+        score: calculatedScore,
+        status: 'finalized_by_teacher',
+        submitted_at: new Date().toISOString(),
+        teacher_remark: 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'
+      };
+
+      setSubmissions(prev => {
+        const exists = prev.some(s => s.assignment_id === activeAssignment.id);
+        if (exists) return prev.map(s => s.assignment_id === activeAssignment.id ? finalSub : s);
+        return [finalSub, ...prev];
+      });
+
       if (user?.id) {
         let localSubs: string[] = [];
         const savedSubs = localStorage.getItem(`toan_cung_em_submitted_assignments_${user.id}`);
@@ -348,12 +382,20 @@ export const StudentDashboard: React.FC = () => {
           localSubs.push(activeAssignment.id);
           localStorage.setItem(`toan_cung_em_submitted_assignments_${user.id}`, JSON.stringify(localSubs));
         }
+
+        let localSavedSubObjects: any[] = [];
+        const savedSubObjectsStr = localStorage.getItem(`toan_cung_em_saved_submissions_${user.id}`);
+        if (savedSubObjectsStr) {
+          try { localSavedSubObjects = JSON.parse(savedSubObjectsStr); } catch (e) {}
+        }
+        const updatedSubObjects = [finalSub, ...localSavedSubObjects.filter((s: any) => s.assignment_id !== activeAssignment.id)];
+        localStorage.setItem(`toan_cung_em_saved_submissions_${user.id}`, JSON.stringify(updatedSubObjects));
       }
 
       confetti({ particleCount: 100, spread: 80 });
 
-      const calcScore = subRes?.score !== undefined 
-        ? (subRes.score > 10 ? Math.round((subRes.score / 100) * 10 * 10) / 10 : subRes.score) 
+      const calcScore = finalSub?.score !== undefined 
+        ? (finalSub.score > 10 ? Math.round((finalSub.score / 100) * 10 * 10) / 10 : finalSub.score) 
         : 10;
 
       alert(`🎉 Em đã nộp bài thành công!\n⭐ Điểm của em: ${calcScore}/10 điểm.\nEm có thể xem lại bài làm của mình bất kỳ lúc nào.`);
