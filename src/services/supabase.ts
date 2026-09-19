@@ -1440,17 +1440,30 @@ export async function addStudentPointLog(payload: {
   created_by?: string;
 }): Promise<PointLogRecord> {
   const defaultClassId = payload.class_id || '38546e64-1664-4fed-b1ca-82fbe5e2d194';
+  const isUuid = (val?: string) => !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
 
-  // 1. Chuẩn hóa lấy đúng Profile UUID trong CSDL
+  // 1. Chuẩn hóa lấy đúng Profile UUID trong CSDL mà KHÔNG gây lỗi PostgREST 400 UUID syntax
   let targetStudentId = payload.student_id;
   try {
-    const { data: prof } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .or(`id.eq.${payload.student_id},email.ilike.${payload.student_id},student_code.ilike.${payload.student_id}`)
-      .maybeSingle();
-    if (prof?.id) {
-      targetStudentId = prof.id;
+    const filters: string[] = [];
+    if (isUuid(payload.student_id)) {
+      filters.push(`id.eq.${payload.student_id}`);
+    }
+    if (payload.student_id && payload.student_id.trim()) {
+      const cleanId = payload.student_id.trim();
+      filters.push(`email.ilike.${cleanId}`);
+      filters.push(`student_code.ilike.${cleanId}`);
+    }
+
+    if (filters.length > 0) {
+      const { data: prof } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .or(filters.join(','))
+        .maybeSingle();
+      if (prof?.id) {
+        targetStudentId = prof.id;
+      }
     }
   } catch (e) {}
 
@@ -1485,24 +1498,41 @@ export async function addStudentPointLog(payload: {
 
 export async function getStudentPointLogs(studentId: string, email?: string, studentCode?: string): Promise<PointLogRecord[]> {
   try {
+    const isUuid = (val?: string) => !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
     // Thu thập tất cả các mã định danh có thể có của học sinh
     const possibleIds: string[] = [studentId];
     if (email) possibleIds.push(email.trim().toLowerCase());
     if (studentCode) possibleIds.push(studentCode.trim());
 
-    // Tra cứu danh sách ID profile liên quan từ bảng profiles
-    const searchFilter = `id.eq.${studentId}${email ? `,email.ilike.${email}` : ''}${studentCode ? `,student_code.ilike.${studentCode}` : ''}`;
-    const { data: profs } = await supabaseAdmin
-      .from('profiles')
-      .select('id, email, student_code')
-      .or(searchFilter);
+    // Tra cứu danh sách ID profile liên quan từ bảng profiles mà không làm crash query
+    const orFilters: string[] = [];
+    if (isUuid(studentId)) {
+      orFilters.push(`id.eq.${studentId}`);
+    } else {
+      orFilters.push(`student_code.ilike.${studentId}`);
+      orFilters.push(`email.ilike.${studentId}`);
+    }
+    if (email && email.trim()) {
+      orFilters.push(`email.ilike.${email.trim()}`);
+    }
+    if (studentCode && studentCode.trim()) {
+      orFilters.push(`student_code.ilike.${studentCode.trim()}`);
+    }
 
-    if (profs && profs.length > 0) {
-      profs.forEach(p => {
-        if (p.id) possibleIds.push(p.id);
-        if (p.email) possibleIds.push(p.email.toLowerCase());
-        if (p.student_code) possibleIds.push(p.student_code);
-      });
+    if (orFilters.length > 0) {
+      const { data: profs } = await supabaseAdmin
+        .from('profiles')
+        .select('id, email, student_code')
+        .or(orFilters.join(','));
+
+      if (profs && profs.length > 0) {
+        profs.forEach(p => {
+          if (p.id) possibleIds.push(p.id);
+          if (p.email) possibleIds.push(p.email.toLowerCase());
+          if (p.student_code) possibleIds.push(p.student_code);
+        });
+      }
     }
 
     const uniqueIds = Array.from(new Set(possibleIds.filter(Boolean)));
@@ -1527,7 +1557,7 @@ export async function getStudentPointLogs(studentId: string, email?: string, stu
     if (allLogs && allLogs.length > 0) {
       return allLogs.filter(l => uniqueIds.some(id => 
         l.student_id?.toLowerCase() === id.toLowerCase() ||
-        l.student_name?.toLowerCase().includes(id.toLowerCase())
+        (l.student_name && id && l.student_name.toLowerCase().includes(id.toLowerCase()))
       ));
     }
   } catch (err) {
@@ -1538,8 +1568,10 @@ export async function getStudentPointLogs(studentId: string, email?: string, stu
 
 export async function getClassPointLogs(classId?: string): Promise<PointLogRecord[]> {
   try {
+    const isUuid = (val?: string) => !!val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val.trim());
+
     let query = supabaseAdmin.from('student_points_log').select('*, student:profiles(full_name, student_code)').order('created_at', { ascending: false });
-    if (classId) {
+    if (classId && isUuid(classId)) {
       query = query.or(`class_id.eq.${classId},class_id.is.null`);
     }
     const { data, error } = await query;
@@ -1549,6 +1581,9 @@ export async function getClassPointLogs(classId?: string): Promise<PointLogRecor
         student_name: d.student?.full_name || d.student_name
       }));
     }
+
+    const { data: rawData } = await supabaseAdmin.from('student_points_log').select('*').order('created_at', { ascending: false });
+    if (rawData) return rawData;
   } catch (err) {
     console.warn('getClassPointLogs exception:', err);
   }

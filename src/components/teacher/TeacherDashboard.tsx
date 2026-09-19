@@ -776,7 +776,13 @@ export const TeacherDashboard: React.FC = () => {
         created_by: user?.id
       });
 
-      const newLog = { ...createdLog, student_name: st.full_name, student_id: st.id };
+      const newLog = { 
+        ...createdLog, 
+        student_name: st.full_name, 
+        student_id: st.id,
+        student_code: st.student_code,
+        email: st.email
+      };
 
       const updatedLogs = [newLog, ...pointLogs];
       setPointLogs(updatedLogs);

@@ -5,7 +5,7 @@ import {
   getDailyTasks, markTaskCompleted, 
   getLearningMaterials, getGames, getAssignments, 
   submitAssignment, getStudentSubmissions, getClassLeaderboard, 
-  updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs,
+  updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs, addStudentPointLog,
   recordStudentProgress, subscribeToSubmissions
 } from '../../services/supabase';
 import { askAIMathAssistant } from '../../services/aiService';
@@ -385,7 +385,18 @@ export const StudentDashboard: React.FC = () => {
       if (savedLogsStr) {
         try {
           localPointLogs = JSON.parse(savedLogsStr);
-          const studentLocalLogs = localPointLogs.filter((p: any) => p.student_id === user?.id);
+          const myIdentifiers = new Set([
+            user?.id?.toLowerCase(),
+            user?.email?.toLowerCase(),
+            user?.student_code?.toLowerCase()
+          ].filter(Boolean));
+
+          const studentLocalLogs = localPointLogs.filter((p: any) => {
+            const sid = p.student_id?.toLowerCase();
+            const sname = p.student_name?.toLowerCase();
+            const uname = user?.full_name?.toLowerCase();
+            return (sid && myIdentifiers.has(sid)) || (uname && sname && (sname === uname || sname.includes(uname) || uname.includes(sname)));
+          });
           setMyPointLogs(studentLocalLogs);
         } catch (e) {}
       }
@@ -492,17 +503,18 @@ export const StudentDashboard: React.FC = () => {
       const allCandidateLogs = [...pLogs, ...localPointLogs, ...globalPointLogs];
 
       allCandidateLogs.forEach(item => {
-        if (!item || !item.id) return;
+        if (!item) return;
+        const itemId = item.id || `${item.student_id}_${item.created_at}_${item.reason}`;
         const sId = item.student_id?.toLowerCase();
         const sName = item.student_name?.toLowerCase();
         const uName = user?.full_name?.toLowerCase();
 
         const isMatched = (sId && myIds.has(sId)) || 
                           (uName && sName && (sName === uName || uName.includes(sName) || sName.includes(uName))) ||
-                          isTeacherPreviewMode; // Nếu Giáo viên mở trang học sinh xem thử -> hiển thị nhật ký điểm thi đua để xem thử
+                          isTeacherPreviewMode;
 
         if (isMatched) {
-          mergedMap.set(item.id, item);
+          mergedMap.set(itemId, { ...item, id: itemId });
         }
       });
 
@@ -619,6 +631,80 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const handleNextQuestion = () => {
+    if (!activeAssignment || !activeAssignment.questions) return;
+    const currentQ = activeAssignment.questions[currentQuestionIndex];
+    if (currentQ) {
+      const durationSeconds = Math.max(1, Math.round((Date.now() - questionStartTime) / 1000));
+      setQuestionTimers(prev => ({ ...prev, [currentQ.id]: (prev[currentQ.id] || 0) + durationSeconds }));
+    }
+
+    if (currentQuestionIndex < activeAssignment.questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+      setQuestionStartTime(Date.now());
+    } else {
+      setShowSubmitConfirmModal(true);
+    }
+  };
+
+  const handlePrevQuestion = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+      setQuestionStartTime(Date.now());
+    }
+  };
+
+  const checkQuestionCorrectness = (question: AssignmentQuestion, userChosen: string[]): boolean => {
+    if (!userChosen || userChosen.length === 0) return false;
+
+    const normalizeStr = (s: any) => (s ?? '').toString().trim().toLowerCase().replace(/\s+/g, '');
+
+    const qAny = question as any;
+    const correctAnswers = (question.correct_answers || qAny.correct_answer ? [qAny.correct_answer, ...(question.correct_answers || [])] : (question.correct_answers || [])).map(a => normalizeStr(a));
+
+    const isFillBlankQuestion = question.question_type === 'fill_blank' || qAny.type === 'fill_blank' ||
+      (question.question_text && (question.question_text.includes('...') || question.question_text.toLowerCase().includes('điền')));
+
+    if (isFillBlankQuestion) {
+      const studentInputText = userChosen[0] || '';
+      if (!studentInputText.trim() || studentInputText.trim().toLowerCase() === 'bỏ trống') return false;
+      const normalizedStudent = normalizeStr(studentInputText);
+
+      // So sánh với correct_answers
+      if (correctAnswers.some(ans => ans === normalizedStudent)) return true;
+
+      // So sánh với options text
+      if (question.options && question.options.length > 0) {
+        const matchesOptionText = question.options.some((opt: any) => {
+          const optText = normalizeStr(opt.text || opt.option_text || opt.label || '');
+          const isOptCorrect = opt.is_correct || correctAnswers.includes(normalizeStr(opt.id));
+          return isOptCorrect && optText === normalizedStudent;
+        });
+        if (matchesOptionText) return true;
+      }
+
+      // Xử lý chuỗi đáp án chứa ký tự phân cách ; hoặc |
+      if (qAny.correct_answer && typeof qAny.correct_answer === 'string' && (qAny.correct_answer.includes(';') || qAny.correct_answer.includes('|'))) {
+        const acceptableParts = qAny.correct_answer.split(/[;|]/).map((p: string) => normalizeStr(p));
+        if (acceptableParts.includes(normalizedStudent)) return true;
+      }
+
+      return false;
+    }
+
+    // TRƯỜNG HỢP 2: Dạng câu hỏi trắc nghiệm chọn đáp án
+    const correctOptionList = (question.options || []).filter((o: any) => o.is_correct || correctAnswers.includes(normalizeStr(o.id)));
+    const correctOptionIds = correctOptionList.length > 0 
+      ? correctOptionList.map((o: any) => normalizeStr(o.id)) 
+      : correctAnswers;
+
+    if (correctOptionIds.length === 0) return false;
+
+    const normalizedUserChosen = userChosen.map(u => normalizeStr(u));
+    if (correctOptionIds.length !== normalizedUserChosen.length) return false;
+    return correctOptionIds.every(id => normalizedUserChosen.includes(id));
+  };
+
   const handleSubmitAssignment = async () => {
     if (!activeAssignment || !activeAssignment.questions) return;
     setIsSubmitting(true);
@@ -687,6 +773,25 @@ export const StudentDashboard: React.FC = () => {
         localStorage.removeItem(`toan_cung_em_user_answers_${activeAssignment.id}_${user.id}`);
         localStorage.removeItem(`toan_cung_em_current_q_idx_${activeAssignment.id}_${user.id}`);
         localStorage.removeItem(`toan_cung_em_question_timers_${activeAssignment.id}_${user.id}`);
+      }
+
+      // ⭐ TỰ ĐỘNG LƯU NHẬT KÝ TÍCH ĐIỂM BÀI TẬP VÀO CSDL SUPABASE
+      if (calculatedScore > 0) {
+        addStudentPointLog({
+          class_id: selectedClassId || '38546e64-1664-4fed-b1ca-82fbe5e2d194',
+          student_id: user!.id,
+          student_name: user?.full_name || 'Học sinh',
+          points_change: calculatedScore,
+          stars_change: Math.max(1, Math.round(calculatedScore)),
+          reason: `Hoàn thành bài tập: ${activeAssignment.title || 'Bài tập tuần'}`,
+          icon: '📝',
+          type: 'reward',
+          created_by: user!.id
+        }).then(newLog => {
+          if (newLog) {
+            setMyPointLogs(prev => [newLog, ...prev.filter(l => l.id !== newLog.id)]);
+          }
+        }).catch(() => {});
       }
 
       confetti({ particleCount: 100, spread: 80 });
