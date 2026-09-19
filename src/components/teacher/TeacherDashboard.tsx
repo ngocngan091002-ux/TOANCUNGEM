@@ -829,6 +829,26 @@ export const TeacherDashboard: React.FC = () => {
     setCustomReasons(prev => prev.filter(r => r.id !== id));
   };
 
+  // XÓA SẠCH LỊCH SỬ TÍCH ĐIỂM THỬ NGHIỆM / ĐIỂM ẢO
+  const handleClearPointLogs = async () => {
+    if (!window.confirm('⚠️ Thầy/Cô có chắc chắn muốn xóa toàn bộ lịch sử tích điểm thử nghiệm không? Thao tác này sẽ làm sạch nhật ký tích điểm cả trên hệ thống và trình duyệt.')) return;
+    
+    try {
+      const targetClassId = selectedClass?.id || '38546e64-1664-4fed-b1ca-82fbe5e2d194';
+      localStorage.removeItem(`toan_cung_em_point_logs_${targetClassId}`);
+      localStorage.removeItem('toan_cung_em_global_point_logs');
+      
+      try {
+        await supabaseAdmin.from('student_points_log').delete().or(`class_id.eq.${targetClassId},class_id.is.null`);
+      } catch (e) {}
+
+      setPointLogs([]);
+      alert('🎉 Đã xóa toàn bộ lịch sử tích điểm thử nghiệm thành công!');
+    } catch (err: any) {
+      alert('Lỗi xóa lịch sử: ' + err.message);
+    }
+  };
+
   // TÍNH TỔNG ĐIỂM THỰC TẾ TRÊN DATABASE (KHÔNG ĐIỂM ẢO)
   const getStudentStats = (studentId: string) => {
     const studentLogs = pointLogs.filter(l => l.student_id === studentId);
@@ -2215,24 +2235,47 @@ export const TeacherDashboard: React.FC = () => {
 
               {/* NHẬT KÝ TÍCH ĐIỂM THỜI GIAN THỰC */}
               <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200 space-y-3">
-                <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📜 NHẬT KÝ TÍCH ĐIỂM GẦN ĐÂY:</h4>
+                <div className="flex items-center justify-between">
+                  <h4 className="font-black text-xs text-amber-950 uppercase tracking-wider">📜 NHẬT KÝ TÍCH ĐIỂM GẦN ĐÂY:</h4>
+                  {pointLogs.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearPointLogs}
+                      className="text-[10px] font-black text-rose-700 bg-rose-100 hover:bg-rose-200 px-2.5 py-1 rounded-xl border border-rose-300 transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      🗑️ Xóa sạch lịch sử
+                    </button>
+                  )}
+                </div>
                 <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                   {pointLogs.length === 0 ? (
                     <p className="text-xs font-bold text-slate-500 italic text-center py-6">Chưa có lịch sử tích điểm nào. Hãy bấm nút cộng điểm cho học sinh!</p>
                   ) : (
-                    pointLogs.map((log, lIdx) => (
-                      <div key={log.id || lIdx} className="bg-white p-2.5 rounded-xl border border-amber-200 text-xs flex items-center justify-between gap-2 shadow-xs">
-                        <div>
-                          <span className="font-black text-slate-900">{log.student_name || 'Học sinh'}</span>
-                          <p className="text-[10px] font-bold text-slate-500">
-                            {log.icon || '⭐'} {log.reason} • {log.created_at ? new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
-                          </p>
+                    pointLogs.map((log, lIdx) => {
+                      const realStudent = students.find(s => 
+                        s.id === log.student_id || 
+                        (s.email && log.student_id && s.email.toLowerCase() === log.student_id.toLowerCase()) ||
+                        (s.student_code && log.student_id && s.student_code.toLowerCase() === log.student_id.toLowerCase()) ||
+                        (s.student_code && (log as any).student_code && s.student_code.toLowerCase() === (log as any).student_code.toLowerCase())
+                      );
+                      const displayName = (log.student_name && log.student_name !== 'Học sinh' && !log.student_name.startsWith('HS20'))
+                        ? log.student_name 
+                        : (realStudent?.full_name || log.student_name || 'Học sinh');
+
+                      return (
+                        <div key={log.id || lIdx} className="bg-white p-2.5 rounded-xl border border-amber-200 text-xs flex items-center justify-between gap-2 shadow-xs">
+                          <div>
+                            <span className="font-black text-slate-900">{displayName}</span>
+                            <p className="text-[10px] font-bold text-slate-500">
+                              {log.icon || '⭐'} {log.reason} • {log.created_at ? new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.created_at).toLocaleDateString('vi-VN') : 'Vừa xong'}
+                            </p>
+                          </div>
+                          <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${log.points_change >= 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'}`}>
+                            {log.points_change >= 0 ? `+${log.points_change}` : log.points_change} điểm
+                          </span>
                         </div>
-                        <span className={`px-2 py-0.5 rounded-lg text-xs font-black ${log.points_change >= 0 ? 'bg-emerald-100 text-emerald-900' : 'bg-rose-100 text-rose-900'}`}>
-                          {log.points_change >= 0 ? `+${log.points_change}` : log.points_change} điểm
-                        </span>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
