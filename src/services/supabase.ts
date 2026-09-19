@@ -1440,9 +1440,23 @@ export async function addStudentPointLog(payload: {
   created_by?: string;
 }): Promise<PointLogRecord> {
   const defaultClassId = payload.class_id || '38546e64-1664-4fed-b1ca-82fbe5e2d194';
+
+  // 1. Chuẩn hóa lấy đúng Profile UUID trong CSDL
+  let targetStudentId = payload.student_id;
+  try {
+    const { data: prof } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .or(`id.eq.${payload.student_id},email.ilike.${payload.student_id},student_code.ilike.${payload.student_id}`)
+      .maybeSingle();
+    if (prof?.id) {
+      targetStudentId = prof.id;
+    }
+  } catch (e) {}
+
   const insertPayload = {
     class_id: defaultClassId,
-    student_id: payload.student_id,
+    student_id: targetStudentId,
     points_change: payload.points_change,
     stars_change: payload.stars_change || (payload.type === 'reward' ? Math.max(1, payload.points_change) : -1),
     reason: payload.reason,
@@ -1459,23 +1473,63 @@ export async function addStudentPointLog(payload: {
       .select()
       .single();
 
-    if (!error && data) return data;
+    if (!error && data) {
+      return { ...data, student_name: payload.student_name };
+    }
   } catch (err) {
     console.warn('addStudentPointLog DB insert warning:', err);
   }
 
-  return { id: crypto.randomUUID(), ...insertPayload };
+  return { id: crypto.randomUUID(), student_name: payload.student_name, ...insertPayload };
 }
 
-export async function getStudentPointLogs(studentId: string): Promise<PointLogRecord[]> {
+export async function getStudentPointLogs(studentId: string, email?: string, studentCode?: string): Promise<PointLogRecord[]> {
   try {
+    // Thu thập tất cả các mã định danh có thể có của học sinh
+    const possibleIds: string[] = [studentId];
+    if (email) possibleIds.push(email.trim().toLowerCase());
+    if (studentCode) possibleIds.push(studentCode.trim());
+
+    // Tra cứu danh sách ID profile liên quan từ bảng profiles
+    const searchFilter = `id.eq.${studentId}${email ? `,email.ilike.${email}` : ''}${studentCode ? `,student_code.ilike.${studentCode}` : ''}`;
+    const { data: profs } = await supabaseAdmin
+      .from('profiles')
+      .select('id, email, student_code')
+      .or(searchFilter);
+
+    if (profs && profs.length > 0) {
+      profs.forEach(p => {
+        if (p.id) possibleIds.push(p.id);
+        if (p.email) possibleIds.push(p.email.toLowerCase());
+        if (p.student_code) possibleIds.push(p.student_code);
+      });
+    }
+
+    const uniqueIds = Array.from(new Set(possibleIds.filter(Boolean)));
+
+    // 1. Query chính xác theo danh sách uniqueIds
     const { data, error } = await supabaseAdmin
       .from('student_points_log')
       .select('*')
-      .eq('student_id', studentId)
+      .in('student_id', uniqueIds)
       .order('created_at', { ascending: false });
 
-    if (!error && data) return data;
+    if (!error && data && data.length > 0) {
+      return data;
+    }
+
+    // 2. Fallback: Lấy toàn bộ nhật ký tích điểm để lọc mềm theo identifier
+    const { data: allLogs } = await supabaseAdmin
+      .from('student_points_log')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (allLogs && allLogs.length > 0) {
+      return allLogs.filter(l => uniqueIds.some(id => 
+        l.student_id?.toLowerCase() === id.toLowerCase() ||
+        l.student_name?.toLowerCase().includes(id.toLowerCase())
+      ));
+    }
   } catch (err) {
     console.warn('getStudentPointLogs exception:', err);
   }
