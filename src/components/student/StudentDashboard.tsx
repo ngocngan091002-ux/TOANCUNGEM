@@ -2824,7 +2824,7 @@ export const StudentDashboard: React.FC = () => {
                     const isAnswered = userSelectedOptions.length > 0 && userSelectedOptions.some(o => (o || '').trim().length > 0 && (o || '').trim().toLowerCase() !== 'bỏ trống');
 
                     const isCorrect = isAnswered 
-                      ? (resp?.is_correct !== undefined ? resp.is_correct : checkQuestionCorrectness(q, userSelectedOptions))
+                      ? (checkQuestionCorrectness(q, userSelectedOptions) || resp?.is_correct === true)
                       : false;
 
                     const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
