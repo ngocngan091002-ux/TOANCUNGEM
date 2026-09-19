@@ -3643,25 +3643,27 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {/* HƯỚNG DẪN GIẢI CHI TIẾT DÀNH CHO GIÁO VIÊN */}
-                        <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 font-black text-amber-900">
-                              <span>💡</span>
-                              <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG CHUẨN:</span>
+                        {/* HƯỚNG DẪN GIẢI CHI TIẾT DÀNH CHO GIÁO VIÊN - CHỈ HIỂN THỊ KHI HỌC SINH LÀM SAI */}
+                        {!isCorrect && (
+                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 font-black text-amber-900">
+                                <span>💡</span>
+                                <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG CHUẨN:</span>
+                              </div>
+                              <p className="text-slate-800 leading-relaxed font-semibold">
+                                {q.explanation || q.guide || (
+                                  <>
+                                    Đáp án đúng của đề bài là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>.
+                                  </>
+                                )}
+                              </p>
                             </div>
-                            <p className="text-slate-800 leading-relaxed font-semibold">
-                              {q.explanation || q.guide || (
-                                <>
-                                  Đáp án đúng của đề bài là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>.
-                                </>
-                              )}
-                            </p>
+                            <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
+                              Đáp án chuẩn
+                            </span>
                           </div>
-                          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
-                            Đáp án chuẩn
-                          </span>
-                        </div>
+                        )}
                       </div>
                     );
                   })
