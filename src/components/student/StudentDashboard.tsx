@@ -85,10 +85,11 @@ const checkQuestionCorrectness = (
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
-  const hasOptions = rawOpts.length > 0;
+  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
+  const isFillBlankQuestion = q.question_type === 'fill_blank' || hasPlaceholders;
 
-  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
-  if (hasOptions) {
+  // Nếu KHÔNG PHẢI là câu hỏi điền từ (là câu trắc nghiệm thực sự có options A, B, C, D và không chứa placeholders)
+  if (!isFillBlankQuestion && rawOpts.length > 0) {
     const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
       if (typeof opt === 'string') {
         return { id: String.fromCharCode(65 + oIdx), text: opt.trim() };
@@ -102,7 +103,7 @@ const checkQuestionCorrectness = (
     return optionsList.some(opt => isOptionUserChosen(opt, filtered) && isOptionCorrectTarget(opt, correctAnswers));
   }
 
-  // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ (không có options A, B, C, D)
+  // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ
   let targets: string[] = [];
   correctAnswers.forEach((t: any) => {
     if (t != null) {
