@@ -36,9 +36,21 @@ export const TeacherDashboard: React.FC = () => {
     return saved || 'tasks';
   });
 
+  useEffect(() => {
+    if (user?.id) {
+      const savedTab = localStorage.getItem(`toan_cung_em_teacher_active_tab_${user.id}`);
+      if (savedTab) {
+        setActiveTabState(savedTab);
+      }
+    }
+  }, [user?.id]);
+
   const setActiveTab = (tab: string) => {
     setActiveTabState(tab);
-    localStorage.setItem(`toan_cung_em_teacher_active_tab_${user?.id || 'default'}`, tab);
+    if (user?.id) {
+      localStorage.setItem(`toan_cung_em_teacher_active_tab_${user.id}`, tab);
+    }
+    localStorage.setItem('toan_cung_em_teacher_active_tab_default', tab);
   };
 
   // Class Content Data

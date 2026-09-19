@@ -19,7 +19,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeView, setActiveView] = useState<ActiveView>('student');
+  const [activeView, setActiveViewState] = useState<ActiveView>(() => {
+    const saved = localStorage.getItem('toan_cung_em_active_view');
+    return (saved as ActiveView) || 'student';
+  });
+
+  const setActiveView = (view: ActiveView) => {
+    setActiveViewState(view);
+    localStorage.setItem('toan_cung_em_active_view', view);
+  };
 
   useEffect(() => {
     const processSession = async (sessionUser: any) => {
@@ -106,7 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // Listen to Supabase Auth Changes
+    // Listen to Supabase Auth Changes - Tránh reset trang/view khi tab đổi focus hoặc token tự động refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session?.user) {
         await processSession(session.user);
@@ -128,13 +136,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     setUser(profile);
 
-    // Đặt mặc định activeView phù hợp với Role
-    if (profile.role === 'admin') {
-      setActiveView('admin');
-    } else if (profile.role === 'teacher') {
-      setActiveView('teacher');
+    // Duy trì activeView từ localStorage nếu người dùng đã tự chọn/chuyển tab trước đó
+    const savedView = localStorage.getItem('toan_cung_em_active_view') as ActiveView;
+    if (savedView) {
+      // Bảo mật: Nếu savedView là 'admin' nhưng user không phải admin thì đưa về role mặc định
+      if (savedView === 'admin' && profile.role !== 'admin') {
+        const defaultView = profile.role === 'teacher' ? 'teacher' : 'student';
+        setActiveViewState(defaultView);
+        localStorage.setItem('toan_cung_em_active_view', defaultView);
+      } else {
+        setActiveViewState(savedView);
+      }
     } else {
-      setActiveView('student');
+      const defaultView = profile.role === 'admin' ? 'admin' : (profile.role === 'teacher' ? 'teacher' : 'student');
+      setActiveViewState(defaultView);
+      localStorage.setItem('toan_cung_em_active_view', defaultView);
     }
   };
 

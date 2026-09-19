@@ -85,8 +85,36 @@ export const StudentDashboard: React.FC = () => {
   useEffect(() => {
     if (user?.id) {
       loadStudentClasses();
+      const savedMenu = localStorage.getItem(`toan_cung_em_student_active_menu_${user.id}`);
+      if (savedMenu) {
+        setActiveMenuState(savedMenu);
+      }
     }
   }, [user]);
+
+  // Khôi phục bài tập đang làm dở (Quiz) nếu bị F5/chuyển tab đột ngột
+  useEffect(() => {
+    if (user?.id && !activeAssignment && assignments.length > 0) {
+      const savedAssignStr = localStorage.getItem(`toan_cung_em_active_assignment_${user.id}`);
+      if (savedAssignStr) {
+        try {
+          const savedAssign = JSON.parse(savedAssignStr) as Assignment;
+          const isSubmitted = submissions.some(s => s.assignment_id === savedAssign.id);
+          if (!isSubmitted) {
+            setActiveAssignment(savedAssign);
+            const savedAnswers = localStorage.getItem(`toan_cung_em_user_answers_${savedAssign.id}_${user.id}`);
+            if (savedAnswers) setUserAnswers(JSON.parse(savedAnswers));
+            const savedQIdx = localStorage.getItem(`toan_cung_em_current_q_idx_${savedAssign.id}_${user.id}`);
+            if (savedQIdx) setCurrentQuestionIndex(parseInt(savedQIdx, 10));
+            const savedTimers = localStorage.getItem(`toan_cung_em_question_timers_${savedAssign.id}_${user.id}`);
+            if (savedTimers) setQuestionTimers(JSON.parse(savedTimers));
+          } else {
+            localStorage.removeItem(`toan_cung_em_active_assignment_${user.id}`);
+          }
+        } catch (e) {}
+      }
+    }
+  }, [user?.id, assignments, submissions]);
 
   useEffect(() => {
     if (selectedClassId && user?.id) {
@@ -347,6 +375,10 @@ export const StudentDashboard: React.FC = () => {
       try {
         await recordStudentProgress(assign.id, user.id, 'in_progress');
       } catch (e) {}
+      localStorage.setItem(`toan_cung_em_active_assignment_${user.id}`, JSON.stringify(assign));
+      localStorage.removeItem(`toan_cung_em_user_answers_${assign.id}_${user.id}`);
+      localStorage.removeItem(`toan_cung_em_current_q_idx_${assign.id}_${user.id}`);
+      localStorage.removeItem(`toan_cung_em_question_timers_${assign.id}_${user.id}`);
     }
     setActiveAssignment(assign);
     setCurrentQuestionIndex(0);
@@ -357,13 +389,20 @@ export const StudentDashboard: React.FC = () => {
 
   const handleSelectOption = (questionId: string, optionId: string) => {
     const elapsed = Math.round((Date.now() - questionStartTime) / 1000);
-    setQuestionTimers(prev => ({ ...prev, [questionId]: (prev[questionId] || 0) + Math.max(1, elapsed) }));
+    const updatedTimers = { ...questionTimers, [questionId]: (questionTimers[questionId] || 0) + Math.max(1, elapsed) };
+    setQuestionTimers(updatedTimers);
     setQuestionStartTime(Date.now());
 
-    setUserAnswers(prev => ({
-      ...prev,
+    const updatedAnswers = {
+      ...userAnswers,
       [questionId]: [optionId]
-    }));
+    };
+    setUserAnswers(updatedAnswers);
+
+    if (activeAssignment && user?.id) {
+      localStorage.setItem(`toan_cung_em_user_answers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedAnswers));
+      localStorage.setItem(`toan_cung_em_question_timers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedTimers));
+    }
   };
 
   const handleSubmitAssignment = async () => {
@@ -424,6 +463,12 @@ export const StudentDashboard: React.FC = () => {
         }
         const updatedSubObjects = [finalSub, ...localSavedSubObjects.filter((s: any) => s.assignment_id !== activeAssignment.id)];
         localStorage.setItem(`toan_cung_em_saved_submissions_${user.id}`, JSON.stringify(updatedSubObjects));
+
+        // Xóa thông tin bài tập dở dang sau khi đã nộp bài thành công
+        localStorage.removeItem(`toan_cung_em_active_assignment_${user.id}`);
+        localStorage.removeItem(`toan_cung_em_user_answers_${activeAssignment.id}_${user.id}`);
+        localStorage.removeItem(`toan_cung_em_current_q_idx_${activeAssignment.id}_${user.id}`);
+        localStorage.removeItem(`toan_cung_em_question_timers_${activeAssignment.id}_${user.id}`);
       }
 
       confetti({ particleCount: 100, spread: 80 });
