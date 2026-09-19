@@ -642,14 +642,16 @@ export const StudentDashboard: React.FC = () => {
       const totalQuestions = responses.length || 1;
       const calculatedScore = Math.round((correctCount / totalQuestions) * 10 * 10) / 10;
 
-      const finalSub = subRes || {
-        id: crypto.randomUUID(),
+      const finalSub = {
+        ...(subRes || {}),
+        id: subRes?.id || crypto.randomUUID(),
         assignment_id: activeAssignment.id,
         student_id: user!.id,
         score: calculatedScore,
-        status: 'finalized_by_teacher',
-        submitted_at: new Date().toISOString(),
-        teacher_remark: 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.'
+        status: subRes?.status || 'finalized_by_teacher',
+        submitted_at: subRes?.submitted_at || new Date().toISOString(),
+        teacher_remark: subRes?.teacher_remark || 'Em đã hoàn thành tốt bài tập tuần! Tiếp tục phát huy nhé.',
+        responses: responses
       };
 
       setSubmissions(prev => {
@@ -659,6 +661,8 @@ export const StudentDashboard: React.FC = () => {
       });
 
       if (user?.id) {
+        localStorage.setItem(`toan_cung_em_submission_responses_${activeAssignment.id}_${user.id}`, JSON.stringify(responses));
+
         let localSubs: string[] = [];
         const savedSubs = localStorage.getItem(`toan_cung_em_submitted_assignments_${user.id}`);
         if (savedSubs) {
@@ -2757,7 +2761,13 @@ export const StudentDashboard: React.FC = () => {
 
                 {selectedSubmissionDetail.assignment.questions && selectedSubmissionDetail.assignment.questions.length > 0 ? (
                   selectedSubmissionDetail.assignment.questions.map((q, idx) => {
-                    const resp = selectedSubmissionDetail.submission.responses?.find((r: any) => r.question_id === q.id);
+                    const savedResponsesStr = user?.id ? localStorage.getItem(`toan_cung_em_submission_responses_${selectedSubmissionDetail.assignment.id}_${user.id}`) : null;
+                    let savedResponses = null;
+                    if (savedResponsesStr) {
+                      try { savedResponses = JSON.parse(savedResponsesStr); } catch (e) {}
+                    }
+                    const allResponses = selectedSubmissionDetail.submission.responses || savedResponses || [];
+                    const resp = allResponses.find((r: any) => r.question_id === q.id);
                     const userSelectedOptions: string[] = resp?.selected_options || [];
                     const correctAnswers: string[] = q.correct_answers || [];
 
@@ -2804,7 +2814,7 @@ export const StudentDashboard: React.FC = () => {
                           <span className={`px-3 py-1 rounded-xl text-xs font-black shrink-0 shadow-xs flex items-center gap-1 ${
                             isCorrect ? 'bg-emerald-100 text-emerald-950 border border-emerald-400' : 'bg-rose-100 text-rose-950 border border-rose-400'
                           }`}>
-                            {isCorrect ? '🟢 ĐÚNG (+10 Điểm)' : '🔴 SAI (0 Điểm)'}
+                            {isCorrect ? `🟢 ĐÚNG (+${q.points || 10} Điểm)` : '🔴 SAI (0 Điểm)'}
                           </span>
                         </div>
 
@@ -2858,28 +2868,30 @@ export const StudentDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {/* HƯỚNG DẪN GIẢI CHI TIẾT */}
-                        <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 font-black text-amber-900">
-                              <span>💡</span>
-                              <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG:</span>
+                        {/* HƯỚNG DẪN GIẢI CHI TIẾT - CHỈ HIỂN THỊ KHI CÂU HỎI LÀM SAI */}
+                        {!isCorrect && (
+                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 font-black text-amber-900">
+                                <span>💡</span>
+                                <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG:</span>
+                              </div>
+                              <p className="text-slate-800 leading-relaxed font-semibold">
+                                {q.explanation || q.guide || (
+                                  <>
+                                    Đáp án chính xác là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>. 
+                                    {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text))
+                                      ? ' Em hãy kiểm tra và tính toán kỹ trước khi điền nhé!' 
+                                      : ' Hãy đọc kỹ đề bài và thực hiện phép tính tương ứng để tìm ra kết quả nhé!'}
+                                  </>
+                                )}
+                              </p>
                             </div>
-                            <p className="text-slate-800 leading-relaxed font-semibold">
-                              {q.explanation || q.guide || (
-                                <>
-                                  Đáp án chính xác là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>. 
-                                  {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text))
-                                    ? ' Em hãy kiểm tra và tính toán kỹ trước khi điền nhé!' 
-                                    : ' Hãy đọc kỹ đề bài và thực hiện phép tính tương ứng để tìm ra kết quả nhé!'}
-                                </>
-                              )}
-                            </p>
+                            <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
+                              Hướng dẫn
+                            </span>
                           </div>
-                          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
-                            Hướng dẫn
-                          </span>
-                        </div>
+                        )}
                       </div>
                     );
                   })
