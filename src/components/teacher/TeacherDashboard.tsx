@@ -74,6 +74,31 @@ const isOptionCorrectTarget = (
   });
 };
 
+const isFillInTheBlankQuestion = (q: any): boolean => {
+  if (!q) return false;
+  const qType = q.question_type || q.type;
+
+  // 1. Explicit fill_blank type is ALWAYS fill_blank
+  if (qType === 'fill_blank') return true;
+
+  // 2. Explicit essay type is NEVER fill_blank
+  if (qType === 'essay') return false;
+
+  // 3. Explicit single_choice or multiple_choice WITH options is MULTIPLE CHOICE (NOT fill_blank)
+  if ((qType === 'single_choice' || qType === 'multiple_choice') && q.options && q.options.length > 0) {
+    return false;
+  }
+
+  // 4. Questions without options
+  if (!q.options || q.options.length === 0) {
+    return true;
+  }
+
+  // 5. Questions with explicit fill_blank placeholders (..., ..., ___, [chỗ trống])
+  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
+  return hasPlaceholders;
+};
+
 const checkQuestionCorrectness = (
   q: any,
   userSelectedOptions: string[]
@@ -87,8 +112,7 @@ const checkQuestionCorrectness = (
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
-  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
-  const isFillBlankQuestion = q.question_type === 'fill_blank' || hasPlaceholders;
+  const isFillBlankQuestion = isFillInTheBlankQuestion(q);
 
   // Nếu KHÔNG PHẢI là câu hỏi điền từ (là câu trắc nghiệm thực sự có options A, B, C, D và không chứa placeholders)
   if (!isFillBlankQuestion && rawOpts.length > 0) {
@@ -682,17 +706,21 @@ export const TeacherDashboard: React.FC = () => {
   // HÀM THÊM 1 CÂU HỎI THỦ CÔNG MỚI
   const handleAddManualQuestion = () => {
     const newIdx = draftQuestions.length + 1;
+    const isFill = selectedQuestionType === 'fill_blank';
+    const isEss = selectedQuestionType === 'essay';
     const newQ = {
-      question_text: `Cho phép tính ${newIdx * 5 + 10} + ${newIdx * 2} = ?. Đáp án đúng là bao nhiêu?`,
+      question_text: isFill
+        ? `Điền số thích hợp vào chỗ trống: ${newIdx * 5 + 10} + ${newIdx * 2} = ...`
+        : `Cho phép tính ${newIdx * 5 + 10} + ${newIdx * 2} = ?. Đáp án đúng là bao nhiêu?`,
       question_type: selectedQuestionType,
       difficulty: questionDifficulty,
-      options: [
+      options: isFill || isEss ? [] : [
         { id: 'A', text: `${newIdx * 7 + 10}` },
         { id: 'B', text: `${newIdx * 7}` },
         { id: 'C', text: `${newIdx * 5}` },
         { id: 'D', text: `${newIdx * 10}` }
       ],
-      correct_answers: ['A'],
+      correct_answers: isFill ? [`${newIdx * 5 + 10 + newIdx * 2}`] : ['A'],
       selected: true
     };
     setDraftQuestions(prev => [...prev, newQ]);
@@ -3743,7 +3771,7 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text)) ? (
+                        {isFillInTheBlankQuestion(q) ? (
                           isCorrect ? (
                             <div className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-2 text-sm font-bold text-slate-900 shadow-2xs">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-900 border-b border-emerald-200 pb-1.5">

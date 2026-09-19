@@ -72,6 +72,31 @@ const isOptionCorrectTarget = (
   });
 };
 
+const isFillInTheBlankQuestion = (q: any): boolean => {
+  if (!q) return false;
+  const qType = q.question_type || q.type;
+
+  // 1. Explicit fill_blank type is ALWAYS fill_blank
+  if (qType === 'fill_blank') return true;
+
+  // 2. Explicit essay type is NEVER fill_blank
+  if (qType === 'essay') return false;
+
+  // 3. Explicit single_choice or multiple_choice WITH options is MULTIPLE CHOICE (NOT fill_blank)
+  if ((qType === 'single_choice' || qType === 'multiple_choice') && q.options && q.options.length > 0) {
+    return false;
+  }
+
+  // 4. Questions without options
+  if (!q.options || q.options.length === 0) {
+    return true;
+  }
+
+  // 5. Questions with explicit fill_blank placeholders (..., ..., ___, [chỗ trống])
+  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
+  return hasPlaceholders;
+};
+
 const checkQuestionCorrectness = (
   q: any,
   userSelectedOptions: string[]
@@ -85,8 +110,7 @@ const checkQuestionCorrectness = (
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
-  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
-  const isFillBlankQuestion = q.question_type === 'fill_blank' || hasPlaceholders;
+  const isFillBlankQuestion = isFillInTheBlankQuestion(q);
 
   // Nếu KHÔNG PHẢI là câu hỏi điền từ (là câu trắc nghiệm thực sự có options A, B, C, D và không chứa placeholders)
   if (!isFillBlankQuestion && rawOpts.length > 0) {
@@ -762,8 +786,7 @@ export const StudentDashboard: React.FC = () => {
     const qAny = question as any;
     const correctAnswers = (question.correct_answers || qAny.correct_answer ? [qAny.correct_answer, ...(question.correct_answers || [])] : (question.correct_answers || [])).map(a => normalizeStr(a));
 
-    const isFillBlankQuestion = question.question_type === 'fill_blank' || qAny.type === 'fill_blank' ||
-      (question.question_text && (question.question_text.includes('...') || question.question_text.toLowerCase().includes('điền')));
+    const isFillBlankQuestion = isFillInTheBlankQuestion(question);
 
     if (isFillBlankQuestion) {
       const studentInputText = userChosen[0] || '';
@@ -2690,7 +2713,7 @@ export const StudentDashboard: React.FC = () => {
                         <img src={q.image_url} alt="Question diagram" className="max-h-60 w-auto rounded-2xl border-2 border-purple-200 mx-auto my-2 shadow object-contain" />
                       )}
 
-                      {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text)) ? (
+                      {isFillInTheBlankQuestion(q) ? (
                         /(?:\.{2,}|…+|_{2,})/g.test(q.question_text) ? (
                           <div className="p-3 bg-amber-100/70 rounded-2xl border border-amber-300 text-xs font-bold text-amber-950 flex items-center gap-2">
                             <span>💡</span>
@@ -2968,7 +2991,7 @@ export const StudentDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text)) ? (
+                        {isFillInTheBlankQuestion(q) ? (
                           isCorrect ? (
                             <div className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-2 text-sm font-bold text-slate-900 shadow-2xs">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-900 border-b border-emerald-200 pb-1.5">
@@ -3045,7 +3068,7 @@ export const StudentDashboard: React.FC = () => {
                                 {q.explanation || q.guide || (
                                   <>
                                     Đáp án chính xác là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>. 
-                                    {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text))
+                                    {isFillInTheBlankQuestion(q)
                                       ? ' Em hãy kiểm tra và tính toán kỹ trước khi điền nhé!' 
                                       : ' Hãy đọc kỹ đề bài và thực hiện phép tính tương ứng để tìm ra kết quả nhé!'}
                                   </>
