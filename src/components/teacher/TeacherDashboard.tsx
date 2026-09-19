@@ -162,6 +162,106 @@ const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
   return val;
 };
 
+const renderQuestionWithFilledAnswers = (
+  questionText: string,
+  rawAnswers: any[],
+  isCorrect: boolean = true
+) => {
+  if (!questionText) return null;
+
+  let cleanText = questionText.replace(/^câu\s*\d+\s*:\s*/i, '').trim();
+
+  let answers: string[] = [];
+  if (Array.isArray(rawAnswers)) {
+    rawAnswers.forEach(item => {
+      if (item != null) {
+        const s = String(item).trim();
+        if (s.length > 0) {
+          answers.push(s);
+        }
+      }
+    });
+  }
+
+  const placeholderRegex = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi;
+  const matches = cleanText.match(placeholderRegex);
+
+  if (matches && matches.length > 1 && answers.length === 1 && answers[0].includes(',')) {
+    answers = answers[0].split(',').map(s => s.trim());
+  }
+
+  if (matches && matches.length > 0) {
+    const parts = cleanText.split(placeholderRegex);
+    return (
+      <span className="leading-relaxed">
+        {parts.map((part, index) => {
+          const rawAns = answers[index];
+          const hasVal = rawAns != null && rawAns.length > 0 && rawAns.toLowerCase() !== 'bỏ trống';
+          const displayVal = hasVal ? rawAns : (matches[index] || '...');
+
+          return (
+            <React.Fragment key={index}>
+              <span>{part}</span>
+              {index < matches.length && (
+                <strong className={`mx-1 px-2.5 py-0.5 rounded-xl font-black inline-block text-sm border shadow-2xs ${
+                  hasVal
+                    ? isCorrect
+                      ? 'bg-emerald-100 text-emerald-950 border-emerald-500 shadow-xs'
+                      : 'bg-rose-100 text-rose-950 border-rose-500 shadow-xs'
+                    : 'bg-slate-100 text-slate-600 border-slate-300 italic'
+                }`}>
+                  {displayVal}
+                </strong>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </span>
+    );
+  }
+
+  if (cleanText.includes(' = ?') || cleanText.includes('=?')) {
+    const isSpaceEq = cleanText.includes(' = ?');
+    const eqSplitter = isSpaceEq ? ' = ?' : '=?';
+    const qParts = cleanText.split(eqSplitter);
+    const rawAns = answers[0];
+    const hasVal = rawAns != null && rawAns.length > 0 && rawAns.toLowerCase() !== 'bỏ trống';
+    const displayVal = hasVal ? rawAns : '?';
+
+    return (
+      <span className="leading-relaxed">
+        {qParts[0]} ={' '}
+        <strong className={`mx-1 px-2.5 py-0.5 rounded-xl font-black inline-block text-sm border shadow-2xs ${
+          hasVal
+            ? isCorrect
+              ? 'bg-emerald-100 text-emerald-950 border-emerald-500 shadow-xs'
+              : 'bg-rose-100 text-rose-950 border-rose-500 shadow-xs'
+            : 'bg-slate-100 text-slate-600 border-slate-300 italic'
+        }`}>
+          {displayVal}
+        </strong>
+        {qParts.slice(1).join(eqSplitter)}
+      </span>
+    );
+  }
+
+  const validAns = answers.filter(a => a && a.toLowerCase() !== 'bỏ trống').join(', ');
+  return (
+    <span className="leading-relaxed">
+      {cleanText}{' '}
+      {validAns ? (
+        <strong className={`mx-1 px-2.5 py-0.5 rounded-xl font-black inline-block text-sm border shadow-2xs ${
+          isCorrect
+            ? 'bg-emerald-100 text-emerald-950 border-emerald-500 shadow-xs'
+            : 'bg-rose-100 text-rose-950 border-rose-500 shadow-xs'
+        }`}>
+          [{validAns}]
+        </strong>
+      ) : null}
+    </span>
+  );
+};
+
 export const TeacherDashboard: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -3644,20 +3744,35 @@ export const TeacherDashboard: React.FC = () => {
                         </div>
 
                         {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text)) ? (
-                          <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-2 text-xs font-bold">
-                            <div className="flex items-center justify-between">
-                              <span className="text-slate-700 font-extrabold">✍️ Học sinh đã điền:</span>
-                              <span className={`px-3 py-1 rounded-xl font-black ${isCorrect ? 'bg-emerald-200 text-emerald-950 border border-emerald-400' : 'bg-rose-200 text-rose-950 border border-rose-400'}`}>
-                                "{displayUserAnswer}"
-                              </span>
+                          isCorrect ? (
+                            <div className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-2 text-sm font-bold text-slate-900 shadow-2xs">
+                              <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-900 border-b border-emerald-200 pb-1.5">
+                                <span>✍️</span> <span>CÂU HỎI & BÀI LÀM CỦA HỌC SINH (ĐÚNG):</span>
+                              </div>
+                              <div className="pt-1 text-slate-900 leading-relaxed font-semibold">
+                                {renderQuestionWithFilledAnswers(q.question_text, userSelectedOptions, true)}
+                              </div>
                             </div>
-                            <div className="flex items-center justify-between pt-1 border-t border-amber-200">
-                              <span className="text-emerald-900 font-black">⭐ Đáp án đúng chuẩn:</span>
-                              <span className="font-black text-emerald-950 font-mono text-xs">
-                                "{correctAnswers.join(', ') || 'N/A'}"
-                              </span>
+                          ) : (
+                            <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-3 text-sm font-bold text-slate-900 shadow-2xs">
+                              <div className="space-y-1.5">
+                                <div className="flex items-center gap-1.5 text-xs font-extrabold text-rose-900">
+                                  <span>✍️</span> <span>CÂU HỎI & BÀI LÀM CỦA HỌC SINH (CHƯA ĐÚNG):</span>
+                                </div>
+                                <div className="p-2.5 bg-white/80 rounded-xl border border-rose-200 text-slate-900 leading-relaxed font-semibold">
+                                  {renderQuestionWithFilledAnswers(q.question_text, userSelectedOptions, false)}
+                                </div>
+                              </div>
+                              <div className="space-y-1.5 pt-2 border-t border-amber-200">
+                                <div className="flex items-center gap-1.5 text-xs font-black text-emerald-900">
+                                  <span>⭐</span> <span>CÂU HỎI KÈM ĐÁP ÁN ĐÚNG CHUẨN:</span>
+                                </div>
+                                <div className="p-2.5 bg-emerald-50/90 rounded-xl border border-emerald-300 text-slate-900 leading-relaxed font-semibold">
+                                  {renderQuestionWithFilledAnswers(q.question_text, correctAnswers, true)}
+                                </div>
+                              </div>
                             </div>
-                          </div>
+                          )
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                             {finalOptionsList.map(opt => {
