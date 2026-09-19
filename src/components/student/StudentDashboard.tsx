@@ -2355,63 +2355,7 @@ export const StudentDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* 📜 7. LỊCH SỬ ĐIỂM THỰC TẾ TRONG SUPABASE CSDL CỦA HỌC SINH */}
-            <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                  <span className="text-xl">📜</span> LỊCH SỬ TÍCH ĐIỂM CHI TIẾT (CSDL SUPABASE)
-                </h3>
-                <span className="text-[10px] font-black bg-amber-100 text-amber-950 px-2.5 py-1 rounded-xl border border-amber-300">
-                  {myPointLogs.length} Nhật ký ghi nhận
-                </span>
-              </div>
 
-              <div className="overflow-x-auto rounded-2xl border border-amber-200">
-                <table className="w-full text-left text-xs font-bold">
-                  <thead className="bg-amber-100/80 text-amber-950 font-black uppercase text-[10px] border-b border-amber-200">
-                    <tr>
-                      <th className="p-3">Ngày Giờ</th>
-                      <th className="p-3">Biểu Tượng & Lý Do Tích Điểm</th>
-                      <th className="p-3 text-right">Số Điểm</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-amber-100 text-slate-800">
-                    {myPointLogs.length > 0 ? (
-                      myPointLogs.map((log, lIdx) => {
-                        const dateStr = log.created_at 
-                          ? new Date(log.created_at).toLocaleDateString('vi-VN') + ' ' + new Date(log.created_at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
-                          : 'Vừa xong';
-                        const ptsVal = log.points_change || 0;
-                        const isPositive = ptsVal >= 0;
-
-                        return (
-                          <tr key={log.id || lIdx} className="hover:bg-amber-50/50">
-                            <td className="p-3 text-slate-500 font-extrabold whitespace-nowrap">{dateStr}</td>
-                            <td className="p-3 font-black text-slate-900">
-                              <span className="text-base mr-1.5">{log.icon || '⭐'}</span>
-                              <span>{log.reason || 'Tích cực học tập'}</span>
-                            </td>
-                            <td className="p-3 text-right whitespace-nowrap">
-                              <span className={`px-2.5 py-1 rounded-xl font-black text-xs ${
-                                isPositive ? 'bg-emerald-100 text-emerald-950 border border-emerald-300' : 'bg-rose-100 text-rose-950 border border-rose-300'
-                              }`}>
-                                {isPositive ? `+${ptsVal}` : ptsVal} điểm
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={3} className="p-6 text-center text-slate-400 font-bold">
-                          Chưa có nhật ký tích điểm riêng nào được ghi nhận trong CSDL. Em hãy hăng hái phát biểu và làm bài tập nhé!
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         );
       })()}
