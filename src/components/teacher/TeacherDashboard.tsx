@@ -29,46 +29,74 @@ const checkQuestionCorrectness = (
   if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return false;
 
   const correctAnswers = q.correct_answers || [];
-  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
+  const rawOpts = q.options && q.options.length > 0 ? q.options : [];
+  const hasOptions = rawOpts.length > 0;
 
-  if (q.question_type === 'fill_blank' || hasPlaceholders) {
-    let targets: string[] = [];
-    correctAnswers.forEach((t: any) => {
-      if (typeof t === 'string' && t.includes(',')) {
-        targets.push(...t.split(',').map(s => s.trim()));
-      } else {
-        targets.push(String(t).trim());
+  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D (dù text hay question_type có dạng điền từ) -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
+  if (hasOptions) {
+    if (filtered.some(optId => correctAnswers.includes(optId))) return true;
+
+    const optionsList = rawOpts.map((opt: any, oIdx: number) => {
+      if (typeof opt === 'string') {
+        return { id: String.fromCharCode(65 + oIdx), text: opt.trim() };
+      }
+      return {
+        id: opt.id || String.fromCharCode(65 + oIdx),
+        text: (opt.text || opt.label || String(opt)).trim()
+      };
+    });
+
+    const userChosenTexts = optionsList
+      .filter((o: any) => filtered.includes(o.id) || filtered.map(f => f.toLowerCase()).includes(o.text.toLowerCase()))
+      .map((o: any) => o.text.toLowerCase());
+
+    const correctOptionTexts: string[] = [];
+    correctAnswers.forEach((ca: string) => {
+      correctOptionTexts.push(String(ca).trim().toLowerCase());
+      const matchedOpt = optionsList.find((o: any) => o.id === ca);
+      if (matchedOpt) {
+        correctOptionTexts.push(matchedOpt.text.toLowerCase());
       }
     });
 
-    if (targets.length === 0) return true;
-
-    return targets.every((target, idx) => {
-      const uStr = (filtered[idx] || '').trim().toLowerCase();
-      const tStr = (target || '').trim().toLowerCase();
-      if (!uStr) return false;
-      return uStr === tStr || (!isNaN(parseFloat(uStr)) && !isNaN(parseFloat(tStr)) && parseFloat(uStr) === parseFloat(tStr));
-    });
-  }
-
-  // Đối với Trắc nghiệm (single_choice, multiple_choice, true_false)
-  if (q.options && q.options.length > 0) {
-    const isDirectIdMatch = filtered.some(optId => correctAnswers.includes(optId));
-    if (isDirectIdMatch) return true;
-
-    const correctOptionTexts = q.options
-      .filter((o: any) => correctAnswers.includes(o.id || o))
-      .map((o: any) => (o.text || o.label || String(o)).trim().toLowerCase());
-
-    const userTextMatch = filtered.some(uOpt => {
-      const uClean = uOpt.trim().toLowerCase();
-      return correctOptionTexts.includes(uClean) || correctAnswers.map((c: string) => String(c).trim().toLowerCase()).includes(uClean);
+    const isMatched = filtered.some((uVal: string) => {
+      const uClean = uVal.toLowerCase();
+      return correctOptionTexts.some((cVal: string) => {
+        if (uClean === cVal) return true;
+        const uNum = parseFloat(uClean);
+        const cNum = parseFloat(cVal);
+        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
+      });
+    }) || userChosenTexts.some((uText: string) => {
+      return correctOptionTexts.some((cVal: string) => {
+        if (uText === cVal) return true;
+        const uNum = parseFloat(uText);
+        const cNum = parseFloat(cVal);
+        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
+      });
     });
 
-    if (userTextMatch) return true;
+    return isMatched;
   }
 
-  return filtered.some(optId => correctAnswers.includes(optId));
+  // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ (không có options A, B, C, D)
+  let targets: string[] = [];
+  correctAnswers.forEach((t: any) => {
+    if (typeof t === 'string' && t.includes(',')) {
+      targets.push(...t.split(',').map(s => s.trim()));
+    } else {
+      targets.push(String(t).trim());
+    }
+  });
+
+  if (targets.length === 0) return true;
+
+  return targets.every((target, idx) => {
+    const uStr = (filtered[idx] || '').trim().toLowerCase();
+    const tStr = (target || '').trim().toLowerCase();
+    if (!uStr) return false;
+    return uStr === tStr || (!isNaN(parseFloat(uStr)) && !isNaN(parseFloat(tStr)) && parseFloat(uStr) === parseFloat(tStr));
+  });
 };
 
 const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
@@ -79,10 +107,20 @@ const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
   const val = filtered.join(', ');
 
   if (q.options && q.options.length > 0) {
-    const matchedOption = q.options.find((o: any) => (o.id || o) === val);
+    const rawOpts = q.options;
+    const optionsList = rawOpts.map((opt: any, oIdx: number) => {
+      if (typeof opt === 'string') {
+        return { id: String.fromCharCode(65 + oIdx), text: opt.trim() };
+      }
+      return {
+        id: opt.id || String.fromCharCode(65 + oIdx),
+        text: (opt.text || opt.label || String(opt)).trim()
+      };
+    });
+
+    const matchedOption = optionsList.find((o: any) => o.id === val || o.text.toLowerCase() === val.toLowerCase());
     if (matchedOption) {
-      const optText = matchedOption.text || matchedOption.label || String(matchedOption);
-      return `${optText} (Phương án ${val})`;
+      return `${matchedOption.text} (Phương án ${matchedOption.id})`;
     }
   }
 
@@ -3521,7 +3559,7 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text) ? (
+                        {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text)) ? (
                           <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-2 text-xs font-bold">
                             <div className="flex items-center justify-between">
                               <span className="text-slate-700 font-extrabold">✍️ Học sinh đã điền:</span>
