@@ -20,23 +20,78 @@ import {
   Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3, X, School, GraduationCap, Eye
 } from 'lucide-react';
 
+const isOptionUserChosen = (
+  opt: { id: string; text: string },
+  userSelectedOptions: string[]
+): boolean => {
+  if (!userSelectedOptions || userSelectedOptions.length === 0) return false;
+  
+  const optIdClean = String(opt.id || '').trim().toLowerCase();
+  const optTextClean = String(opt.text || '').trim().toLowerCase();
+  
+  return userSelectedOptions.some(rawUserAns => {
+    if (rawUserAns == null) return false;
+    const uClean = String(rawUserAns).trim().toLowerCase();
+    if (!uClean || uClean === 'bỏ trống') return false;
+
+    if (uClean === optIdClean) return true;
+    if (uClean === optTextClean) return true;
+    if (uClean.includes(optIdClean) && uClean.includes(optTextClean)) return true;
+
+    const uNum = parseFloat(uClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    const oNum = parseFloat(optTextClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (!isNaN(uNum) && !isNaN(oNum) && uNum === oNum) return true;
+
+    return false;
+  });
+};
+
+const isOptionCorrectTarget = (
+  opt: { id: string; text: string },
+  correctAnswers: string[]
+): boolean => {
+  if (!correctAnswers || correctAnswers.length === 0) {
+    return opt.id === 'A';
+  }
+
+  const optIdClean = String(opt.id || '').trim().toLowerCase();
+  const optTextClean = String(opt.text || '').trim().toLowerCase();
+
+  return correctAnswers.some(rawCa => {
+    if (rawCa == null) return false;
+    const caClean = String(rawCa).trim().toLowerCase();
+    if (!caClean) return false;
+
+    if (caClean === optIdClean) return true;
+    if (caClean === optTextClean) return true;
+    if (caClean.includes(optIdClean) && caClean.includes(optTextClean)) return true;
+
+    const caNum = parseFloat(caClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    const oNum = parseFloat(optTextClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (!isNaN(caNum) && !isNaN(oNum) && caNum === oNum) return true;
+
+    return false;
+  });
+};
+
 const checkQuestionCorrectness = (
   q: any,
   userSelectedOptions: string[]
 ): boolean => {
   if (!userSelectedOptions || userSelectedOptions.length === 0) return false;
-  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
-  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return false;
+  const filtered = userSelectedOptions
+    .map(s => (s != null ? String(s) : '').trim())
+    .filter(str => str.length > 0 && str.toLowerCase() !== 'bỏ trống');
+
+  if (filtered.length === 0) return false;
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
   const hasOptions = rawOpts.length > 0;
 
-  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D (dù text hay question_type có dạng điền từ) -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
+  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
   if (hasOptions) {
-    if (filtered.some(optId => correctAnswers.includes(optId))) return true;
-
-    const optionsList = rawOpts.map((opt: any, oIdx: number) => {
+    const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
       if (typeof opt === 'string') {
         return { id: String.fromCharCode(65 + oIdx), text: opt.trim() };
       }
@@ -46,63 +101,42 @@ const checkQuestionCorrectness = (
       };
     });
 
-    const userChosenTexts = optionsList
-      .filter((o: any) => filtered.includes(o.id) || filtered.map(f => f.toLowerCase()).includes(o.text.toLowerCase()))
-      .map((o: any) => o.text.toLowerCase());
-
-    const correctOptionTexts: string[] = [];
-    correctAnswers.forEach((ca: string) => {
-      correctOptionTexts.push(String(ca).trim().toLowerCase());
-      const matchedOpt = optionsList.find((o: any) => o.id === ca);
-      if (matchedOpt) {
-        correctOptionTexts.push(matchedOpt.text.toLowerCase());
-      }
-    });
-
-    const isMatched = filtered.some((uVal: string) => {
-      const uClean = uVal.toLowerCase();
-      return correctOptionTexts.some((cVal: string) => {
-        if (uClean === cVal) return true;
-        const uNum = parseFloat(uClean);
-        const cNum = parseFloat(cVal);
-        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
-      });
-    }) || userChosenTexts.some((uText: string) => {
-      return correctOptionTexts.some((cVal: string) => {
-        if (uText === cVal) return true;
-        const uNum = parseFloat(uText);
-        const cNum = parseFloat(cVal);
-        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
-      });
-    });
-
-    return isMatched;
+    return optionsList.some(opt => isOptionUserChosen(opt, filtered) && isOptionCorrectTarget(opt, correctAnswers));
   }
 
   // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ (không có options A, B, C, D)
   let targets: string[] = [];
   correctAnswers.forEach((t: any) => {
-    if (typeof t === 'string' && t.includes(',')) {
-      targets.push(...t.split(',').map(s => s.trim()));
-    } else {
-      targets.push(String(t).trim());
+    if (t != null) {
+      const tStr = String(t).trim();
+      if (tStr.includes(',')) {
+        targets.push(...tStr.split(',').map(s => s.trim()));
+      } else {
+        targets.push(tStr);
+      }
     }
   });
 
-  if (targets.length === 0) return true;
+  if (targets.length === 0) return filtered.length > 0;
 
   return targets.every((target, idx) => {
     const uStr = (filtered[idx] || '').trim().toLowerCase();
     const tStr = (target || '').trim().toLowerCase();
     if (!uStr) return false;
-    return uStr === tStr || (!isNaN(parseFloat(uStr)) && !isNaN(parseFloat(tStr)) && parseFloat(uStr) === parseFloat(tStr));
+    if (uStr === tStr) return true;
+    const uNum = parseFloat(uStr.replace(',', '.'));
+    const tNum = parseFloat(tStr.replace(',', '.'));
+    return !isNaN(uNum) && !isNaN(tNum) && uNum === tNum;
   });
 };
 
 const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
   if (!userSelectedOptions || userSelectedOptions.length === 0) return 'Bỏ trống';
-  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
-  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return 'Bỏ trống';
+  const filtered = userSelectedOptions
+    .map(s => (s != null ? String(s) : '').trim())
+    .filter(str => str.length > 0 && str.toLowerCase() !== 'bỏ trống');
+
+  if (filtered.length === 0) return 'Bỏ trống';
 
   const val = filtered.join(', ');
 
@@ -118,7 +152,7 @@ const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
       };
     });
 
-    const matchedOption = optionsList.find((o: any) => o.id === val || o.text.toLowerCase() === val.toLowerCase());
+    const matchedOption = optionsList.find((o: any) => isOptionUserChosen(o, filtered));
     if (matchedOption) {
       return `${matchedOption.text} (Phương án ${matchedOption.id})`;
     }
@@ -3577,8 +3611,8 @@ export const TeacherDashboard: React.FC = () => {
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                             {finalOptionsList.map(opt => {
-                              const isUserChosen = userSelectedOptions.includes(opt.id) || (isAnswered && userSelectedOptions.includes(opt.text));
-                              const isCorrectOpt = correctAnswers.includes(opt.id) || (correctAnswers.length === 0 && opt.id === 'A');
+                              const isUserChosen = isOptionUserChosen(opt, userSelectedOptions);
+                              const isCorrectOpt = isOptionCorrectTarget(opt, correctAnswers);
 
                               let cardStyle = 'bg-slate-50 border-slate-200 text-slate-700 font-bold';
                               let badgeLabel = null;
@@ -3609,13 +3643,25 @@ export const TeacherDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {/* DÒNG TÓM TẮT NẾU HỌC SINH LÀM SAI */}
-                        {!isCorrect && (
-                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-center justify-between gap-2">
-                            <span>💡 <strong>Đáp án đúng của đề bài:</strong> {finalOptionsList.filter(o => correctAnswers.includes(o.id) || (correctAnswers.length === 0 && o.id === 'A')).map(o => `${o.id}. ${o.text}`).join(', ')}</span>
-                            <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg">Đáp án chuẩn</span>
+                        {/* HƯỚNG DẪN GIẢI CHI TIẾT DÀNH CHO GIÁO VIÊN */}
+                        <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 font-black text-amber-900">
+                              <span>💡</span>
+                              <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG CHUẨN:</span>
+                            </div>
+                            <p className="text-slate-800 leading-relaxed font-semibold">
+                              {q.explanation || q.guide || (
+                                <>
+                                  Đáp án đúng của đề bài là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>.
+                                </>
+                              )}
+                            </p>
                           </div>
-                        )}
+                          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
+                            Đáp án chuẩn
+                          </span>
+                        </div>
                       </div>
                     );
                   })

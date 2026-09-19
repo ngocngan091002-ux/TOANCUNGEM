@@ -155,6 +155,8 @@ export interface AssignmentQuestion {
   correct_answers: string[];
   points: number;
   order_index: number;
+  explanation?: string;
+  guide?: string;
 }
 
 export interface Assignment {

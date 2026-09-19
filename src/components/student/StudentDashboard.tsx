@@ -18,6 +18,60 @@ import {
   Home, RefreshCw, Flame, Users, Heart, ThumbsUp, X, RotateCcw, Eye
 } from 'lucide-react';
 
+const isOptionUserChosen = (
+  opt: { id: string; text: string },
+  userSelectedOptions: string[]
+): boolean => {
+  if (!userSelectedOptions || userSelectedOptions.length === 0) return false;
+  
+  const optIdClean = String(opt.id || '').trim().toLowerCase();
+  const optTextClean = String(opt.text || '').trim().toLowerCase();
+  
+  return userSelectedOptions.some(rawUserAns => {
+    if (rawUserAns == null) return false;
+    const uClean = String(rawUserAns).trim().toLowerCase();
+    if (!uClean || uClean === 'bỏ trống') return false;
+
+    if (uClean === optIdClean) return true;
+    if (uClean === optTextClean) return true;
+    if (uClean.includes(optIdClean) && uClean.includes(optTextClean)) return true;
+
+    const uNum = parseFloat(uClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    const oNum = parseFloat(optTextClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (!isNaN(uNum) && !isNaN(oNum) && uNum === oNum) return true;
+
+    return false;
+  });
+};
+
+const isOptionCorrectTarget = (
+  opt: { id: string; text: string },
+  correctAnswers: string[]
+): boolean => {
+  if (!correctAnswers || correctAnswers.length === 0) {
+    return opt.id === 'A';
+  }
+
+  const optIdClean = String(opt.id || '').trim().toLowerCase();
+  const optTextClean = String(opt.text || '').trim().toLowerCase();
+
+  return correctAnswers.some(rawCa => {
+    if (rawCa == null) return false;
+    const caClean = String(rawCa).trim().toLowerCase();
+    if (!caClean) return false;
+
+    if (caClean === optIdClean) return true;
+    if (caClean === optTextClean) return true;
+    if (caClean.includes(optIdClean) && caClean.includes(optTextClean)) return true;
+
+    const caNum = parseFloat(caClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    const oNum = parseFloat(optTextClean.replace(/[^\d.,]/g, '').replace(',', '.'));
+    if (!isNaN(caNum) && !isNaN(oNum) && caNum === oNum) return true;
+
+    return false;
+  });
+};
+
 const checkQuestionCorrectness = (
   q: any,
   userSelectedOptions: string[]
@@ -35,9 +89,7 @@ const checkQuestionCorrectness = (
 
   // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
   if (hasOptions) {
-    if (filtered.some(optId => correctAnswers.includes(optId))) return true;
-
-    const optionsList = rawOpts.map((opt: any, oIdx: number) => {
+    const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
       if (typeof opt === 'string') {
         return { id: String.fromCharCode(65 + oIdx), text: opt.trim() };
       }
@@ -47,37 +99,7 @@ const checkQuestionCorrectness = (
       };
     });
 
-    const userChosenTexts = optionsList
-      .filter((o: any) => filtered.includes(o.id) || filtered.map(f => f.toLowerCase()).includes(o.text.toLowerCase()))
-      .map((o: any) => o.text.toLowerCase());
-
-    const correctOptionTexts: string[] = [];
-    correctAnswers.forEach((ca: string) => {
-      correctOptionTexts.push(String(ca).trim().toLowerCase());
-      const matchedOpt = optionsList.find((o: any) => o.id === ca);
-      if (matchedOpt) {
-        correctOptionTexts.push(matchedOpt.text.toLowerCase());
-      }
-    });
-
-    const isMatched = filtered.some((uVal: string) => {
-      const uClean = uVal.toLowerCase();
-      return correctOptionTexts.some((cVal: string) => {
-        if (uClean === cVal) return true;
-        const uNum = parseFloat(uClean.replace(',', '.'));
-        const cNum = parseFloat(cVal.replace(',', '.'));
-        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
-      });
-    }) || userChosenTexts.some((uText: string) => {
-      return correctOptionTexts.some((cVal: string) => {
-        if (uText === cVal) return true;
-        const uNum = parseFloat(uText.replace(',', '.'));
-        const cNum = parseFloat(cVal.replace(',', '.'));
-        return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
-      });
-    });
-
-    return isMatched;
+    return optionsList.some(opt => isOptionUserChosen(opt, filtered) && isOptionCorrectTarget(opt, correctAnswers));
   }
 
   // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ (không có options A, B, C, D)
@@ -128,7 +150,7 @@ const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
       };
     });
 
-    const matchedOption = optionsList.find((o: any) => o.id === val || o.text.toLowerCase() === val.toLowerCase());
+    const matchedOption = optionsList.find((o: any) => isOptionUserChosen(o, filtered));
     if (matchedOption) {
       return `${matchedOption.text} (Phương án ${matchedOption.id})`;
     }
@@ -2804,8 +2826,8 @@ export const StudentDashboard: React.FC = () => {
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                             {finalOptionsList.map(opt => {
-                              const isUserChosen = userSelectedOptions.includes(opt.id) || (userSelectedOptions.length === 0 && isCorrect && correctAnswers.includes(opt.id));
-                              const isCorrectOpt = correctAnswers.includes(opt.id) || (correctAnswers.length === 0 && opt.id === 'A');
+                              const isUserChosen = isOptionUserChosen(opt, userSelectedOptions);
+                              const isCorrectOpt = isOptionCorrectTarget(opt, correctAnswers);
 
                               let cardStyle = 'bg-slate-50 border-slate-200 text-slate-700 font-bold';
                               let badgeLabel = null;
@@ -2836,13 +2858,28 @@ export const StudentDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {/* GIẢI THÍCH / HIỂN THỊ ĐÁP ÁN ĐÚNG RÕ RÀNG NẾU LÀM SAI */}
-                        {!isCorrect && (
-                          <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-center justify-between gap-2">
-                            <span>💡 <strong>Đáp án đúng là:</strong> {finalOptionsList.filter(o => correctAnswers.includes(o.id)).map(o => `${o.id}. ${o.text}`).join(', ') || 'Đáp án A'}</span>
-                            <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg">Hướng dẫn</span>
+                        {/* HƯỚNG DẪN GIẢI CHI TIẾT */}
+                        <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 font-black text-amber-900">
+                              <span>💡</span>
+                              <span>HƯỚNG DẪN GIẢI & ĐÁP ÁN ĐÚNG:</span>
+                            </div>
+                            <p className="text-slate-800 leading-relaxed font-semibold">
+                              {q.explanation || q.guide || (
+                                <>
+                                  Đáp án chính xác là <strong>{finalOptionsList.filter(o => isOptionCorrectTarget(o, correctAnswers)).map(o => `${o.id}. ${o.text}`).join(', ') || getUserAnswerText(q, correctAnswers)}</strong>. 
+                                  {(!q.options || q.options.length === 0) && (q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text))
+                                    ? ' Em hãy kiểm tra và tính toán kỹ trước khi điền nhé!' 
+                                    : ' Hãy đọc kỹ đề bài và thực hiện phép tính tương ứng để tìm ra kết quả nhé!'}
+                                </>
+                              )}
+                            </p>
                           </div>
-                        )}
+                          <span className="text-[10px] font-black bg-amber-200 text-amber-950 px-2 py-0.5 rounded-lg shrink-0">
+                            Hướng dẫn
+                          </span>
+                        </div>
                       </div>
                     );
                   })
