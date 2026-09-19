@@ -23,14 +23,17 @@ const checkQuestionCorrectness = (
   userSelectedOptions: string[]
 ): boolean => {
   if (!userSelectedOptions || userSelectedOptions.length === 0) return false;
-  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
-  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return false;
+  const filtered = userSelectedOptions
+    .map(s => (s != null ? String(s) : '').trim())
+    .filter(str => str.length > 0 && str.toLowerCase() !== 'bỏ trống');
+
+  if (filtered.length === 0) return false;
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
   const hasOptions = rawOpts.length > 0;
 
-  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D (dù text hay question_type có dạng điền từ) -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
+  // Nếu câu hỏi CÓ các phương án lựa chọn A, B, C, D -> ĐÂY LÀ CÂU HỎI TRẮC NGHIỆM!
   if (hasOptions) {
     if (filtered.some(optId => correctAnswers.includes(optId))) return true;
 
@@ -61,15 +64,15 @@ const checkQuestionCorrectness = (
       const uClean = uVal.toLowerCase();
       return correctOptionTexts.some((cVal: string) => {
         if (uClean === cVal) return true;
-        const uNum = parseFloat(uClean);
-        const cNum = parseFloat(cVal);
+        const uNum = parseFloat(uClean.replace(',', '.'));
+        const cNum = parseFloat(cVal.replace(',', '.'));
         return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
       });
     }) || userChosenTexts.some((uText: string) => {
       return correctOptionTexts.some((cVal: string) => {
         if (uText === cVal) return true;
-        const uNum = parseFloat(uText);
-        const cNum = parseFloat(cVal);
+        const uNum = parseFloat(uText.replace(',', '.'));
+        const cNum = parseFloat(cVal.replace(',', '.'));
         return !isNaN(uNum) && !isNaN(cNum) && uNum === cNum;
       });
     });
@@ -80,27 +83,36 @@ const checkQuestionCorrectness = (
   // Đối với CÂU HỎI ĐIỀN CHỖ TRỐNG THỰC SỰ (không có options A, B, C, D)
   let targets: string[] = [];
   correctAnswers.forEach((t: any) => {
-    if (typeof t === 'string' && t.includes(',')) {
-      targets.push(...t.split(',').map(s => s.trim()));
-    } else {
-      targets.push(String(t).trim());
+    if (t != null) {
+      const tStr = String(t).trim();
+      if (tStr.includes(',')) {
+        targets.push(...tStr.split(',').map(s => s.trim()));
+      } else {
+        targets.push(tStr);
+      }
     }
   });
 
-  if (targets.length === 0) return true;
+  if (targets.length === 0) return filtered.length > 0;
 
   return targets.every((target, idx) => {
     const uStr = (filtered[idx] || '').trim().toLowerCase();
     const tStr = (target || '').trim().toLowerCase();
     if (!uStr) return false;
-    return uStr === tStr || (!isNaN(parseFloat(uStr)) && !isNaN(parseFloat(tStr)) && parseFloat(uStr) === parseFloat(tStr));
+    if (uStr === tStr) return true;
+    const uNum = parseFloat(uStr.replace(',', '.'));
+    const tNum = parseFloat(tStr.replace(',', '.'));
+    return !isNaN(uNum) && !isNaN(tNum) && uNum === tNum;
   });
 };
 
 const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
   if (!userSelectedOptions || userSelectedOptions.length === 0) return 'Bỏ trống';
-  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
-  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return 'Bỏ trống';
+  const filtered = userSelectedOptions
+    .map(s => (s != null ? String(s) : '').trim())
+    .filter(str => str.length > 0 && str.toLowerCase() !== 'bỏ trống');
+
+  if (filtered.length === 0) return 'Bỏ trống';
 
   const val = filtered.join(', ');
 
@@ -151,12 +163,13 @@ const renderInteractiveQuestionText = (
               <input
                 type="text"
                 disabled={isReadOnly}
-                value={userAnswerList[index] || ''}
+                value={userAnswerList[index] != null ? String(userAnswerList[index]) : ''}
                 onChange={(e) => onAnswerChange(index, e.target.value)}
+                onBlur={(e) => onAnswerChange(index, e.target.value)}
                 placeholder="..."
                 className={`w-28 px-3 py-1.5 rounded-xl border-2 font-black text-sm text-center transition-all shadow-inner focus:outline-none focus:ring-2 ${
                   isReadOnly
-                    ? (correctAnswersList && (userAnswerList[index] || '').trim().toLowerCase() === (correctAnswersList[index] || '').trim().toLowerCase()
+                    ? (correctAnswersList && (userAnswerList[index] != null ? String(userAnswerList[index]) : '').trim().toLowerCase() === (correctAnswersList[index] || '').trim().toLowerCase()
                         ? 'bg-emerald-100 border-emerald-500 text-emerald-950 font-black'
                         : 'bg-rose-100 border-rose-500 text-rose-950 font-black')
                     : 'bg-amber-100/90 border-amber-500 focus:bg-white text-slate-900 focus:ring-amber-500 ring-amber-300'
@@ -2516,8 +2529,9 @@ export const StudentDashboard: React.FC = () => {
                             </label>
                             <input
                               type="text"
-                              value={selectedOpts[0] || ''}
+                              value={selectedOpts[0] != null ? String(selectedOpts[0]) : ''}
                               onChange={(e) => handleSelectOption(q.id, e.target.value)}
+                              onBlur={(e) => handleSelectOption(q.id, e.target.value)}
                               placeholder="Nhập câu trả lời (VD: 80 hoặc Hình chữ nhật)..."
                               className="w-full p-4 bg-white border-2 border-amber-400 rounded-2xl font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
                             />
