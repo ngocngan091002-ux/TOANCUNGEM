@@ -18,6 +18,56 @@ import {
   Home, RefreshCw, Flame, Users, Heart, ThumbsUp, X, RotateCcw, Eye
 } from 'lucide-react';
 
+const renderInteractiveQuestionText = (
+  questionText: string,
+  questionId: string,
+  userAnswerList: string[],
+  onAnswerChange: (blankIndex: number, value: string) => void,
+  isReadOnly: boolean = false,
+  correctAnswersList?: string[]
+) => {
+  const placeholderRegex = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi;
+  const parts = questionText.split(placeholderRegex);
+  const matches = questionText.match(placeholderRegex);
+
+  if (!matches || matches.length === 0) {
+    return <span className="whitespace-pre-line">{questionText}</span>;
+  }
+
+  return (
+    <span className="leading-loose text-base font-black text-slate-900 inline">
+      {parts.map((part, index) => (
+        <React.Fragment key={index}>
+          <span className="whitespace-pre-line">{part}</span>
+          {index < matches.length && (
+            <span className="inline-flex flex-col items-center align-middle mx-1.5 my-1" key={`blank_${index}`}>
+              <input
+                type="text"
+                disabled={isReadOnly}
+                value={userAnswerList[index] || ''}
+                onChange={(e) => onAnswerChange(index, e.target.value)}
+                placeholder="..."
+                className={`w-28 px-3 py-1.5 rounded-xl border-2 font-black text-sm text-center transition-all shadow-inner focus:outline-none focus:ring-2 ${
+                  isReadOnly
+                    ? (correctAnswersList && (userAnswerList[index] || '').trim().toLowerCase() === (correctAnswersList[index] || '').trim().toLowerCase()
+                        ? 'bg-emerald-100 border-emerald-500 text-emerald-950 font-black'
+                        : 'bg-rose-100 border-rose-500 text-rose-950 font-black')
+                    : 'bg-amber-100/90 border-amber-500 focus:bg-white text-slate-900 focus:ring-amber-500 ring-amber-300'
+                }`}
+              />
+              {isReadOnly && correctAnswersList && correctAnswersList[index] && (
+                <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md border border-emerald-300 mt-0.5 whitespace-nowrap">
+                  Đúng: {correctAnswersList[index]}
+                </span>
+              )}
+            </span>
+          )}
+        </React.Fragment>
+      ))}
+    </span>
+  );
+};
+
 export const StudentDashboard: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
 
@@ -405,6 +455,27 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const handleMultiBlankAnswer = (questionId: string, blankIndex: number, val: string) => {
+    const elapsed = Math.round((Date.now() - questionStartTime) / 1000);
+    const updatedTimers = { ...questionTimers, [questionId]: (questionTimers[questionId] || 0) + Math.max(1, elapsed) };
+    setQuestionTimers(updatedTimers);
+    setQuestionStartTime(Date.now());
+
+    const currentArr = [...(userAnswers[questionId] || [])];
+    currentArr[blankIndex] = val;
+
+    const updatedAnswers = {
+      ...userAnswers,
+      [questionId]: currentArr
+    };
+    setUserAnswers(updatedAnswers);
+
+    if (activeAssignment && user?.id) {
+      localStorage.setItem(`toan_cung_em_user_answers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedAnswers));
+      localStorage.setItem(`toan_cung_em_question_timers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedTimers));
+    }
+  };
+
   const handleSubmitAssignment = async () => {
     if (!activeAssignment || !activeAssignment.questions) return;
     setIsSubmitting(true);
@@ -414,13 +485,29 @@ export const StudentDashboard: React.FC = () => {
         const chosen = userAnswers[q.id] || [];
         let isCorrect = false;
 
-        if (q.question_type === 'fill_blank') {
-          const userStr = (chosen[0] || '').trim().toLowerCase();
-          const targetStr = (q.correct_answers && q.correct_answers[0] ? q.correct_answers[0] : '').trim().toLowerCase();
-          isCorrect = userStr.length > 0 && (
-            userStr === targetStr || 
-            (!isNaN(parseFloat(userStr)) && !isNaN(parseFloat(targetStr)) && parseFloat(userStr) === parseFloat(targetStr))
-          );
+        const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text);
+
+        if (q.question_type === 'fill_blank' || hasPlaceholders) {
+          const rawTargets = q.correct_answers || [];
+          let targets: string[] = [];
+          rawTargets.forEach(t => {
+            if (typeof t === 'string' && t.includes(',')) {
+              targets.push(...t.split(',').map(s => s.trim()));
+            } else {
+              targets.push(t);
+            }
+          });
+
+          if (targets.length === 0) {
+            isCorrect = chosen.some(c => (c || '').trim().length > 0);
+          } else {
+            isCorrect = targets.every((target, idx) => {
+              const userVal = (chosen[idx] || '').trim().toLowerCase();
+              const targetVal = (target || '').trim().toLowerCase();
+              if (!userVal) return false;
+              return userVal === targetVal || (!isNaN(parseFloat(userVal)) && !isNaN(parseFloat(targetVal)) && parseFloat(userVal) === parseFloat(targetVal));
+            });
+          }
         } else {
           isCorrect = chosen.length > 0 && q.correct_answers.includes(chosen[0]);
         }
@@ -2322,27 +2409,41 @@ export const StudentDashboard: React.FC = () => {
                         </span>
                       </div>
 
-                      <h4 className="text-base font-black text-slate-900 bg-amber-50 p-4 rounded-2xl border border-amber-200">
-                        {q.question_text}
+                      <h4 className="text-base font-black text-slate-900 bg-amber-50 p-4.5 rounded-2xl border-2 border-amber-200 leading-relaxed shadow-2xs">
+                        {renderInteractiveQuestionText(
+                          q.question_text,
+                          q.id,
+                          selectedOpts,
+                          (bIdx, val) => handleMultiBlankAnswer(q.id, bIdx, val)
+                        )}
                       </h4>
 
                       {q.image_url && (
                         <img src={q.image_url} alt="Question diagram" className="max-h-60 w-auto rounded-2xl border-2 border-purple-200 mx-auto my-2 shadow object-contain" />
                       )}
 
-                      {q.question_type === 'fill_blank' ? (
-                        <div className="p-5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
-                          <label className="block text-xs font-black text-amber-950 uppercase flex items-center gap-1.5">
-                            <span>✍️</span> NHẬP CÂU TRẢ LỜI CỦA EM VÀO Ô DƯỚI ĐÂY:
-                          </label>
-                          <input
-                            type="text"
-                            value={selectedOpts[0] || ''}
-                            onChange={(e) => handleSelectOption(q.id, e.target.value)}
-                            placeholder="Nhập câu trả lời (VD: 80 hoặc Hình chữ nhật)..."
-                            className="w-full p-4 bg-white border-2 border-amber-400 rounded-2xl font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
-                          />
-                        </div>
+                      {q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text) ? (
+                        /(?:\.{2,}|…+|_{2,})/g.test(q.question_text) ? (
+                          <div className="p-3 bg-amber-100/70 rounded-2xl border border-amber-300 text-xs font-bold text-amber-950 flex items-center gap-2">
+                            <span>💡</span>
+                            <span>
+                              Em hãy nhấp trực tiếp vào ô <code className="bg-white px-2 py-0.5 rounded-md border border-amber-300 text-amber-900 font-black">...</code> ở câu hỏi phía trên để nhập đáp án nhé!
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="p-5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
+                            <label className="block text-xs font-black text-amber-950 uppercase flex items-center gap-1.5">
+                              <span>✍️</span> NHẬP CÂU TRẢ LỜI CỦA EM VÀO Ô DƯỚI ĐÂY:
+                            </label>
+                            <input
+                              type="text"
+                              value={selectedOpts[0] || ''}
+                              onChange={(e) => handleSelectOption(q.id, e.target.value)}
+                              placeholder="Nhập câu trả lời (VD: 80 hoặc Hình chữ nhật)..."
+                              className="w-full p-4 bg-white border-2 border-amber-400 rounded-2xl font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                            />
+                          </div>
+                        )
                       ) : q.question_type === 'essay' ? (
                         <div className="p-5 bg-purple-50/90 rounded-2xl border-2 border-purple-300 space-y-3 shadow-xs">
                           <label className="block text-xs font-black text-purple-950 uppercase flex items-center gap-1.5">
