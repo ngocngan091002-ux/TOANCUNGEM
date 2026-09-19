@@ -1207,7 +1207,7 @@ export const TeacherDashboard: React.FC = () => {
     // Tự động đặt tên bài kiểm tra theo nhóm nếu Giáo viên chọn giao theo nhóm
     const targetGroupLabel = getTargetGroupLabel(targetGroup);
     const targetSuffix = targetGroup !== 'all' ? ` (${targetGroupLabel})` : '';
-    const finalTitle = assignTitle.trim() ? (assignTitle.trim() + targetSuffix) : `Kiểm Tra Toán Lớp 2${targetSuffix} (${new Date().toLocaleDateString('vi-VN')})`;
+    const finalTitle = assignTitle.trim() ? (assignTitle.trim() + targetSuffix) : `Bài tập cuối tuần 2${targetSuffix}`;
 
     try {
       const questionsToSave = selectedDrafts.map(q => ({

@@ -1315,7 +1315,7 @@ export const StudentDashboard: React.FC = () => {
                 ) : (
                   completedSubmissions.map(sub => {
                     const assign = assignments.find(a => a.id === sub.assignment_id);
-                    const title = assign?.title || 'Kiểm Tra Toán Lớp 2 (24/8/2026)';
+                    const title = assign?.title || 'Bài tập cuối tuần 2';
                     const scoreVal = sub.score > 10 ? Math.round((sub.score / 100) * 10 * 10) / 10 : (sub.score !== undefined ? sub.score : 10);
 
                     return (
