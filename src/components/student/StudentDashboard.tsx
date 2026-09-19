@@ -412,7 +412,19 @@ export const StudentDashboard: React.FC = () => {
     try {
       const responses = activeAssignment.questions.map(q => {
         const chosen = userAnswers[q.id] || [];
-        const isCorrect = chosen.length > 0 && q.correct_answers.includes(chosen[0]);
+        let isCorrect = false;
+
+        if (q.question_type === 'fill_blank') {
+          const userStr = (chosen[0] || '').trim().toLowerCase();
+          const targetStr = (q.correct_answers && q.correct_answers[0] ? q.correct_answers[0] : '').trim().toLowerCase();
+          isCorrect = userStr.length > 0 && (
+            userStr === targetStr || 
+            (!isNaN(parseFloat(userStr)) && !isNaN(parseFloat(targetStr)) && parseFloat(userStr) === parseFloat(targetStr))
+          );
+        } else {
+          isCorrect = chosen.length > 0 && q.correct_answers.includes(chosen[0]);
+        }
+
         const timeSpent = questionTimers[q.id] || 5;
 
         return {
@@ -2318,50 +2330,77 @@ export const StudentDashboard: React.FC = () => {
                         <img src={q.image_url} alt="Question diagram" className="max-h-60 w-auto rounded-2xl border-2 border-purple-200 mx-auto my-2 shadow object-contain" />
                       )}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                        {(() => {
-                          const rawOpts = q.options && q.options.length > 0 ? q.options : [];
-                          const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
-                            if (typeof opt === 'string') {
-                              const optKey = String.fromCharCode(65 + oIdx);
-                              return { id: optKey, text: opt };
-                            }
-                            return { id: opt.id || String.fromCharCode(65 + oIdx), text: opt.text || opt.label || String(opt) };
-                          });
-                          const finalOptionsList = optionsList.length > 0 ? optionsList : (
-                            q.question_text?.includes('15 + 2') ? [
-                              { id: 'A', text: '17' },
-                              { id: 'B', text: '7' },
-                              { id: 'C', text: '5' },
-                              { id: 'D', text: '10' }
-                            ] : [
-                              { id: 'A', text: 'Đáp án A' },
-                              { id: 'B', text: 'Đáp án B' },
-                              { id: 'C', text: 'Đáp án C' },
-                              { id: 'D', text: 'Đáp án D' }
-                            ]
-                          );
-
-                          return finalOptionsList.map(opt => {
-                            const isChecked = selectedOpts.includes(opt.id);
-                            return (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => handleSelectOption(q.id, opt.id)}
-                                className={`p-4 rounded-2xl border-2 text-left font-extrabold text-xs transition-all flex items-center justify-between ${
-                                  isChecked
-                                    ? 'bg-amber-500 text-white border-amber-600 shadow-md scale-102'
-                                    : 'bg-white text-slate-800 border-amber-200 hover:bg-amber-50'
-                                }`}
-                              >
-                                <span><strong className="text-sm mr-2">{opt.id}.</strong> {opt.text}</span>
-                                {isChecked && <CheckCircle2 className="w-5 h-5 text-white" />}
-                              </button>
+                      {q.question_type === 'fill_blank' ? (
+                        <div className="p-5 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-3 shadow-xs">
+                          <label className="block text-xs font-black text-amber-950 uppercase flex items-center gap-1.5">
+                            <span>✍️</span> NHẬP CÂU TRẢ LỜI CỦA EM VÀO Ô DƯỚI ĐÂY:
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedOpts[0] || ''}
+                            onChange={(e) => handleSelectOption(q.id, e.target.value)}
+                            placeholder="Nhập câu trả lời (VD: 80 hoặc Hình chữ nhật)..."
+                            className="w-full p-4 bg-white border-2 border-amber-400 rounded-2xl font-black text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 shadow-sm"
+                          />
+                        </div>
+                      ) : q.question_type === 'essay' ? (
+                        <div className="p-5 bg-purple-50/90 rounded-2xl border-2 border-purple-300 space-y-3 shadow-xs">
+                          <label className="block text-xs font-black text-purple-950 uppercase flex items-center gap-1.5">
+                            <span>✍️</span> NHẬP BÀI LÀM TỰ LUẬN CỦA EM:
+                          </label>
+                          <textarea
+                            value={selectedOpts[0] || ''}
+                            onChange={(e) => handleSelectOption(q.id, e.target.value)}
+                            placeholder="Nhập câu trả lời tự luận..."
+                            className="w-full p-4 bg-white border-2 border-purple-400 rounded-2xl font-bold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm h-32"
+                          />
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                          {(() => {
+                            const rawOpts = q.options && q.options.length > 0 ? q.options : [];
+                            const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
+                              if (typeof opt === 'string') {
+                                const optKey = String.fromCharCode(65 + oIdx);
+                                return { id: optKey, text: opt };
+                              }
+                              return { id: opt.id || String.fromCharCode(65 + oIdx), text: opt.text || opt.label || String(opt) };
+                            });
+                            const finalOptionsList = optionsList.length > 0 ? optionsList : (
+                              q.question_text?.includes('15 + 2') ? [
+                                { id: 'A', text: '17' },
+                                { id: 'B', text: '7' },
+                                { id: 'C', text: '5' },
+                                { id: 'D', text: '10' }
+                              ] : [
+                                { id: 'A', text: 'Đáp án A' },
+                                { id: 'B', text: 'Đáp án B' },
+                                { id: 'C', text: 'Đáp án C' },
+                                { id: 'D', text: 'Đáp án D' }
+                              ]
                             );
-                          });
-                        })()}
-                      </div>
+
+                            return finalOptionsList.map(opt => {
+                              const isChecked = selectedOpts.includes(opt.id);
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => handleSelectOption(q.id, opt.id)}
+                                  className={`p-4 rounded-2xl border-2 text-left font-extrabold text-xs transition-all flex items-center justify-between ${
+                                    isChecked
+                                      ? 'bg-amber-500 text-white border-amber-600 shadow-md scale-102'
+                                      : 'bg-white text-slate-800 border-amber-200 hover:bg-amber-50'
+                                  }`}
+                                >
+                                  <span><strong className="text-sm mr-2">{opt.id}.</strong> {opt.text}</span>
+                                  {isChecked && <CheckCircle2 className="w-5 h-5 text-white" />}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
                     </div>
                   );
                 })()
@@ -2548,39 +2587,55 @@ export const StudentDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {/* DANH SÁCH TẤT CẢ CÁC ĐÁP ÁN (A, B, C, D) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                          {finalOptionsList.map(opt => {
-                            const isUserChosen = userSelectedOptions.includes(opt.id) || (userSelectedOptions.length === 0 && isCorrect && correctAnswers.includes(opt.id));
-                            const isCorrectOpt = correctAnswers.includes(opt.id) || (correctAnswers.length === 0 && opt.id === 'A');
+                        {q.question_type === 'fill_blank' ? (
+                          <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-2 text-xs font-bold">
+                            <div className="flex items-center justify-between">
+                              <span className="text-slate-700 font-extrabold">✍️ Câu trả lời của em:</span>
+                              <span className={`px-3 py-1 rounded-xl font-black ${isCorrect ? 'bg-emerald-200 text-emerald-950 border border-emerald-400' : 'bg-rose-200 text-rose-950 border border-rose-400'}`}>
+                                "{userSelectedOptions[0] || 'Bỏ trống'}"
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-amber-200">
+                              <span className="text-emerald-900 font-black">⭐ Đáp án đúng chuẩn:</span>
+                              <span className="font-black text-emerald-950 font-mono text-xs">
+                                "{correctAnswers[0] || 'N/A'}"
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                            {finalOptionsList.map(opt => {
+                              const isUserChosen = userSelectedOptions.includes(opt.id) || (userSelectedOptions.length === 0 && isCorrect && correctAnswers.includes(opt.id));
+                              const isCorrectOpt = correctAnswers.includes(opt.id) || (correctAnswers.length === 0 && opt.id === 'A');
 
-                            let cardStyle = 'bg-slate-50 border-slate-200 text-slate-700 font-bold';
-                            let badgeLabel = null;
+                              let cardStyle = 'bg-slate-50 border-slate-200 text-slate-700 font-bold';
+                              let badgeLabel = null;
 
-                            if (isUserChosen && isCorrectOpt) {
-                              cardStyle = 'bg-emerald-100/90 border-2 border-emerald-500 text-emerald-950 font-black shadow-xs';
-                              badgeLabel = <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-lg">✓ Đúng (Em đã chọn)</span>;
-                            } else if (isUserChosen && !isCorrectOpt) {
-                              cardStyle = 'bg-rose-100/90 border-2 border-rose-500 text-rose-950 font-black shadow-xs';
-                              badgeLabel = <span className="text-[10px] bg-rose-600 text-white font-black px-2 py-0.5 rounded-lg">❌ Sai (Em đã chọn)</span>;
-                            } else if (isCorrectOpt) {
-                              cardStyle = 'bg-emerald-50 border-2 border-emerald-400 text-emerald-900 font-black';
-                              badgeLabel = <span className="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-lg">⭐ Đáp án đúng</span>;
-                            }
+                              if (isUserChosen && isCorrectOpt) {
+                                cardStyle = 'bg-emerald-100/90 border-2 border-emerald-500 text-emerald-950 font-black shadow-xs';
+                                badgeLabel = <span className="text-[10px] bg-emerald-600 text-white font-black px-2 py-0.5 rounded-lg">✓ Đúng (Em đã chọn)</span>;
+                              } else if (isUserChosen && !isCorrectOpt) {
+                                cardStyle = 'bg-rose-100/90 border-2 border-rose-500 text-rose-950 font-black shadow-xs';
+                                badgeLabel = <span className="text-[10px] bg-rose-600 text-white font-black px-2 py-0.5 rounded-lg">❌ Sai (Em đã chọn)</span>;
+                              } else if (isCorrectOpt) {
+                                cardStyle = 'bg-emerald-50 border-2 border-emerald-400 text-emerald-900 font-black';
+                                badgeLabel = <span className="text-[10px] bg-emerald-500 text-white font-black px-2 py-0.5 rounded-lg">⭐ Đáp án đúng</span>;
+                              }
 
-                            return (
-                              <div key={opt.id} className={`p-3 rounded-2xl border flex items-center justify-between gap-2 text-xs transition-all ${cardStyle}`}>
-                                <div className="flex items-center gap-2">
-                                  <span className="w-6 h-6 rounded-full bg-white border border-slate-300 flex items-center justify-center font-black text-slate-900 shrink-0">
-                                    {opt.id}
-                                  </span>
-                                  <span className="font-extrabold">{opt.text}</span>
+                              return (
+                                <div key={opt.id} className={`p-3 rounded-2xl border flex items-center justify-between gap-2 text-xs transition-all ${cardStyle}`}>
+                                  <div className="flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-full bg-white border border-slate-300 flex items-center justify-center font-black text-slate-900 shrink-0">
+                                      {opt.id}
+                                    </span>
+                                    <span className="font-extrabold">{opt.text}</span>
+                                  </div>
+                                  {badgeLabel}
                                 </div>
-                                {badgeLabel}
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        )}
 
                         {/* GIẢI THÍCH / HIỂN THỊ ĐÁP ÁN ĐÚNG RÕ RÀNG NẾU LÀM SAI */}
                         {!isCorrect && (
