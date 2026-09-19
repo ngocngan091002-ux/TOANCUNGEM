@@ -20,6 +20,75 @@ import {
   Lock, Unlock, Archive, UserCheck, Star, Award, Shield, QrCode, Clock, UserPlus, FileText, Shuffle, CheckSquare, Edit3, X, School, GraduationCap, Eye
 } from 'lucide-react';
 
+const checkQuestionCorrectness = (
+  q: any,
+  userSelectedOptions: string[]
+): boolean => {
+  if (!userSelectedOptions || userSelectedOptions.length === 0) return false;
+  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
+  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return false;
+
+  const correctAnswers = q.correct_answers || [];
+  const hasPlaceholders = /(?:\.{2,}|…+|_{2,}|\[\s*chỗ\s*trống\s*\])/gi.test(q.question_text || '');
+
+  if (q.question_type === 'fill_blank' || hasPlaceholders) {
+    let targets: string[] = [];
+    correctAnswers.forEach((t: any) => {
+      if (typeof t === 'string' && t.includes(',')) {
+        targets.push(...t.split(',').map(s => s.trim()));
+      } else {
+        targets.push(String(t).trim());
+      }
+    });
+
+    if (targets.length === 0) return true;
+
+    return targets.every((target, idx) => {
+      const uStr = (filtered[idx] || '').trim().toLowerCase();
+      const tStr = (target || '').trim().toLowerCase();
+      if (!uStr) return false;
+      return uStr === tStr || (!isNaN(parseFloat(uStr)) && !isNaN(parseFloat(tStr)) && parseFloat(uStr) === parseFloat(tStr));
+    });
+  }
+
+  // Đối với Trắc nghiệm (single_choice, multiple_choice, true_false)
+  if (q.options && q.options.length > 0) {
+    const isDirectIdMatch = filtered.some(optId => correctAnswers.includes(optId));
+    if (isDirectIdMatch) return true;
+
+    const correctOptionTexts = q.options
+      .filter((o: any) => correctAnswers.includes(o.id || o))
+      .map((o: any) => (o.text || o.label || String(o)).trim().toLowerCase());
+
+    const userTextMatch = filtered.some(uOpt => {
+      const uClean = uOpt.trim().toLowerCase();
+      return correctOptionTexts.includes(uClean) || correctAnswers.map((c: string) => String(c).trim().toLowerCase()).includes(uClean);
+    });
+
+    if (userTextMatch) return true;
+  }
+
+  return filtered.some(optId => correctAnswers.includes(optId));
+};
+
+const getUserAnswerText = (q: any, userSelectedOptions: string[]): string => {
+  if (!userSelectedOptions || userSelectedOptions.length === 0) return 'Bỏ trống';
+  const filtered = userSelectedOptions.map(s => (s || '').trim()).filter(Boolean);
+  if (filtered.length === 0 || filtered[0].toLowerCase() === 'bỏ trống') return 'Bỏ trống';
+
+  const val = filtered.join(', ');
+
+  if (q.options && q.options.length > 0) {
+    const matchedOption = q.options.find((o: any) => (o.id || o) === val);
+    if (matchedOption) {
+      const optText = matchedOption.text || matchedOption.label || String(matchedOption);
+      return `${optText} (Phương án ${val})`;
+    }
+  }
+
+  return val;
+};
+
 export const TeacherDashboard: React.FC = () => {
   const { user, refreshProfile, logout } = useAuth();
   const dateInputRef = useRef<HTMLInputElement>(null);
@@ -3396,10 +3465,17 @@ export const TeacherDashboard: React.FC = () => {
                 {selectedStudentDetail.questions && selectedStudentDetail.questions.length > 0 ? (
                   selectedStudentDetail.questions.map((q, idx) => {
                     const resp = selectedStudentDetail.submission?.responses?.find((r: any) => r.question_id === q.id);
-                    const isCorrect = resp?.is_correct ?? true;
-                    const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
                     const userSelectedOptions: string[] = resp?.selected_options || [];
                     const correctAnswers: string[] = q.correct_answers || [];
+
+                    const isAnswered = userSelectedOptions.length > 0 && userSelectedOptions.some(o => (o || '').trim().length > 0 && (o || '').trim().toLowerCase() !== 'bỏ trống');
+
+                    const isCorrect = isAnswered 
+                      ? (resp?.is_correct !== undefined ? resp.is_correct : checkQuestionCorrectness(q, userSelectedOptions))
+                      : false;
+
+                    const cleanQText = q.question_text.replace(/^câu\s*\d+\s*:\s*/i, '');
+                    const displayUserAnswer = getUserAnswerText(q, userSelectedOptions);
 
                     // Lấy danh sách 4 đáp án đầy đủ
                     const rawOpts = q.options && q.options.length > 0 ? q.options : [];
@@ -3445,25 +3521,25 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {q.question_type === 'fill_blank' ? (
+                        {q.question_type === 'fill_blank' || /(?:\.{2,}|…+|_{2,})/g.test(q.question_text) ? (
                           <div className="p-4 bg-amber-50/90 rounded-2xl border-2 border-amber-300 space-y-2 text-xs font-bold">
                             <div className="flex items-center justify-between">
                               <span className="text-slate-700 font-extrabold">✍️ Học sinh đã điền:</span>
                               <span className={`px-3 py-1 rounded-xl font-black ${isCorrect ? 'bg-emerald-200 text-emerald-950 border border-emerald-400' : 'bg-rose-200 text-rose-950 border border-rose-400'}`}>
-                                "{userSelectedOptions[0] || 'Bỏ trống'}"
+                                "{displayUserAnswer}"
                               </span>
                             </div>
                             <div className="flex items-center justify-between pt-1 border-t border-amber-200">
                               <span className="text-emerald-900 font-black">⭐ Đáp án đúng chuẩn:</span>
                               <span className="font-black text-emerald-950 font-mono text-xs">
-                                "{correctAnswers[0] || 'N/A'}"
+                                "{correctAnswers.join(', ') || 'N/A'}"
                               </span>
                             </div>
                           </div>
                         ) : (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
                             {finalOptionsList.map(opt => {
-                              const isUserChosen = userSelectedOptions.includes(opt.id) || (userSelectedOptions.length === 0 && isCorrect && (correctAnswers.includes(opt.id) || opt.id === 'A'));
+                              const isUserChosen = userSelectedOptions.includes(opt.id) || (isAnswered && userSelectedOptions.includes(opt.text));
                               const isCorrectOpt = correctAnswers.includes(opt.id) || (correctAnswers.length === 0 && opt.id === 'A');
 
                               let cardStyle = 'bg-slate-50 border-slate-200 text-slate-700 font-bold';
