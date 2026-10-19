@@ -1335,7 +1335,13 @@ export const TeacherDashboard: React.FC = () => {
     // Tự động đặt tên bài kiểm tra theo nhóm nếu Giáo viên chọn giao theo nhóm
     const targetGroupLabel = getTargetGroupLabel(targetGroup);
     const targetSuffix = targetGroup !== 'all' ? ` (${targetGroupLabel})` : '';
-    const defaultAssignmentName = `Bài tập cuối tuần ${assignments.length + 1}`;
+    const weekNumbers = assignments.map(a => {
+      const match = (a.title || '').match(/cuối\s*tuần\s*(\d+)/i) || (a.title || '').match(/tuần\s*(\d+)/i);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+    const maxExistingWeek = weekNumbers.length > 0 ? Math.max(...weekNumbers) : assignments.length;
+    const nextWeek = maxExistingWeek > 0 ? maxExistingWeek + 1 : assignments.length + 1;
+    const defaultAssignmentName = `Bài tập cuối tuần ${nextWeek}`;
     const finalTitle = assignTitle.trim() ? (assignTitle.trim() + targetSuffix) : `${defaultAssignmentName}${targetSuffix}`;
 
     try {
