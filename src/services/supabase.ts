@@ -868,9 +868,9 @@ export async function getAssignments(classId?: string, isTeacher = false): Promi
         .order('order_index', { ascending: true });
 
       data = data.map((a: any) => {
-        let cleanTitle = a.title || 'Bài tập cuối tuần 2';
+        let cleanTitle = a.title || 'Bài tập cuối tuần';
         if (cleanTitle.toLowerCase().includes('kiểm tra toán lớp 2')) {
-          cleanTitle = cleanTitle.replace(/Kiểm Tra Toán Lớp 2(?:\s*\(\d+\/\d+\/\d+\))?/gi, 'Bài tập cuối tuần 2');
+          cleanTitle = cleanTitle.replace(/Kiểm Tra Toán Lớp 2(?:\s*\(\d+\/\d+\/\d+\))?/gi, 'Bài tập cuối tuần 4');
         }
         const qList = (allQuestions && allQuestions.length > 0) ? allQuestions.filter((q: any) => q.assignment_id === a.id) : [];
         return {
@@ -880,12 +880,12 @@ export async function getAssignments(classId?: string, isTeacher = false): Promi
         };
       });
 
-      // Cập nhật ngầm tiêu đề trong DB Supabase để vĩnh viễn là Bài tập cuối tuần 2
+      // Cập nhật ngầm tiêu đề trong DB Supabase nếu còn tồn tại tên cũ
       try {
         Promise.resolve(
           supabaseAdmin
             .from('assignments')
-            .update({ title: 'Bài tập cuối tuần 2' })
+            .update({ title: 'Bài tập cuối tuần 4' })
             .ilike('title', '%Kiểm Tra Toán Lớp 2%')
         ).catch(() => {});
       } catch (e) {}
