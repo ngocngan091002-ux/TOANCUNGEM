@@ -2778,7 +2778,7 @@ export const TeacherDashboard: React.FC = () => {
 
       {/* 👤 8. HỒ SƠ GIÁO VIÊN (GIAO DIỆN KHUNG CHÍNH GIỮA TRANG CHUẨN GIỐNG HỌC SINH) */}
       {activeTab === 'profile' && (() => {
-        const activeClassName = selectedClass ? selectedClass.name : 'Lớp Hai 4';
+        const activeClassName = selectedClass ? selectedClass.name : 'Lớp Hai 14';
         const totalStudentsCount = students.length;
         const totalAssignmentsCount = assignments.length;
         const displayName = user?.full_name || 'Cô Ngọc (Giáo Viên)';
@@ -2936,7 +2936,7 @@ export const TeacherDashboard: React.FC = () => {
                 <input
                   type="text"
                   required
-                  placeholder="VD: Lớp Hai 4 / Lớp 2A1"
+                  placeholder="VD: Lớp Hai 14 / Lớp 2A1"
                   value={newClassName}
                   onChange={(e) => setNewClassName(e.target.value)}
                   className="w-full p-3 bg-amber-50 border-2 border-amber-200 rounded-2xl text-xs font-bold focus:outline-none focus:border-amber-500"

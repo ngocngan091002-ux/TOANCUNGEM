@@ -1130,7 +1130,7 @@ export const StudentDashboard: React.FC = () => {
               </h2>
               <p className="text-xs font-extrabold text-amber-950 opacity-90">
                 {isTeacherPreview
-                  ? 'Chào mừng Thầy/Cô! Đây là giao diện trải nghiệm thực tế của Học sinh Lớp Hai 4. Thầy/Cô có thể làm thử bài tập, trải nghiệm kho game hoặc kiểm tra giao diện học sinh.'
+                  ? 'Chào mừng Thầy/Cô! Đây là giao diện trải nghiệm thực tế của Học sinh Lớp Hai 14. Thầy/Cô có thể làm thử bài tập, trải nghiệm kho game hoặc kiểm tra giao diện học sinh.'
                   : 'Chúc em có một ngày học tập thật vui vẻ và gặt hái nhiều điểm thưởng!'}
               </p>
             </div>
@@ -1139,7 +1139,7 @@ export const StudentDashboard: React.FC = () => {
               <form onSubmit={handleJoinClass} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Nhập Mã Lớp (VD: Hai 14)..."
+                  placeholder="Nhập Mã Lớp (VD: ZJ3KYE)..."
                   value={classCodeInput}
                   onChange={(e) => setClassCodeInput(e.target.value)}
                   className="px-3.5 py-2 bg-white text-slate-800 font-extrabold text-xs rounded-2xl border-2 border-amber-300 focus:outline-none uppercase"
@@ -1211,7 +1211,7 @@ export const StudentDashboard: React.FC = () => {
               <div>
                 <span className="text-[10px] font-black uppercase text-rose-200 opacity-90 block">{isTeacherPreview ? '🏫 SĨ SỐ LỚP HỌC:' : '🔥 CHUỖI THÀNH TÍCH:'}</span>
                 <h3 className="text-2xl font-black text-white">{isTeacherPreview ? `${leaderboard.length || 32} EM` : `${streakDays} NGÀY`}</h3>
-                <span className="text-[11px] font-extrabold text-rose-100">{isTeacherPreview ? `Lớp ${activeClassObj?.name || 'Hai 4'}` : 'Học tập chăm chỉ mỗi ngày'}</span>
+                <span className="text-[11px] font-extrabold text-rose-100">{isTeacherPreview ? `Lớp ${activeClassObj?.name || 'Hai 14'}` : 'Học tập chăm chỉ mỗi ngày'}</span>
               </div>
               <div className="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center text-2xl shadow">
                 {isTeacherPreview ? '🏫' : '🔥'}
@@ -2275,7 +2275,7 @@ export const StudentDashboard: React.FC = () => {
                       👩‍🏫
                     </div>
                     <div>
-                      <h4 className="font-black text-xs text-pink-950">Cô Chủ Nhiệm Lớp Hai 4</h4>
+                      <h4 className="font-black text-xs text-pink-950">Cô Chủ Nhiệm Lớp Hai 14</h4>
                       <span className="text-[10px] font-extrabold text-pink-800">Nhận xét bài làm chính thức từ CSDL</span>
                     </div>
                   </div>
@@ -2377,7 +2377,7 @@ export const StudentDashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-xl text-xs font-black uppercase text-amber-100 border border-white/30 inline-block mb-1">
-                    🏆 THI ĐUA HỌC TẬP LỚP HAI 4 (REALTIME SUPABASE)
+                    🏆 THI ĐUA HỌC TẬP LỚP HAI 14 (REALTIME SUPABASE)
                   </span>
                   <h2 className="text-2xl sm:text-3xl font-black">🏆 BẢNG XẾP HẠNG HỌC SINH</h2>
                   <p className="text-xs font-extrabold text-amber-100 opacity-90">
@@ -2470,7 +2470,7 @@ export const StudentDashboard: React.FC = () => {
             <div className="bg-white p-6 rounded-3xl border-2 border-amber-200 shadow-md space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="font-black text-base text-slate-900 flex items-center gap-2">
-                  <span className="text-xl">🥇</span> BẢNG XẾP HẠNG HỌC SINH LỚP HAI 4 ({leaderboard.length} Học Sinh)
+                  <span className="text-xl">🥇</span> BẢNG XẾP HẠNG HỌC SINH LỚP HAI 14 ({leaderboard.length} Học Sinh)
                 </h3>
                 <span className="text-[10px] font-black bg-emerald-100 text-emerald-950 px-2.5 py-1 rounded-xl border border-emerald-300">
                   ⚡ Tự động cập nhật Realtime
@@ -2535,7 +2535,7 @@ export const StudentDashboard: React.FC = () => {
         const myEntry = leaderboard.find(lb => lb.student_id === user?.id || lb.student_code === user?.student_code);
         const myRankInClass = myEntry ? myEntry.rank : 1;
         const activeClass = studentClasses.find(c => c.id === selectedClassId);
-        const classNameStr = activeClass ? activeClass.name : 'Hai 4';
+        const classNameStr = activeClass ? activeClass.name : 'Hai 14';
 
         // Tự động rút gọn hoặc lấy Tên thật từ CSDL
         const isCodeOrShort = !user?.full_name || user.full_name.toUpperCase().startsWith('HS2026_') || user.full_name.toUpperCase().startsWith('HS20') || user.full_name.split(' ').length < 2;

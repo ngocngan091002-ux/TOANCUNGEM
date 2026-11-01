@@ -101,7 +101,7 @@ export const AdminDashboard: React.FC = () => {
         password: pwd
       }]);
 
-      alert(`🎉 [ADMIN] Đã thêm thành công học sinh "${name}" (Mã: ${code}, Mật khẩu: ${pwd}) vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
+      alert(`🎉 [ADMIN] Đã thêm thành công học sinh "${name}" (Mã: ${code}, Mật khẩu: ${pwd}) vào lớp ${targetClass?.name || 'Lớp Hai 14'}!`);
       setShowAddSingleStudentAdminModal(false);
       setSingleStudentNameAdmin('');
       setSingleStudentEmailAdmin('');
@@ -119,7 +119,7 @@ export const AdminDashboard: React.FC = () => {
     const targetClass = classes.find(c => c.id === targetId);
     if (!targetId) return;
 
-    if (!window.confirm(`⚠️ [ADMIN] Thầy/Cô có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp ${targetClass?.name || 'Lớp Hai 4'}?`)) {
+    if (!window.confirm(`⚠️ [ADMIN] Thầy/Cô có chắc chắn muốn xóa học sinh "${studentName}" ra khỏi lớp ${targetClass?.name || 'Lớp Hai 14'}?`)) {
       return;
     }
 
@@ -165,7 +165,7 @@ export const AdminDashboard: React.FC = () => {
       }
 
       const count = await batchImportStudentsToClass(targetId, studentList);
-      alert(`🎉 [ADMIN] Đã nạp thành công ${count} / ${studentList.length} học sinh vào lớp ${targetClass?.name || 'Lớp Hai 4'}!`);
+      alert(`🎉 [ADMIN] Đã nạp thành công ${count} / ${studentList.length} học sinh vào lớp ${targetClass?.name || 'Lớp Hai 14'}!`);
       await fetchClassStudents(targetId);
       await fetchProfiles();
     } catch (err: any) {
@@ -739,7 +739,7 @@ export const AdminDashboard: React.FC = () => {
                 <UserPlus className="w-6 h-6" />
               </div>
               <h3 className="text-xl font-black text-slate-800">[ADMIN] THÊM HỌC SINH VÀO LỚP</h3>
-              <p className="text-xs font-bold text-slate-500">Quản trị viên nhập Họ tên học sinh để nạp trực tiếp vào {classes.find(c => c.id === selectedClassId)?.name || 'Lớp Hai 4'}</p>
+              <p className="text-xs font-bold text-slate-500">Quản trị viên nhập Họ tên học sinh để nạp trực tiếp vào {classes.find(c => c.id === selectedClassId)?.name || 'Lớp Hai 14'}</p>
             </div>
 
             <form onSubmit={handleAddSingleStudentAdmin} className="space-y-3">
