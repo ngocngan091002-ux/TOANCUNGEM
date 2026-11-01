@@ -1345,16 +1345,20 @@ export const TeacherDashboard: React.FC = () => {
     const finalTitle = assignTitle.trim() ? (assignTitle.trim() + targetSuffix) : `${defaultAssignmentName}${targetSuffix}`;
 
     try {
-      const questionsToSave = selectedDrafts.map(q => ({
-        question_text: q.question_text,
-        question_type: q.question_type || selectedQuestionType,
-        difficulty: q.difficulty || questionDifficulty,
-        image_url: q.image_url,
-        options: q.options,
-        correct_answers: q.correct_answers,
-        points: 10,
-        order_index: 0
-      }));
+      const questionsToSave = selectedDrafts.map(q => {
+        const qType = q.question_type || selectedQuestionType;
+        const isEssayOrFill = qType === 'essay' || qType === 'fill_blank';
+        return {
+          question_text: q.question_text,
+          question_type: qType,
+          difficulty: q.difficulty || questionDifficulty,
+          image_url: q.image_url,
+          options: isEssayOrFill ? [] : (q.options || []),
+          correct_answers: q.correct_answers,
+          points: 10,
+          order_index: 0
+        };
+      });
 
       const isUuid = (id?: string) => id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
       const safeTeacherId = isUuid(user?.id) ? user!.id : selectedClass.teacher_id;
@@ -1584,7 +1588,17 @@ export const TeacherDashboard: React.FC = () => {
                 <label className="text-[11px] font-bold text-purple-950 block mb-1">Dạng Bài Tập Tuần:</label>
                 <select
                   value={selectedQuestionType}
-                  onChange={(e: any) => setSelectedQuestionType(e.target.value)}
+                  onChange={(e: any) => {
+                    const newType = e.target.value;
+                    setSelectedQuestionType(newType);
+                    if (newType === 'essay' || newType === 'fill_blank') {
+                      setDraftQuestions(prev => prev.map(q => ({
+                        ...q,
+                        question_type: newType,
+                        options: []
+                      })));
+                    }
+                  }}
                   className="w-full p-2.5 bg-white border border-purple-300 rounded-xl text-xs font-bold"
                 >
                   <option value="single_choice">Trắc nghiệm 1 đáp án</option>
@@ -1727,6 +1741,16 @@ export const TeacherDashboard: React.FC = () => {
                               setDraftQuestions(prev => {
                                 const updated = [...prev];
                                 updated[idx].question_type = newType;
+                                if (newType === 'essay' || newType === 'fill_blank') {
+                                  updated[idx].options = [];
+                                } else if (!updated[idx].options || updated[idx].options.length === 0) {
+                                  updated[idx].options = [
+                                    { id: 'A', text: 'Phương án A' },
+                                    { id: 'B', text: 'Phương án B' },
+                                    { id: 'C', text: 'Phương án C' },
+                                    { id: 'D', text: 'Phương án D' }
+                                  ];
+                                }
                                 return updated;
                               });
                             }}
@@ -3407,48 +3431,83 @@ export const TeacherDashboard: React.FC = () => {
                       <img src={q.image_url} alt="Question diagram" className="max-h-48 w-auto rounded-xl border border-amber-300 mx-auto my-2" />
                     )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
-                      {(() => {
-                        const rawOpts = q.options && q.options.length > 0 ? q.options : [];
-                        const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
-                          if (typeof opt === 'string') {
-                            const optKey = String.fromCharCode(65 + oIdx);
-                            return { id: optKey, text: opt };
-                          }
-                          return { id: opt.id || String.fromCharCode(65 + oIdx), text: opt.text || opt.label || String(opt) };
-                        });
-                        const finalOptionsList = optionsList.length > 0 ? optionsList : (
-                          q.question_text?.includes('15 + 2') ? [
-                            { id: 'A', text: '17' },
-                            { id: 'B', text: '7' },
-                            { id: 'C', text: '5' },
-                            { id: 'D', text: '10' }
-                          ] : [
-                            { id: 'A', text: 'Đáp án A' },
-                            { id: 'B', text: 'Đáp án B' },
-                            { id: 'C', text: 'Đáp án C' },
-                            { id: 'D', text: 'Đáp án D' }
-                          ]
-                        );
-
-                        return finalOptionsList.map(opt => {
-                          const isCorrect = q.correct_answers?.includes(opt.id) || (q.correct_answers?.length === 0 && opt.id === 'A');
-                          return (
-                            <div
-                              key={opt.id}
-                              className={`p-2.5 rounded-xl border flex items-center justify-between ${
-                                isCorrect
-                                  ? 'bg-emerald-100 text-emerald-950 border-emerald-400 font-extrabold shadow-sm'
-                                  : 'bg-white text-slate-700 border-amber-200'
-                              }`}
-                            >
-                              <span><strong>{opt.id}.</strong> {opt.text}</span>
-                              {isCorrect && <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-md font-black">✓ ĐÁP ÁN ĐÚNG</span>}
-                            </div>
+                    {q.question_type === 'essay' ? (
+                      <div className="p-4 bg-purple-50 rounded-2xl border-2 border-purple-200 space-y-2 text-xs">
+                        <div className="flex items-center gap-2 font-black text-purple-950">
+                          <span className="px-2.5 py-1 bg-purple-200 text-purple-900 rounded-xl text-[11px] flex items-center gap-1 shadow-2xs">
+                            📝 Dạng bài: Tự luận (Học sinh nộp bằng cách thêm ảnh hoặc gõ bài giải)
+                          </span>
+                        </div>
+                        <p className="text-slate-600 font-semibold text-[11px]">
+                          💡 Học sinh sẽ nộp bài bằng cách gõ trực tiếp lời giải hoặc chụp ảnh bài làm từ vở ô ly tải lên.
+                        </p>
+                        {q.correct_answers && q.correct_answers[0] && (
+                          <div className="mt-2 pt-2 border-t border-purple-200">
+                            <span className="font-black text-purple-900 block mb-1">⭐ LỜI GIẢI MẪU / HƯỚNG DẪN CHẤM CỦA GIÁO VIÊN:</span>
+                            <pre className="p-3 bg-white rounded-xl border border-purple-300 font-sans font-bold text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                              {q.correct_answers[0]}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    ) : isFillInTheBlankQuestion(q) ? (
+                      <div className="p-4 bg-amber-50 rounded-2xl border-2 border-amber-300 space-y-2 text-xs">
+                        <div className="flex items-center gap-2 font-black text-amber-950">
+                          <span className="px-2.5 py-1 bg-amber-200 text-amber-900 rounded-xl text-[11px]">
+                            ✍️ Dạng bài: Điền vào chỗ trống
+                          </span>
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-amber-200 flex items-center justify-between">
+                          <span className="font-black text-amber-900">⭐ ĐÁP ÁN ĐÚNG CẦN ĐIỀN:</span>
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-950 border border-emerald-400 font-black rounded-xl">
+                            {q.correct_answers?.join(', ') || 'Chưa thiết lập'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold">
+                        {(() => {
+                          const rawOpts = q.options && q.options.length > 0 ? q.options : [];
+                          const optionsList: { id: string; text: string }[] = rawOpts.map((opt: any, oIdx: number) => {
+                            if (typeof opt === 'string') {
+                              const optKey = String.fromCharCode(65 + oIdx);
+                              return { id: optKey, text: opt };
+                            }
+                            return { id: opt.id || String.fromCharCode(65 + oIdx), text: opt.text || opt.label || String(opt) };
+                          });
+                          const finalOptionsList = optionsList.length > 0 ? optionsList : (
+                            q.question_text?.includes('15 + 2') ? [
+                              { id: 'A', text: '17' },
+                              { id: 'B', text: '7' },
+                              { id: 'C', text: '5' },
+                              { id: 'D', text: '10' }
+                            ] : [
+                              { id: 'A', text: 'Đáp án A' },
+                              { id: 'B', text: 'Đáp án B' },
+                              { id: 'C', text: 'Đáp án C' },
+                              { id: 'D', text: 'Đáp án D' }
+                            ]
                           );
-                        });
-                      })()}
-                    </div>
+
+                          return finalOptionsList.map(opt => {
+                            const isCorrect = q.correct_answers?.includes(opt.id) || (q.correct_answers?.length === 0 && opt.id === 'A');
+                            return (
+                              <div
+                                key={opt.id}
+                                className={`p-2.5 rounded-xl border flex items-center justify-between ${
+                                  isCorrect
+                                    ? 'bg-emerald-100 text-emerald-950 border-emerald-400 font-extrabold shadow-sm'
+                                    : 'bg-white text-slate-700 border-amber-200'
+                                }`}
+                              >
+                                <span><strong>{opt.id}.</strong> {opt.text}</span>
+                                {isCorrect && <span className="text-[10px] bg-emerald-600 text-white px-2 py-0.5 rounded-md font-black">✓ ĐÁP ÁN ĐÚNG</span>}
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
                   </div>
                 );
               })
@@ -3778,7 +3837,58 @@ export const TeacherDashboard: React.FC = () => {
                           </span>
                         </div>
 
-                        {isFillInTheBlankQuestion(q) ? (
+                        {q.question_type === 'essay' ? (
+                          <div className="p-4 bg-purple-50/90 rounded-2xl border-2 border-purple-300 space-y-3 text-xs">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-1.5 font-black text-purple-950 text-xs">
+                                <span>✍️</span> <span>BÀI LÀM TỰ LUẬN CỦA HỌC SINH:</span>
+                              </div>
+                              {(() => {
+                                const textAns = userSelectedOptions.find(opt => opt && !opt.startsWith('http') && !opt.startsWith('blob:') && !opt.startsWith('data:image') && opt.toLowerCase() !== 'bỏ trống');
+                                const imageAns = userSelectedOptions.find(opt => opt && (opt.startsWith('http') || opt.startsWith('blob:') || opt.startsWith('data:image')));
+
+                                return (
+                                  <div className="space-y-2">
+                                    {textAns ? (
+                                      <div className="p-3 bg-white rounded-xl border border-purple-200 font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                                        <span className="text-[10px] font-black text-purple-900 block mb-1">📝 Lời giải học sinh đã gõ:</span>
+                                        {textAns}
+                                      </div>
+                                    ) : null}
+
+                                    {imageAns ? (
+                                      <div className="space-y-1">
+                                        <span className="text-[10px] font-black text-purple-900 block">📷 Ảnh vở bài làm học sinh chụp tải lên:</span>
+                                        <img 
+                                          src={imageAns} 
+                                          alt="Ảnh bài làm học sinh" 
+                                          className="max-h-72 w-auto rounded-xl border-2 border-purple-300 shadow object-contain cursor-pointer hover:opacity-95"
+                                          onClick={() => setPreviewImageUrl(imageAns)}
+                                        />
+                                        <p className="text-[10px] text-purple-700 italic">Nhấp vào ảnh để phóng to xem rõ nét</p>
+                                      </div>
+                                    ) : null}
+
+                                    {!textAns && !imageAns && (
+                                      <div className="p-3 bg-white/60 rounded-xl border border-dashed border-purple-300 text-slate-500 italic">
+                                        Học sinh chưa nhập bài giải hoặc tải ảnh bài làm.
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {q.correct_answers && q.correct_answers[0] && (
+                              <div className="pt-2 border-t border-purple-200 space-y-1">
+                                <span className="font-black text-purple-950 text-xs block">⭐ HƯỚNG DẪN CHẤM / LỜI GIẢI MẪU CỦA GIÁO VIÊN:</span>
+                                <pre className="p-3 bg-white rounded-xl border border-purple-200 font-sans font-bold text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                                  {q.correct_answers[0]}
+                                </pre>
+                              </div>
+                            )}
+                          </div>
+                        ) : isFillInTheBlankQuestion(q) ? (
                           isCorrect ? (
                             <div className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-2 text-sm font-bold text-slate-900 shadow-2xs">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-900 border-b border-emerald-200 pb-1.5">

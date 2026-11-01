@@ -6,7 +6,7 @@ import {
   getLearningMaterials, getGames, getAssignments, 
   submitAssignment, getStudentSubmissions, getClassLeaderboard, 
   updateUserStatus, supabase, supabaseAdmin, getStudentPointLogs, addStudentPointLog,
-  recordStudentProgress, subscribeToSubmissions
+  recordStudentProgress, subscribeToSubmissions, uploadFileToStorage
 } from '../../services/supabase';
 import { askAIMathAssistant } from '../../services/aiService';
 import { useAuth } from '../../context/AuthContext';
@@ -107,6 +107,11 @@ const checkQuestionCorrectness = (
     .filter(str => str.length > 0 && str.toLowerCase() !== 'bỏ trống');
 
   if (filtered.length === 0) return false;
+
+  // Đối với CÂU HỎI TỰ LUẬN (ESSAY)
+  if (q.question_type === 'essay' || q.type === 'essay') {
+    return filtered.length > 0;
+  }
 
   const correctAnswers = q.correct_answers || [];
   const rawOpts = q.options && q.options.length > 0 ? q.options : [];
@@ -398,6 +403,8 @@ export const StudentDashboard: React.FC = () => {
     icon: string;
     pts: number;
   } | null>(null);
+  const [uploadingEssayImage, setUploadingEssayImage] = useState<boolean>(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -734,6 +741,40 @@ export const StudentDashboard: React.FC = () => {
     }
   };
 
+  const handleEssayAnswerChange = (questionId: string, textAnswer: string, imageUrl?: string) => {
+    const elapsed = Math.round((Date.now() - questionStartTime) / 1000);
+    const updatedTimers = { ...questionTimers, [questionId]: (questionTimers[questionId] || 0) + Math.max(1, elapsed) };
+    setQuestionTimers(updatedTimers);
+    setQuestionStartTime(Date.now());
+
+    const result: string[] = [];
+    if (textAnswer && textAnswer.trim()) result.push(textAnswer.trim());
+    if (imageUrl && imageUrl.trim()) result.push(imageUrl.trim());
+
+    const updatedAnswers = {
+      ...userAnswers,
+      [questionId]: result
+    };
+    setUserAnswers(updatedAnswers);
+
+    if (activeAssignment && user?.id) {
+      localStorage.setItem(`toan_cung_em_user_answers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedAnswers));
+      localStorage.setItem(`toan_cung_em_question_timers_${activeAssignment.id}_${user.id}`, JSON.stringify(updatedTimers));
+    }
+  };
+
+  const handleStudentEssayImageUpload = async (questionId: string, file: File, currentText: string) => {
+    setUploadingEssayImage(true);
+    try {
+      const publicUrl = await uploadFileToStorage('question-images', file);
+      handleEssayAnswerChange(questionId, currentText, publicUrl);
+    } catch (err: any) {
+      alert('Lỗi tải ảnh bài làm: ' + (err.message || 'Không thể tải ảnh'));
+    } finally {
+      setUploadingEssayImage(false);
+    }
+  };
+
   const handleMultiBlankAnswer = (questionId: string, blankIndex: number, val: string) => {
     const elapsed = Math.round((Date.now() - questionStartTime) / 1000);
     const updatedTimers = { ...questionTimers, [questionId]: (questionTimers[questionId] || 0) + Math.max(1, elapsed) };
@@ -787,6 +828,12 @@ export const StudentDashboard: React.FC = () => {
     const correctAnswers = (question.correct_answers || qAny.correct_answer ? [qAny.correct_answer, ...(question.correct_answers || [])] : (question.correct_answers || [])).map(a => normalizeStr(a));
 
     const isFillBlankQuestion = isFillInTheBlankQuestion(question);
+
+    // TRƯỜNG HỢP: Dạng câu hỏi tự luận (Essay)
+    if (question.question_type === 'essay' || qAny.type === 'essay') {
+      const filtered = userChosen.filter(u => u && u.trim() && u.trim().toLowerCase() !== 'bỏ trống');
+      return filtered.length > 0;
+    }
 
     if (isFillBlankQuestion) {
       const studentInputText = userChosen[0] || '';
@@ -2737,17 +2784,96 @@ export const StudentDashboard: React.FC = () => {
                           </div>
                         )
                       ) : q.question_type === 'essay' ? (
-                        <div className="p-5 bg-purple-50/90 rounded-2xl border-2 border-purple-300 space-y-3 shadow-xs">
-                          <label className="block text-xs font-black text-purple-950 uppercase flex items-center gap-1.5">
-                            <span>✍️</span> NHẬP BÀI LÀM TỰ LUẬN CỦA EM:
-                          </label>
-                          <textarea
-                            value={selectedOpts[0] || ''}
-                            onChange={(e) => handleSelectOption(q.id, e.target.value)}
-                            placeholder="Nhập câu trả lời tự luận..."
-                            className="w-full p-4 bg-white border-2 border-purple-400 rounded-2xl font-bold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm h-32"
-                          />
-                        </div>
+                        (() => {
+                          const textVal = selectedOpts.find(s => s && !s.startsWith('http') && !s.startsWith('blob:') && !s.startsWith('data:image')) || '';
+                          const imageVal = selectedOpts.find(s => s && (s.startsWith('http') || s.startsWith('blob:') || s.startsWith('data:image'))) || '';
+
+                          return (
+                            <div className="p-5 bg-purple-50/90 rounded-3xl border-2 border-purple-300 space-y-4 shadow-xs">
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-purple-200 pb-2 gap-2">
+                                <label className="block text-xs font-black text-purple-950 uppercase flex items-center gap-1.5">
+                                  <span>✍️</span> BÀI TẬP TỰ LUẬN (GÕ BÀI GIẢI HOẶC CHỤP ẢNH TẢI LÊN):
+                                </label>
+                                <span className="text-[10px] font-extrabold text-purple-800 bg-purple-200 px-2.5 py-0.5 rounded-lg w-max">
+                                  Gõ bài giải hoặc chụp ảnh vở ô ly
+                                </span>
+                              </div>
+
+                              {/* CÁCH 1: GÕ LỜI GIẢI */}
+                              <div className="space-y-1.5">
+                                <span className="text-xs font-black text-purple-950 flex items-center gap-1">
+                                  <span>📝</span> Cách 1: Gõ bài giải của em vào đây:
+                                </span>
+                                <textarea
+                                  value={textVal}
+                                  onChange={(e) => handleEssayAnswerChange(q.id, e.target.value, imageVal)}
+                                  placeholder="Em hãy gõ các bước giải và đáp số vào đây (Ví dụ: Số con gà chuồng thứ hai là: 24 + 3 = 27 con...)"
+                                  className="w-full p-3.5 bg-white border-2 border-purple-300 rounded-2xl font-bold text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 shadow-sm h-28 leading-relaxed"
+                                />
+                              </div>
+
+                              {/* CÁCH 2: CHỤP ẢNH / TẢI ẢNH BÀI LÀM TỪ VỞ */}
+                              <div className="space-y-2 pt-2 border-t border-purple-200">
+                                <span className="text-xs font-black text-purple-950 flex items-center gap-1">
+                                  <span>📷</span> Cách 2: Chụp ảnh bài làm trong vở và tải lên:
+                                </span>
+
+                                {imageVal ? (
+                                  <div className="p-3 bg-white rounded-2xl border-2 border-emerald-400 space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs font-black text-emerald-800 flex items-center gap-1">
+                                        ✓ Đã tải ảnh bài làm thành công!
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewImageUrl(imageVal)}
+                                          className="px-2.5 py-1 bg-purple-100 hover:bg-purple-200 text-purple-900 rounded-xl text-[11px] font-black border border-purple-300 cursor-pointer"
+                                        >
+                                          🔍 Xem to
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleEssayAnswerChange(q.id, textVal, '')}
+                                          className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-xl text-[11px] font-black border border-rose-300 cursor-pointer"
+                                        >
+                                          ❌ Xóa ảnh
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <img 
+                                      src={imageVal} 
+                                      alt="Ảnh bài làm" 
+                                      className="max-h-60 w-auto rounded-xl border border-slate-200 shadow-xs cursor-pointer object-contain"
+                                      onClick={() => setPreviewImageUrl(imageVal)}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <label className={`inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-2xl text-xs font-black shadow-md cursor-pointer transition-all active:scale-95 ${uploadingEssayImage ? 'opacity-50 pointer-events-none' : ''}`}>
+                                      <span>📷</span>
+                                      <span>{uploadingEssayImage ? 'Đang tải ảnh lên...' : 'Chụp ảnh / Tải ảnh bài làm từ máy'}</span>
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        capture="environment"
+                                        onChange={(e) => {
+                                          if (e.target.files && e.target.files[0]) {
+                                            handleStudentEssayImageUpload(q.id, e.target.files[0], textVal);
+                                          }
+                                        }}
+                                        className="hidden"
+                                      />
+                                    </label>
+                                    <p className="text-[11px] text-purple-800 font-semibold mt-1">
+                                      💡 Dành cho các em làm bài trên vở: chụp ảnh trang vở rồi bấm tải lên để cô giáo chấm nhé!
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()
                       ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                           {(() => {
@@ -2987,11 +3113,64 @@ export const StudentDashboard: React.FC = () => {
                           <span className={`px-3 py-1 rounded-xl text-xs font-black shrink-0 shadow-xs flex items-center gap-1 ${
                             isCorrect ? 'bg-emerald-100 text-emerald-950 border border-emerald-400' : 'bg-rose-100 text-rose-950 border border-rose-400'
                           }`}>
-                            {isCorrect ? `🟢 ĐÚNG (+${q.points || 10} Điểm)` : '🔴 SAI (0 Điểm)'}
+                            {q.question_type === 'essay' 
+                              ? (isCorrect ? '📝 ĐÃ NỘP BÀI GIẢI' : '⚠️ CHƯA NỘP')
+                              : (isCorrect ? `🟢 ĐÚNG (+${q.points || 10} Điểm)` : '🔴 SAI (0 Điểm)')}
                           </span>
                         </div>
 
-                        {isFillInTheBlankQuestion(q) ? (
+                        {q.question_type === 'essay' ? (
+                          <div className="p-4 bg-emerald-50/80 rounded-2xl border-2 border-emerald-300 space-y-3 text-xs">
+                            <div className="space-y-2">
+                              <div className="flex items-center gap-1.5 font-black text-emerald-950 text-xs">
+                                <span>✍️</span> <span>BÀI LÀM CỦA EM:</span>
+                              </div>
+                              {(() => {
+                                const textAns = userSelectedOptions.find(opt => opt && !opt.startsWith('http') && !opt.startsWith('blob:') && !opt.startsWith('data:image') && opt.toLowerCase() !== 'bỏ trống');
+                                const imageAns = userSelectedOptions.find(opt => opt && (opt.startsWith('http') || opt.startsWith('blob:') || opt.startsWith('data:image')));
+
+                                return (
+                                  <div className="space-y-2">
+                                    {textAns ? (
+                                      <div className="p-3 bg-white rounded-xl border border-emerald-200 font-semibold text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                                        <span className="text-[10px] font-black text-emerald-900 block mb-1">📝 Lời giải em đã gõ:</span>
+                                        {textAns}
+                                      </div>
+                                    ) : null}
+
+                                    {imageAns ? (
+                                      <div className="space-y-1">
+                                        <span className="text-[10px] font-black text-emerald-900 block">📷 Ảnh vở bài làm em đã tải lên:</span>
+                                        <img 
+                                          src={imageAns} 
+                                          alt="Ảnh vở bài làm" 
+                                          className="max-h-72 w-auto rounded-xl border-2 border-emerald-300 shadow object-contain cursor-pointer hover:opacity-95"
+                                          onClick={() => setPreviewImageUrl(imageAns)}
+                                        />
+                                        <p className="text-[10px] text-emerald-700 italic">Nhấp vào ảnh để phóng to xem rõ nét</p>
+                                      </div>
+                                    ) : null}
+
+                                    {!textAns && !imageAns && (
+                                      <div className="p-3 bg-white/60 rounded-xl border border-dashed border-emerald-300 text-slate-500 italic">
+                                        Em chưa nhập bài giải hoặc tải ảnh bài làm.
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+
+                            {q.correct_answers && q.correct_answers[0] && (
+                              <div className="pt-2 border-t border-emerald-200 space-y-1">
+                                <span className="font-black text-emerald-950 text-xs block">⭐ LỜI GIẢI MẪU / HƯỚNG DẪN CỦA THẦY CÔ:</span>
+                                <div className="p-3 bg-white rounded-xl border border-emerald-200 font-sans font-bold text-slate-800 whitespace-pre-wrap leading-relaxed shadow-2xs">
+                                  {q.correct_answers[0]}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : isFillInTheBlankQuestion(q) ? (
                           isCorrect ? (
                             <div className="p-4 bg-emerald-50/90 rounded-2xl border-2 border-emerald-300 space-y-2 text-sm font-bold text-slate-900 shadow-2xs">
                               <div className="flex items-center gap-2 text-xs font-extrabold text-emerald-900 border-b border-emerald-200 pb-1.5">
@@ -3056,8 +3235,8 @@ export const StudentDashboard: React.FC = () => {
                           </div>
                         )}
 
-                        {/* HƯỚNG DẪN GIẢI CHI TIẾT - CHỈ HIỂN THỊ KHI CÂU HỎI LÀM SAI */}
-                        {!isCorrect && (
+                        {/* HƯỚNG DẪN GIẢI CHI TIẾT - CHỈ HIỂN THỊ KHI CÂU HỎI LÀM SAI VÀ KHÔNG PHẢI TỰ LUẬN (TỰ LUẬN ĐÃ CÓ BÀI GIẢI MẪU Ở TRÊN) */}
+                        {!isCorrect && q.question_type !== 'essay' && (
                           <div className="p-3 bg-amber-50 rounded-2xl border-2 border-amber-300 text-xs font-bold text-amber-950 flex items-start justify-between gap-2">
                             <div className="space-y-1">
                               <div className="flex items-center gap-1.5 font-black text-amber-900">
@@ -3099,7 +3278,32 @@ export const StudentDashboard: React.FC = () => {
                 Đóng Cửa Sổ
               </button>
             </div>
+          </div>
+        </div>
+      )}
 
+      {/* MODAL XEM ẢNH BÀI LÀM PHÓNG TO */}
+      {previewImageUrl && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div 
+            className="relative max-w-4xl max-h-[90vh] bg-white rounded-3xl p-3 shadow-2xl flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-3 -right-3 w-9 h-9 bg-rose-600 hover:bg-rose-700 text-white rounded-full flex items-center justify-center font-black shadow-lg cursor-pointer transition-transform hover:scale-110"
+              title="Đóng"
+            >
+              ✕
+            </button>
+            <img 
+              src={previewImageUrl} 
+              alt="Ảnh phóng to" 
+              className="max-h-[82vh] w-auto rounded-2xl object-contain shadow-inner" 
+            />
           </div>
         </div>
       )}
