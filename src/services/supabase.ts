@@ -235,14 +235,30 @@ export async function createClass(name: string, grade: number = 2, teacherId: st
 }
 
 export async function joinClassByCode(code: string, studentId: string): Promise<ClassItem> {
-  const cleanCode = code.trim().toUpperCase();
-  const { data: cls, error: clsErr } = await supabaseAdmin
+  const trimmed = code.trim();
+  const cleanUpper = trimmed.toUpperCase();
+  const compactCode = cleanUpper.replace(/\s+/g, '');
+
+  // 1. Tìm theo code chính xác hoặc không phân biệt hoa thường
+  let { data: cls } = await supabaseAdmin
     .from('classes')
     .select('*')
-    .eq('code', cleanCode)
-    .single();
+    .or(`code.eq.${trimmed},code.ilike.${trimmed},code.ilike.${cleanUpper}`)
+    .limit(1)
+    .maybeSingle();
 
-  if (clsErr || !cls) {
+  // 2. Fallback tìm nới lỏng loại bỏ khoảng trắng (Ví dụ: "HAI14" khớp với "Hai 14")
+  if (!cls) {
+    const { data: allCls } = await supabaseAdmin.from('classes').select('*');
+    if (allCls && allCls.length > 0) {
+      cls = allCls.find(c => {
+        const cCompact = (c.code || '').toUpperCase().replace(/\s+/g, '');
+        return cCompact === compactCode || (c.code || '').toLowerCase() === trimmed.toLowerCase();
+      }) || null;
+    }
+  }
+
+  if (!cls) {
     throw new Error('Mã gia nhập Lớp không tồn tại! Vui lòng kiểm tra lại mã từ Giáo viên.');
   }
 

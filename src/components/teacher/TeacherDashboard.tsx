@@ -794,7 +794,7 @@ export const TeacherDashboard: React.FC = () => {
       const cls = await getTeacherClasses(user?.id || '');
       setClasses(cls);
       if (cls.length > 0) {
-        const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+        const targetCls = cls.find(c => c.code === 'Hai 14' || c.code === 'HAI 14' || c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4') || c.name.includes('Hai 14')) || cls[0];
         setSelectedClass(targetCls);
       }
     } catch (err) {

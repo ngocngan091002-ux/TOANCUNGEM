@@ -1139,7 +1139,7 @@ export const StudentDashboard: React.FC = () => {
               <form onSubmit={handleJoinClass} className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Nhập Mã Lớp (VD: ZJ3KYE)..."
+                  placeholder="Nhập Mã Lớp (VD: Hai 14)..."
                   value={classCodeInput}
                   onChange={(e) => setClassCodeInput(e.target.value)}
                   className="px-3.5 py-2 bg-white text-slate-800 font-extrabold text-xs rounded-2xl border-2 border-amber-300 focus:outline-none uppercase"

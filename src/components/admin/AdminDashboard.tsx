@@ -46,7 +46,7 @@ export const AdminDashboard: React.FC = () => {
     try {
       const cls = await getTeacherClasses('');
       setClasses(cls);
-      const targetCls = cls.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || cls[0];
+      const targetCls = cls.find(c => c.code === 'Hai 14' || c.code === 'HAI 14' || c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4') || c.name.includes('Hai 14')) || cls[0];
       if (targetCls) {
         setSelectedClassId(targetCls.id);
         await fetchClassStudents(targetCls.id);
@@ -142,7 +142,7 @@ export const AdminDashboard: React.FC = () => {
 
     let targetId = selectedClassId;
     if (!targetId && classes.length > 0) {
-      const found = classes.find(c => c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4')) || classes[0];
+      const found = classes.find(c => c.code === 'Hai 14' || c.code === 'HAI 14' || c.code === 'ZJ3KYE' || c.name.includes('Lớp Hai 4') || c.name.includes('Hai 14')) || classes[0];
       targetId = found.id;
       setSelectedClassId(targetId);
     }
