@@ -2951,7 +2951,7 @@ export const StudentDashboard: React.FC = () => {
                   disabled={isSubmitting}
                   className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black text-xs shadow-lg uppercase cursor-pointer"
                 >
-                  {isSubmitting ? 'Đang nộp bài...' : '🎯 NỘP BÀI THI'}
+                  {isSubmitting ? 'Đang nộp bài...' : '🎯 NỘP BÀI'}
                 </button>
               )}
             </div>
